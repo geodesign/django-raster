@@ -1,0 +1,14 @@
+# Compiled python code
+*.pyc
+
+# osx files
+.DS_Store
+
+# sass cache
+.sass-cache
+.elasticbeanstalk
+
+# Distribution
+dist
+django_wms.egg-info
+
