@@ -1,5 +1,7 @@
 import os, tempfile, shutil, requests, subprocess, datetime
 
+from celery.contrib.methods import task
+
 from django.db import models, connection
 from django.conf import settings
 
@@ -8,7 +10,8 @@ from .fields import RasterField
 class RasterLayer(models.Model):
     """Source data model for raster layers"""
 
-    DATATYPES = (('co', 'Continuous'), ('ca', 'Categorical'), ('ma', 'Mask'))
+    DATATYPES = (('co', 'Continuous'), ('ca', 'Categorical'),
+                ('ma', 'Mask'), ('ro', 'Rank Ordered'))
 
     name = models.CharField(max_length = 100, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
@@ -21,6 +24,7 @@ class RasterLayer(models.Model):
     def __unicode__(self):
         return '{name}'.format(name=self.name)
 
+    @task()
     def parse(self):
         """
         This method pushes the raster data from the Raster Layer into the

@@ -8,7 +8,7 @@ class RasterLayerModelAdmin(admin.ModelAdmin):
     def parse_raster_layer_data(self, request, queryset):
         # Send parse data command to celery
         for lyr in queryset:
-            lyr.parse()
+            lyr.parse.delay()
 
         # Message user 
         self.message_user(request, 
