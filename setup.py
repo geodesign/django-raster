@@ -3,31 +3,27 @@ from setuptools import setup
 
 README = open(os.path.join(os.path.dirname(__file__), 'README.rst')).read()
 
-# allow setup.py to be run from any path
+# Allow setup.py to be run from any path
 os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
 
 setup(
-    name='django-wms',
+    name='django-raster',
     version='0.1',
-    packages=['wms'],
+    packages=['raster'],
     include_package_data=True,
-    license='BSD License',  # example license
-    description='Mapscript based WMS framework for GeoDjango',
+    license='BSD',
+    description='Simple raster file implementation for Django based on PostGis',
     long_description=README,
-    # install_requires=[
-    #   'mapscript',
-    # ],
-    url='https://github.com/yellowcap/django-wms',
+    url='https://github.com/yellowcap/django-raster',
     author='Daniel Wiesmann',
     author_email='daniel@urbmet.com',
     classifiers=[
         'Environment :: Web Environment',
         'Framework :: Django',
         'Intended Audience :: Developers',
-        'License :: OSI Approved :: BSD License', # example license
+        'License :: OSI Approved :: BSD License',
         'Operating System :: OS Independent',
         'Programming Language :: Python',
-        # Replace these appropriately if you are stuck on Python 2.
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.2',

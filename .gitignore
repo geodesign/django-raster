@@ -10,5 +10,4 @@
 
 # Distribution
 dist
-django_wms.egg-info
-
+django_raster.egg-info

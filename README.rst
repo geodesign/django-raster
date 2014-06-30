@@ -17,4 +17,4 @@ Quick start
         'raster',
     )
 
-2. Run `python manage.py migrate` to create the wms models.
+2. Run `python manage.py migrate` to create the raster models.

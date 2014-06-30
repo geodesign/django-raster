@@ -1,5 +1,3 @@
-"""Models for storing landover raster layers"""
-
 import os, tempfile, shutil, requests, subprocess, datetime
 
 from django.db import models, connection
@@ -7,7 +5,6 @@ from django.conf import settings
 
 from .fields import RasterField
 
-###############################################################################
 class RasterLayer(models.Model):
     """Source data model for raster layers"""
 
@@ -100,7 +97,6 @@ class RasterLayer(models.Model):
         # Remove tempdir with source file
         shutil.rmtree(tmpdir)
 
-###############################################################################
 class RasterTile(models.Model):
     """Model to store individual tiles of a raster data source layer"""
     
