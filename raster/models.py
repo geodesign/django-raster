@@ -3,7 +3,6 @@ import os, tempfile, shutil, requests, subprocess, datetime
 from celery.contrib.methods import task
 
 from django.db import models, connection
-from django.conf import settings
 
 from .fields import RasterField
 
@@ -55,43 +54,43 @@ class RasterLayer(models.Model):
             return
 
         # Setup import raster command pattern
-        psql_cmd = 'raster2pgsql -a -F -M -t 100x100 -s {srid} {raster} '\
-                   'raster_rastertile | psql -U {db_user} -d {db_name} '\
-                   '-h {db_host} -p {db_port}'
+        raster2pgsql = 'raster2pgsql -a -F -M -t 100x100 -s {srid} {raster} '\
+                   'raster_rastertile > raster.sql'
 
         # Replace placeholders with current values
-        psql_cmd = psql_cmd.format(
-                srid=self.srid,
-                raster=rastername,
-                db_user=settings.DATABASES['default']['USER'],
-                db_name=settings.DATABASES['default']['NAME'],
-                db_host=settings.DATABASES['default']['HOST'],
-                db_port=settings.DATABASES['default']['PORT'])
+        raster2pgsql = raster2pgsql.format(srid=self.srid, raster=rastername)
 
-        # Add password if available
-        pwd = settings.DATABASES['default']['PASSWORD']
-        if pwd: psql_cmd += ' -W ' + pwd
-
-        # Remove existing tiles for this layer before loading new ones
-        self.rastertile_set.all().delete()
-
-        # Call raster2pgsql to import raster
+        # Call raster2pgsql to setup sql file
         try:
             os.chdir(tmpdir)
-            subprocess.call(psql_cmd, shell=True)
+            subprocess.call(raster2pgsql, shell=True)
         except:
             shutil.rmtree(tmpdir)
             self.parse_log += 'Error: Failed to import raster data from file\n'
             self.save()
             return
 
+        # Remove existing tiles for this layer before loading new ones
+        self.rastertile_set.all().delete()
+
+        # Setup cursor and insert raster data from file
+        cursor = connection.cursor()
+        counter = 0
+        for line in open(os.path.join(tmpdir, 'raster.sql')):
+            if line in ['BEGIN;', 'END;']: continue
+            cursor.execute(line)
+            if counter%500 == 0:
+                self.parse_log += "Processed {0} lines \n".format(counter)
+
+        # Vacuum table
+        cursor.execute('VACUUM ANALYZE "raster_rastertile"')
+
         # Set foreign key in new raster tiles
         RasterTile.objects.filter(filename=rastername)\
                 .update(rasterlayer=self.id)
 
         # Vacum analyze raster table
-        cur = connection.cursor()
-        cur.execute('VACUUM ANALYZE "raster_rastertile"')
+        cursor.execute('VACUUM ANALYZE "raster_rastertile"')
 
         # Finish message in parse log and save
         now = '[{0}] '.format(datetime.datetime.now().strftime('%Y-%m-%d %T'))
