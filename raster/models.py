@@ -79,6 +79,7 @@ class RasterLayer(models.Model):
         for line in open(os.path.join(tmpdir, 'raster.sql')):
             if line in ['BEGIN;', 'END;']: continue
             cursor.execute(line)
+            counter +=1
             if counter%500 == 0:
                 self.parse_log += "Processed {0} lines \n".format(counter)
 
