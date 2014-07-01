@@ -103,7 +103,7 @@ class RasterLayer(models.Model):
 
 class RasterTile(models.Model):
     """Model to store individual tiles of a raster data source layer"""
-    
+    rid = models.AutoField(primary_key=True)
     rast = RasterField(null=True, blank=True)
     rasterlayer = models.ForeignKey(RasterLayer, null=True, blank=True)
     filename = models.TextField(null=True, blank=True)
