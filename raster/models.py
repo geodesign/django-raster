@@ -54,7 +54,7 @@ class RasterLayer(models.Model):
             return
 
         # Setup import raster command pattern
-        raster2pgsql = 'raster2pgsql -a -F -M -t 100x100 -s {srid} {raster} '\
+        raster2pgsql = 'raster2pgsql -a -F -M -C -t 100x100 -s {srid} {raster} '\
                    'raster_rastertile > raster.sql'
 
         # Replace placeholders with current values

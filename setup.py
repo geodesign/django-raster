@@ -8,7 +8,7 @@ os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
 
 setup(
     name='django-raster',
-    version='0.1.3',
+    version='0.1.4',
     packages=['raster'],
     include_package_data=True,
     license='BSD',
