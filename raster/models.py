@@ -18,6 +18,7 @@ class RasterLayer(models.Model):
         default='co')
     rasterfile = models.FileField(upload_to='rasters')
     srid = models.CharField(max_length=10, default='3086')
+    nodata = models.CharField(max_length=100, default='-9999')
     parse_log = models.TextField(blank=True, null=True, default='')
 
     def __unicode__(self):
@@ -54,7 +55,7 @@ class RasterLayer(models.Model):
             return
 
         # Setup import raster command pattern
-        raster2pgsql = 'raster2pgsql -a -F -M -C -t 100x100 -s {srid} {raster} '\
+        raster2pgsql = 'raster2pgsql -a -F -M -s {srid} {raster} '\
                    'raster_rastertile > raster.sql'
 
         # Replace placeholders with current values
