@@ -55,7 +55,7 @@ class RasterLayer(models.Model):
             return
 
         # Setup import raster command pattern
-        raster2pgsql = 'raster2pgsql -a -F -M -s {srid} -N {nodata} {raster} '\
+        raster2pgsql = 'raster2pgsql -a -F -M -P -t 100x100 -s {srid} -N {nodata} {raster} '\
                    'raster_rastertile > raster.sql'
 
         # Replace placeholders with current values
@@ -75,8 +75,11 @@ class RasterLayer(models.Model):
         # Remove existing tiles for this layer before loading new ones
         self.rastertile_set.all().delete()
 
-        # Setup cursor and insert raster data from file
+        # Drop current raster constraints before adding more data
         cursor = connection.cursor()
+        cursor.execute("SELECT Droprasterconstraints('raster_rastertile'::name,'rast'::name)");
+
+        # Insert raster data from file
         counter = 0
         for line in open(os.path.join(tmpdir, 'raster.sql')):
             if line in ['BEGIN;', 'END;']: continue
@@ -85,14 +88,14 @@ class RasterLayer(models.Model):
             if counter%500 == 0:
                 self.parse_log += "Processed {0} lines \n".format(counter)
 
-        # Vacuum table
-        cursor.execute('VACUUM ANALYZE "raster_rastertile"')
+        # Set raster constraints
+        cursor.execute("SELECT Addrasterconstraints('raster_rastertile'::name,'rast'::name)");
 
         # Set foreign key in new raster tiles
         RasterTile.objects.filter(filename=rastername)\
                 .update(rasterlayer=self.id)
 
-        # Vacum analyze raster table
+        # Vacuum table
         cursor.execute('VACUUM ANALYZE "raster_rastertile"')
 
         # Finish message in parse log and save
