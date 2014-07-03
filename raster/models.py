@@ -55,11 +55,12 @@ class RasterLayer(models.Model):
             return
 
         # Setup import raster command pattern
-        raster2pgsql = 'raster2pgsql -a -F -M -s {srid} {raster} '\
+        raster2pgsql = 'raster2pgsql -a -F -M -s {srid} -N {nodata} {raster} '\
                    'raster_rastertile > raster.sql'
 
         # Replace placeholders with current values
-        raster2pgsql = raster2pgsql.format(srid=self.srid, raster=rastername)
+        raster2pgsql = raster2pgsql.format(srid=self.srid, nodata=self.nodata,
+                                                raster=rastername)
 
         # Call raster2pgsql to setup sql file
         try:
