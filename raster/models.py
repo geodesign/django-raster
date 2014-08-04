@@ -1,38 +1,41 @@
 import os, tempfile, shutil, requests, subprocess, datetime
 
-from celery.contrib.methods import task
-
 from django.db import models, connection
+from django.db.models.signals import pre_save, post_save
+from django.dispatch import receiver
 
 from .fields import RasterField
 
 class RasterLayer(models.Model):
     """Source data model for raster layers"""
 
-    DATATYPES = (('co', 'Continuous'), ('ca', 'Categorical'),
-                ('ma', 'Mask'), ('ro', 'Rank Ordered'))
+    DATATYPES = (('co', 'Continuous'),
+                 ('ca', 'Categorical'),
+                 ('ma', 'Mask'),
+                 ('ro', 'Rank Ordered'))
 
     name = models.CharField(max_length = 100, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
-    datatype = models.CharField(max_length = 2, choices = DATATYPES,
+    datatype = models.CharField(max_length=2, choices=DATATYPES,
         default='co')
     rasterfile = models.FileField(upload_to='rasters')
     srid = models.CharField(max_length=10, default='3086')
     nodata = models.CharField(max_length=100, default='-9999')
-    parse_log = models.TextField(blank=True, null=True, default='')
+    parse_log = models.TextField(blank=True, null=True, default='', editable=False)
 
     def __unicode__(self):
-        return '{name}'.format(name=self.name)
+        count = self.rastertile_set.count()
+        if count:
+            info = str(count) + ' raster tiles'
+        else:
+            info = 'not parsed yet'
+        return '{name} ({info})'.format(name=self.name, info=info)
 
-    @task()
     def parse(self):
         """
         This method pushes the raster data from the Raster Layer into the
         RasterTile table, in tiles of 100x100 pixels.
-
-        ToDo: Make the tile size a setting.
         """
-
         # Clean previous parse log
         now = '[{0}] '.format(datetime.datetime.now().strftime('%Y-%m-%d %T'))
         self.parse_log = now + 'Started parsing raster file\n'
@@ -105,6 +108,27 @@ class RasterLayer(models.Model):
 
         # Remove tempdir with source file
         shutil.rmtree(tmpdir)
+
+@receiver(pre_save, sender=RasterLayer)
+def reset_parse_log_if_data_changed(sender, instance, **kwargs):
+    try:
+        obj = RasterLayer.objects.get(pk=instance.pk)
+    except RasterLayer.DoesNotExist:
+        pass
+    else:
+        if not obj.rasterfile.name == instance.rasterfile.name:
+            instance.parse_log = ''
+            print 'Deleted parselog'
+
+@receiver(post_save, sender=RasterLayer)
+def parse_raster_layer_if_log_is_empty(sender, instance, **kwargs):
+    if instance.parse_log == '':
+        # Parse data asynchronously if celery is installed
+        try:
+            from raster.tasks import parse_raster_with_celery
+            parse_raster_with_celery(instance)
+        except:
+            instance.parse()
 
 class RasterTile(models.Model):
     """Model to store individual tiles of a raster data source layer"""

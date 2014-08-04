@@ -17,9 +17,6 @@ setup(
     url='https://github.com/yellowcap/django-raster',
     author='Daniel Wiesmann',
     author_email='daniel@urbmet.com',
-    install_requires=[
-      'celery',
-    ],
     classifiers=[
         'Environment :: Web Environment',
         'Framework :: Django',

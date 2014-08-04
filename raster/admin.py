@@ -1,19 +1,8 @@
 from django.contrib import admin
-from .models import RasterLayer, RasterTile
+from .models import RasterLayer
 
 class RasterLayerModelAdmin(admin.ModelAdmin):
-    
-    actions = ['parse_raster_layer_data']
+    readonly_fields=('parse_log',)
 
-    def parse_raster_layer_data(self, request, queryset):
-        # Send parse data command to celery
-        for lyr in queryset:
-            lyr.parse.delay()
-
-        # Message user 
-        self.message_user(request, 
-            "Parsing raster, please check the parse log for status(es)")
-
-# Register models in admin
+# Register raster layer in admin
 admin.site.register(RasterLayer, RasterLayerModelAdmin)
-admin.site.register(RasterTile)
