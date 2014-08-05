@@ -1,11 +1,11 @@
 Rasters for Django
 ==================
 
-Django-raster provides the simplest possible raster data integration for Django projects using PostGIS database backends.
+Django-raster provides the simplest possible raster data integration for Django projects using PostGIS database back-ends.
 
 Setup
 -----
-**Note: This package requires a PostGIS >= 2.0 databse backend**
+**Note: This package requires a PostGIS >= 2.0 database back-end**
 
 1. Install package with `pip install django-raster`
 
@@ -18,18 +18,18 @@ Setup
 
 3. Run `python manage.py migrate` to create the raster models.
 
-4. (Optional) Add ``RASTER_USE_CELERY = True`` to your project's setting for asyncrnous raster parsing.
+4. (Optional) Add ``RASTER_USE_CELERY = True`` to your project's setting for asynchronous raster parsing.
 
 Description
 -----------
 Django-raster provides the simplest possible integration of raster
 data in Django. Raster files can be uploaded and parsed through the admin interface. The raw raster data can be parsed asynchronously if `Celery <http://celeryproject.org/>`_ is integrated into the project.
 
-Once a raster file is uploaded, the parser will extract the data in the raste files and store the rasters in tiles of 100x100 pixels in a PostGIS raster table. 
+Once a raster file is uploaded, the parser will extract the data in the raster files and store the rasters in tiles of 100x100 pixels in a PostGIS raster table. 
 
 For this, the package defines two models and one field:
 
-* ``RasterLayer`` - storing the raw raster files and metadata (for example rasterfile=raster.tif and srid=4326)
+* ``RasterLayer`` - storing the raw raster files and meta-data (for example rasterfile=raster.tif and srid=4326)
 
 * ``RasterTile`` - storing the parsed raster in PostGis. The raster data is split into tiles of 100x100 pixels and each tile is stored as an instance of RasterTile. The raster data itself is stored in a *RasterField* within the RasterTile model.
 
@@ -47,7 +47,7 @@ The RasterLayer instances have a *parse_log* field, which stores information abo
 
 Asynchronous parsing with Celery
 --------------------------------
-Note that for large rasters this parsing step might take a while, so your html request might time out. It is therefore recommented to use `Celery <http://celeryproject.org/>`_ in combination with django-raster.
+Note that for large rasters this parsing step might take a while, so your html request might time out. It is therefore recommended to use `Celery <http://celeryproject.org/>`_ in combination with django-raster.
 
 To use celery for the raster parsing step, which is triggered automatically after saving RasterLayer instances, add the following setting to your django settings file::
 
