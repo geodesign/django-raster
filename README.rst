@@ -22,7 +22,7 @@ Setup
 Description
 -----------
 Django-raster provides the simplest possible integration of raster
-data in Django. Raster files can be uploaded and parsed through the admin interface. The raw raster data can be parsed asynchronously if [Celery](http://celeryproject.org) is integrated into the project.
+data in Django. Raster files can be uploaded and parsed through the admin interface. The raw raster data can be parsed asynchronously if `Celery <http://celeryproject.org/>`_ is integrated into the project.
 
 Once a raster file is uploaded, the parser will extract the data in the raste files and store the rasters in tiles of 100x100 pixels in a PostGIS raster table. 
 
@@ -47,6 +47,6 @@ The RasterLayer instances have a *parse_log* field, which stores information abo
 
 Asynchronous parsing with Celery
 --------------------------------
-Note that for large rasters this parsing step might take a while, so your html request might time out. It is therefore recommented to use [Celery](http://celeryproject.org) in combination with django-raster.
+Note that for large rasters this parsing step might take a while, so your html request might time out. It is therefore recommented to use `Celery <http://celeryproject.org/>`_ in combination with django-raster.
 
 If celery is found on the python path of your project, it is automatically used for parsing the raster asynchronously. After uploading a file the parsing routine is added to the celery queue of your application.
