@@ -18,6 +18,7 @@ setup(
     author='Daniel Wiesmann',
     author_email='daniel@urbmet.com',
     requires = ['python (>= 2.7)', 'django (>= 1.6)'],
+    zip_safe=False,
     classifiers=[
         'Environment :: Web Environment',
         'Framework :: Django',

@@ -1,11 +1,8 @@
-import os, tempfile, shutil, requests, subprocess, datetime
-
-from django.conf import settings
-from django.db import models, connection
+from django.db import models
 from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 
-from .fields import RasterField
+from raster.fields import RasterField
 
 class RasterLayer(models.Model):
     """Source data model for raster layers"""
@@ -32,84 +29,6 @@ class RasterLayer(models.Model):
             info = 'not parsed yet'
         return '{name} ({info})'.format(name=self.name, info=info)
 
-    def parse(self):
-        """
-        This method pushes the raster data from the Raster Layer into the
-        RasterTile table, in tiles of 100x100 pixels.
-        """
-        # Clean previous parse log
-        now = '[{0}] '.format(datetime.datetime.now().strftime('%Y-%m-%d %T'))
-        self.parse_log = now + 'Started parsing raster file\n'
-        self.save()
-
-        # Create tempdir for raster file and get raster file name
-        tmpdir = tempfile.mkdtemp()
-        rastername = os.path.basename(self.rasterfile.name)
-
-        # Access rasterfile and store locally
-        try:
-            f = open(os.path.join(tmpdir, rastername), 'wb')
-            for chunk in self.rasterfile.chunks():
-                f.write(chunk)
-            f.close()
-        except:
-            self.parse_log += 'Error: Library error for download\n'
-            self.save()
-            shutil.rmtree(tmpdir)
-            return
-
-        # Setup import raster command pattern
-        raster2pgsql = 'raster2pgsql -a -F -M -P -t 100x100 -s {srid} -N {nodata} {raster} '\
-                   'raster_rastertile > raster.sql'
-
-        # Replace placeholders with current values
-        raster2pgsql = raster2pgsql.format(srid=self.srid, nodata=self.nodata,
-                                                raster=rastername)
-
-        # Call raster2pgsql to setup sql file
-        try:
-            os.chdir(tmpdir)
-            subprocess.call(raster2pgsql, shell=True)
-        except:
-            shutil.rmtree(tmpdir)
-            self.parse_log += 'Error: Failed to import raster data from file\n'
-            self.save()
-            return
-
-        # Remove existing tiles for this layer before loading new ones
-        self.rastertile_set.all().delete()
-
-        # Drop current raster constraints before adding more data
-        cursor = connection.cursor()
-        cursor.execute("SELECT Droprasterconstraints('raster_rastertile'::name,'rast'::name)");
-
-        # Insert raster data from file
-        counter = 0
-        for line in open(os.path.join(tmpdir, 'raster.sql')):
-            if line in ['BEGIN;', 'END;']: continue
-            cursor.execute(line)
-            counter +=1
-            if counter%500 == 0:
-                self.parse_log += "Processed {0} lines \n".format(counter)
-
-        # Set raster constraints
-        cursor.execute("SELECT Addrasterconstraints('raster_rastertile'::name,'rast'::name)");
-
-        # Set foreign key in new raster tiles
-        RasterTile.objects.filter(filename=rastername)\
-                .update(rasterlayer=self.id)
-
-        # Vacuum table
-        cursor.execute('VACUUM ANALYZE "raster_rastertile"')
-
-        # Finish message in parse log and save
-        now = '[{0}] '.format(datetime.datetime.now().strftime('%Y-%m-%d %T'))
-        self.parse_log += now + 'Finished parsing patch collection'
-        self.save()
-
-        # Remove tempdir with source file
-        shutil.rmtree(tmpdir)
-
 @receiver(pre_save, sender=RasterLayer)
 def reset_parse_log_if_data_changed(sender, instance, **kwargs):
     try:
@@ -127,7 +46,8 @@ def parse_raster_layer_if_log_is_empty(sender, instance, **kwargs):
             from raster.tasks import parse_raster_with_celery
             parse_raster_with_celery.delay(instance)
         except:
-            instance.parse()
+            from raster.tasks import parse_raster_layer
+            parse_raster_layer(instance)
 
 class RasterTile(models.Model):
     """Model to store individual tiles of a raster data source layer"""
