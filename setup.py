@@ -16,8 +16,8 @@ setup(
     long_description=README,
     url='https://github.com/yellowcap/django-raster',
     author='Daniel Wiesmann',
-    author_email='daniel@urbmet.com',
-    requires = ['python (>= 2.7)', 'django (>= 1.6)'],
+    author_email='daniel.wiesmann@ist.utl.pt',
+    requires=['python (>= 2.7)', 'django (>= 1.6)'],
     zip_safe=False,
     classifiers=[
         'Environment :: Web Environment',

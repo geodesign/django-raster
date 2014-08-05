@@ -13,15 +13,15 @@ class RasterLayer(models.Model):
                  ('ma', 'Mask'),
                  ('ro', 'Rank Ordered'))
 
-    name = models.CharField(max_length = 100, blank=True, null=True)
+    name = models.CharField(max_length=100, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     datatype = models.CharField(max_length=2, choices=DATATYPES,
-        default='co')
+                                default='co')
     rasterfile = models.FileField(upload_to='rasters')
     srid = models.CharField(max_length=10, default='3086')
     nodata = models.CharField(max_length=100, default='-9999')
     parse_log = models.TextField(blank=True, null=True, default='',
-        editable=False)
+                                 editable=False)
 
     def __unicode__(self):
         count = self.rastertile_set.count()

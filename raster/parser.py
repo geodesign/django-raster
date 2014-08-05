@@ -20,31 +20,32 @@ def parse_raster_layer(rasterlayer):
 
     # Access rasterfile and store locally
     try:
-        f = open(os.path.join(tmpdir, rastername), 'wb')
+        rasterfile = open(os.path.join(tmpdir, rastername), 'wb')
         for chunk in rasterlayer.rasterfile.chunks():
-            f.write(chunk)
-        f.close()
-    except:
+            rasterfile.write(chunk)
+        rasterfile.close()
+    except IOError:
         rasterlayer.parse_log += 'Error: Library error for download\n'
         rasterlayer.save()
         shutil.rmtree(tmpdir)
         return
 
     # Setup import raster command pattern
-    raster2pgsql = 'raster2pgsql -a -F -M -P -t 100x100 -s {srid} -N {nodata} {raster} '\
-               'raster_rastertile > raster.sql'
+    raster2pgsql = 'raster2pgsql -a -F -M -P -t 100x100 -s {srid} '\
+                   '-N {nodata} {raster} raster_rastertile > raster.sql'
 
     # Replace placeholders with current values
-    raster2pgsql = raster2pgsql.format(srid=rasterlayer.srid, nodata=rasterlayer.nodata,
-                                            raster=rastername)
+    raster2pgsql = raster2pgsql.format(srid=rasterlayer.srid,
+                                       nodata=rasterlayer.nodata,
+                                       raster=rastername)
 
     # Call raster2pgsql to setup sql file
     try:
         os.chdir(tmpdir)
         subprocess.call(raster2pgsql, shell=True)
-    except:
+    except RuntimeError:
         shutil.rmtree(tmpdir)
-        rasterlayer.parse_log += 'Error: Failed to import raster data from file\n'
+        rasterlayer.parse_log += 'Error: Failed to import data from file\n'
         rasterlayer.save()
         return
 
@@ -53,19 +54,22 @@ def parse_raster_layer(rasterlayer):
 
     # Drop current raster constraints before adding more data
     cursor = connection.cursor()
-    cursor.execute("SELECT DropRasterConstraints('raster_rastertile'::name,'rast'::name)");
+    cursor.execute(
+        "SELECT DropRasterConstraints('raster_rastertile'::name,'rast'::name)")
 
     # Insert raster data from file
     counter = 0
     for line in open(os.path.join(tmpdir, 'raster.sql')):
-        if line in ['BEGIN;', 'END;']: continue
+        if line in ['BEGIN;', 'END;']:
+            continue
         cursor.execute(line)
-        counter +=1
+        counter += 1
         if counter%500 == 0:
             rasterlayer.parse_log += "Processed {0} lines \n".format(counter)
 
     # Set raster constraints
-    cursor.execute("SELECT AddRasterConstraints('raster_rastertile'::name,'rast'::name)");
+    cursor.execute(
+        "SELECT AddRasterConstraints('raster_rastertile'::name,'rast'::name)")
 
     # Set foreign key in new raster tiles
     RasterTile.objects.filter(filename=rastername)\

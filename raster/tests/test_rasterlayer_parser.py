@@ -5,13 +5,13 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.core.files import File
 
-from ..models import RasterLayer
+from raster.models import RasterLayer
 
 class RasterLayerParserWithoutCeleryTests(TestCase):
 
     def setUp(self):
         # Instantiate Django file instances with nodes and links
-        self.pwd=os.path.dirname(os.path.abspath(
+        self.pwd = os.path.dirname(os.path.abspath(
             inspect.getfile(inspect.currentframe())))
 
         sourcefile = File(open(os.path.join(self.pwd, 'raster.tif')))
@@ -26,7 +26,8 @@ class RasterLayerParserWithoutCeleryTests(TestCase):
             rasterfile=sourcefile)
 
     def tearDown(self):
-        shutil.rmtree(os.path.dirname(os.path.join(settings.BASE_DIR, self.rasterlayer.rasterfile.name)))
+        shutil.rmtree(os.path.dirname(os.path.join(
+            settings.BASE_DIR, self.rasterlayer.rasterfile.name)))
         self.rasterlayer.rastertile_set.all().delete()
 
     def test_raster_layer_parsing(self):
@@ -36,11 +37,13 @@ class RasterLayerParserWithoutCeleryTests(TestCase):
         self.rasterlayer.rastertile_set.all().delete()
         self.rasterlayer.rasterfile.name = 'raster_new.tif'
         sourcefile = File(open(os.path.join(self.pwd, 'raster.tif')),
-            'raster_new.tif')
-        self.rasterlayer.rasterfile=sourcefile
+                          'raster_new.tif')
+        self.rasterlayer.rasterfile = sourcefile
         self.rasterlayer.save()
         self.assertEqual(self.rasterlayer.rastertile_set.all().count(), 4)
 
-@override_settings(CELERY_ALWAYS_EAGER=True, CELERY_EAGER_PROPAGATES_EXCEPTIONS=True, RASTER_USE_CELERY=True)
+@override_settings(CELERY_ALWAYS_EAGER=True,
+                   CELERY_EAGER_PROPAGATES_EXCEPTIONS=True,
+                   RASTER_USE_CELERY=True)
 class RasterLayerParserWithCeleryTests(RasterLayerParserWithoutCeleryTests):
     pass
