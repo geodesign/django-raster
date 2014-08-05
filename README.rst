@@ -3,10 +3,9 @@ Rasters for Django
 
 Django-raster provides the simplest possible raster data integration for Django projects using PostGIS database backends.
 
-**Note: This package requires PostGIS >= 2.0**
-
 Setup
 -----
+**Note: This package requires a PostGIS >= 2.0 databse backend**
 
 1. Install package with `pip install django-raster`
 
@@ -18,6 +17,8 @@ Setup
         )
 
 3. Run `python manage.py migrate` to create the raster models.
+
+4. (Optional) Add ``RASTER_USE_CELERY = True`` to your project's setting for asyncrnous raster parsing.
 
 Description
 -----------
@@ -48,8 +49,8 @@ Asynchronous parsing with Celery
 --------------------------------
 Note that for large rasters this parsing step might take a while, so your html request might time out. It is therefore recommented to use `Celery <http://celeryproject.org/>`_ in combination with django-raster.
 
-To use celery for the raster parsing step, which is triggered automatically after saving RasterLayer instances, add the following setting to your django settings file:
+To use celery for the raster parsing step, which is triggered automatically after saving RasterLayer instances, add the following setting to your django settings file::
 
-    RASTER_USE_CELERY = True
+        RASTER_USE_CELERY = True
 
 If this setting is enabled, Celery is used for parsing the raster asynchronously.
