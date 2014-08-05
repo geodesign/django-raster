@@ -44,9 +44,12 @@ Upon saving the raster file, django-raster automatically loads the raster data f
 
 The RasterLayer instances have a *parse_log* field, which stores information about the parsing process.
 
-
 Asynchronous parsing with Celery
 --------------------------------
 Note that for large rasters this parsing step might take a while, so your html request might time out. It is therefore recommented to use `Celery <http://celeryproject.org/>`_ in combination with django-raster.
 
-If celery is found on the python path of your project, it is automatically used for parsing the raster asynchronously. After uploading a file the parsing routine is added to the celery queue of your application.
+To use celery for the raster parsing step, which is triggered automatically after saving RasterLayer instances, add the following setting to your django settings file:
+
+    RASTER_USE_CELERY = True
+
+If this setting is enabled, Celery is used for parsing the raster asynchronously.
