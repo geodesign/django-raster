@@ -5,6 +5,11 @@ Django-raster provides the simplest possible raster data integration for Django 
 
 **Note: This package requires PostGIS >= 2.0**
 
+
+###### H6
+
+
+
 Setup
 -----
 
@@ -42,7 +47,8 @@ After setting the package up, you can upload raster files through the admin inte
 
 Upon saving the raster file, django-raster automatically loads the raster data from the file into a raster column in the PostGIS database. These tiles will be stored in the RasterTile model, which should not be edited directly but only through adding and deleting entire RasterLayers instances.
 
-The RasterLayer instances have a *parse_log* field, which stores information about the parsing process
+The RasterLayer instances have a *parse_log* field, which stores information about the parsing process.
+
 
 ### Asynchronous parsing with Celery
 
