@@ -7,7 +7,7 @@ Setup
 -----
 **Note: This package requires a PostGIS >= 2.0 database back-end**
 
-1. Install package with `pip install django-raster`
+1. Install package with ``pip install django-raster``
 
 2. Add "raster" to your INSTALLED_APPS setting like this::
 
@@ -16,9 +16,9 @@ Setup
             'raster',
         )
 
-3. Run `python manage.py migrate` to create the raster models.
+3. Run ``python manage.py migrate`` to create the raster models.
 
-4. (Optional) Add ``RASTER_USE_CELERY = True`` to your project's setting for asynchronous raster parsing.
+4. (Optional) Add ``RASTER_USE_CELERY = True`` to your project's setting to enable asynchronous raster parsing.
 
 Description
 -----------
