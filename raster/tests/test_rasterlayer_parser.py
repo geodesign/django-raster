@@ -1,5 +1,6 @@
-import inspect, os
+import inspect, os, shutil
 
+from django.conf import settings
 from django.test import TestCase
 from django.test.utils import override_settings
 from django.core.files import File
@@ -13,9 +14,9 @@ class RasterLayerParserTests(TestCase):
         # Instantiate Django file instances with nodes and links
         self.pwd=os.path.dirname(os.path.abspath(
             inspect.getfile(inspect.currentframe())))
-        sourcefile = File(open(os.path.join(self.pwd, 'raster.tif')),
-            'raster.tif')
-        
+
+        sourcefile = File(open(os.path.join(self.pwd, 'raster.tif')))
+
         # Create network with csv data attached
         self.rasterlayer = RasterLayer.objects.create(
             name='Raster data',
@@ -26,16 +27,16 @@ class RasterLayerParserTests(TestCase):
             rasterfile=sourcefile)
 
     def tearDown(self):
-        self.rasterlayer.delete()
+        shutil.rmtree(os.path.dirname(os.path.join(settings.BASE_DIR, self.rasterlayer.rasterfile.name)))
 
     def test_raster_layer_parsing(self):
-        # Make sure nodes and links have been created
         self.assertEqual(self.rasterlayer.rastertile_set.all().count(), 4)
 
     def test_raster_layer_parsing_after_file_change(self):
         self.rasterlayer.rastertile_set.all().delete()
+        self.rasterlayer.rasterfile.name = 'raster_new.tif'
         sourcefile = File(open(os.path.join(self.pwd, 'raster.tif')),
             'raster_new.tif')
-        self.rasterlayer.sourcefile=sourcefile
+        self.rasterlayer.rasterfile=sourcefile
         self.rasterlayer.save()
         self.assertEqual(self.rasterlayer.rastertile_set.all().count(), 4)

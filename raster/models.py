@@ -1,5 +1,6 @@
 import os, tempfile, shutil, requests, subprocess, datetime
 
+from django.conf import settings
 from django.db import models, connection
 from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
@@ -116,17 +117,15 @@ def reset_parse_log_if_data_changed(sender, instance, **kwargs):
     except RasterLayer.DoesNotExist:
         pass
     else:
-        if not obj.rasterfile.name == instance.rasterfile.name:
+        if obj.rasterfile.name != instance.rasterfile.name:
             instance.parse_log = ''
-            print 'Deleted parselog'
 
 @receiver(post_save, sender=RasterLayer)
 def parse_raster_layer_if_log_is_empty(sender, instance, **kwargs):
-    if instance.parse_log == '':
-        # Parse data asynchronously if celery is installed
+    if instance.rasterfile.name and instance.parse_log == '':
         try:
             from raster.tasks import parse_raster_with_celery
-            parse_raster_with_celery(instance)
+            parse_raster_with_celery.delay(instance)
         except:
             instance.parse()
 
