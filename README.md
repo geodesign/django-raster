@@ -5,11 +5,6 @@ Django-raster provides the simplest possible raster data integration for Django 
 
 **Note: This package requires PostGIS >= 2.0**
 
-
-###### H6
-
-
-
 Setup
 -----
 
@@ -17,10 +12,10 @@ Setup
 
 2. Add "raster" to your INSTALLED_APPS setting like this::
 
-    INSTALLED_APPS = (
-        ...
-        'raster',
-    )
+        INSTALLED_APPS = (
+            ...
+            'raster',
+        )
 
 3. Run `python manage.py migrate` to create the raster models.
 
