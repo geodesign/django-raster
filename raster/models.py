@@ -46,11 +46,9 @@ def parse_raster_layer_if_log_is_empty(sender, instance, **kwargs):
     if instance.rasterfile.name and instance.parse_log == '':
         if hasattr(settings, 'RASTER_USE_CELERY') and\
                                 settings.RASTER_USE_CELERY:
-            print 'celerying'    
             from raster.tasks import parse_raster_layer_with_celery
             parse_raster_layer_with_celery.delay(instance)
         else:
-            print 'noncelerying'
             from raster.parser import parse_raster_layer
             parse_raster_layer(instance)
 

@@ -7,8 +7,7 @@ from django.core.files import File
 
 from ..models import RasterLayer
 
-@override_settings(CELERY_ALWAYS_EAGER=True, CELERY_EAGER_PROPAGATES_EXCEPTIONS=True)
-class RasterLayerParserTests(TestCase):
+class RasterLayerParserWithoutCeleryTests(TestCase):
 
     def setUp(self):
         # Instantiate Django file instances with nodes and links
@@ -28,6 +27,7 @@ class RasterLayerParserTests(TestCase):
 
     def tearDown(self):
         shutil.rmtree(os.path.dirname(os.path.join(settings.BASE_DIR, self.rasterlayer.rasterfile.name)))
+        self.rasterlayer.rastertile_set.all().delete()
 
     def test_raster_layer_parsing(self):
         self.assertEqual(self.rasterlayer.rastertile_set.all().count(), 4)
@@ -40,3 +40,7 @@ class RasterLayerParserTests(TestCase):
         self.rasterlayer.rasterfile=sourcefile
         self.rasterlayer.save()
         self.assertEqual(self.rasterlayer.rastertile_set.all().count(), 4)
+
+@override_settings(CELERY_ALWAYS_EAGER=True, CELERY_EAGER_PROPAGATES_EXCEPTIONS=True, RASTER_USE_CELERY=True)
+class RasterLayerParserWithCeleryTests(RasterLayerParserWithoutCeleryTests):
+    pass
