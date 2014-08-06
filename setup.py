@@ -8,7 +8,7 @@ os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
 
 setup(
     name='django-raster',
-    version='0.2.0',
+    version='0.1.0',
     packages=['raster', 'raster.migrations'],
     include_package_data=True,
     license='BSD',
@@ -16,7 +16,7 @@ setup(
     long_description=README,
     url='https://github.com/yellowcap/django-raster',
     author='Daniel Wiesmann',
-    author_email='daniel.wiesmann@ist.utl.pt',
+    author_email='daniel@urbmet.com',
     requires=['python (>= 2.7)', 'django (>= 1.6)'],
     zip_safe=False,
     classifiers=[
