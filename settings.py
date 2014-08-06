@@ -1,13 +1,11 @@
 """
-Django settings for example project dev environment of raster app.
+Settings for django-raster tests
 """
+
 import os
 SECRET_KEY = 'testkey'
 
 INSTALLED_APPS = (
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
     'raster'
 )
 
