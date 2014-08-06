@@ -1,0 +1,17 @@
+language: python
+
+python:
+  - '2.7'
+  - '3'
+  - '3.2'
+  - '3.3'
+
+before_script:
+  - psql -c 'CREATE DATABASE travis_ci_test' -U postgres
+  - psql -c 'CREATE EXTENSION postgis' -U postgres -d travis_ci_test
+
+env: DB_NAME='travis_ci_test'
+
+install: pip install -r requirements.txt
+
+script: python manage.py test

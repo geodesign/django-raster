@@ -27,7 +27,7 @@ class RasterLayerParserWithoutCeleryTests(TestCase):
 
     def tearDown(self):
         shutil.rmtree(os.path.dirname(os.path.join(
-            settings.BASE_DIR, self.rasterlayer.rasterfile.name)))
+            self.pwd, '../..', self.rasterlayer.rasterfile.name)))
         self.rasterlayer.rastertile_set.all().delete()
 
     def test_raster_layer_parsing(self):
