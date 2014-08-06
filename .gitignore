@@ -11,8 +11,3 @@
 # Distribution
 dist
 django_raster.egg-info
-
-# Django stuff
-db.sqlite3
-example
-manage.py

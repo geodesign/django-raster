@@ -1,10 +1,9 @@
 Rasters for Django
 ==================
+Django-raster provides the simplest possible raster data integration for Django projects using PostGIS database back-ends.
 
 .. image:: https://travis-ci.org/geodesign/django-raster.svg?branch=master
     :target: https://travis-ci.org/geodesign/django-raster
-
-Django-raster provides the simplest possible raster data integration for Django projects using PostGIS database back-ends.
 
 Setup
 -----
