@@ -7,8 +7,8 @@ before_script:
   - psql -c 'CREATE DATABASE travis_ci_test' -U postgres
   - psql -c 'CREATE EXTENSION postgis' -U postgres -d travis_ci_test
 
-env: DB_NAME='travis_ci_test' DJANGO_SETTINGS_MODULE='testsettings' PYTHONPATH=.
+env: DB_NAME='travis_ci_test' DJANGO_SETTINGS_MODULE='testsettings'
 
 install: pip install psycopg2==2.5.3 django==1.6.5 celery==3.1.11 South==1.0
 
-script: django-admin.py test raster
+script: PYTHONPATH=. django-admin.py test raster
