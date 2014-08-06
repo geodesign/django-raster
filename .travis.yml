@@ -3,7 +3,7 @@ language: python
 python:
   - '2.7'
 
-env: DB_NAME='travis_ci_test' DJANGO_SETTINGS_MODULE='testsettings' PYTHONPATH=$HOME/build/geodesign/django-raster
+env: DB_NAME='travis_ci_test' DJANGO_SETTINGS_MODULE='settings'
 
 before_script:
   - psql -c 'CREATE DATABASE travis_ci_test' -U postgres
