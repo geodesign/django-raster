@@ -1,13 +1,13 @@
 import inspect, os, shutil
 
 from django.conf import settings
-from django.test import TestCase
+from django.test import TransactionTestCase
 from django.test.utils import override_settings
 from django.core.files import File
 
 from raster.models import RasterLayer
-
-class RasterLayerParserWithoutCeleryTests(TestCase):
+@override_settings(DEBUG=True)
+class RasterLayerParserWithoutCeleryTests(TransactionTestCase):
 
     def setUp(self):
         # Instantiate Django file instances with nodes and links
@@ -33,17 +33,17 @@ class RasterLayerParserWithoutCeleryTests(TestCase):
     def test_raster_layer_parsing(self):
         self.assertEqual(self.rasterlayer.rastertile_set.all().count(), 4)
 
-    def test_raster_layer_parsing_after_file_change(self):
-        self.rasterlayer.rastertile_set.all().delete()
-        self.rasterlayer.rasterfile.name = 'raster_new.tif'
-        sourcefile = File(open(os.path.join(self.pwd, 'raster.tif')),
-                          'raster_new.tif')
-        self.rasterlayer.rasterfile = sourcefile
-        self.rasterlayer.save()
-        self.assertEqual(self.rasterlayer.rastertile_set.all().count(), 4)
+#     def test_raster_layer_parsing_after_file_change(self):
+#         self.rasterlayer.rastertile_set.all().delete()
+#         self.rasterlayer.rasterfile.name = 'raster_new.tif'
+#         sourcefile = File(open(os.path.join(self.pwd, 'raster.tif')),
+#                           'raster_new.tif')
+#         self.rasterlayer.rasterfile = sourcefile
+#         self.rasterlayer.save()
+#         self.assertEqual(self.rasterlayer.rastertile_set.all().count(), 4)
 
-@override_settings(CELERY_ALWAYS_EAGER=True,
-                   CELERY_EAGER_PROPAGATES_EXCEPTIONS=True,
-                   RASTER_USE_CELERY=True)
-class RasterLayerParserWithCeleryTests(RasterLayerParserWithoutCeleryTests):
-    pass
+# @override_settings(CELERY_ALWAYS_EAGER=True,
+#                    CELERY_EAGER_PROPAGATES_EXCEPTIONS=True,
+#                    RASTER_USE_CELERY=True)
+# class RasterLayerParserWithCeleryTests(RasterLayerParserWithoutCeleryTests):
+#     pass

@@ -17,3 +17,5 @@ DATABASES = {
         'NAME':     os.environ.get('DB_NAME', '')
     }
 }
+
+DEBUG = True
