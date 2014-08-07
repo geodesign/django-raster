@@ -49,8 +49,9 @@ def parse_raster_layer_if_log_is_empty(sender, instance, **kwargs):
             from raster.tasks import parse_raster_layer_with_celery
             parse_raster_layer_with_celery.delay(instance)
         else:
-            from raster.parser import parse_raster_layer
-            parse_raster_layer(instance)
+            from raster.parser import RasterLayerParser
+            parser = RasterLayerParser(instance)
+            parser.parse_raster_layer()
 
 class RasterTile(models.Model):
     """Model to store individual tiles of a raster data source layer"""

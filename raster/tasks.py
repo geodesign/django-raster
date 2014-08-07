@@ -1,7 +1,8 @@
 from celery import task
-from raster.parser import parse_raster_layer
+from raster.parser import RasterLayerParser
 
 @task
 def parse_raster_layer_with_celery(rasterlayer):
     """Wrapper to all the raster parser as a celery task"""
-    parse_raster_layer(rasterlayer)
+    parser = RasterLayerParser(rasterlayer)
+    parser.parse_raster_layer()
