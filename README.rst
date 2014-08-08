@@ -25,9 +25,9 @@ Setup
 Description
 -----------
 Django-raster provides the simplest possible integration of raster
-data in Django. Raster files can be uploaded and parsed through the admin interface. The raw raster data can be parsed asynchronously if `Celery <http://celeryproject.org/>`_ is integrated into the project.
+data in Django. It is based on the python bindings provided by the `GDAL <https://pypi.python.org/pypi/GDAL/>` package. Raster files can be uploaded and parsed through the admin interface. The raw raster data can be parsed asynchronously if `Celery <http://celeryproject.org/>`_ is integrated into the Django project (see below).
 
-Once a raster file is uploaded, the parser will extract the data in the raster files and store the rasters in tiles of 100x100 pixels in a PostGIS raster table. 
+Once a raster file is uploaded, the parser will extract the data in the raster file and store the rasters in regular tiles of 100x100 pixels in a PostGIS raster table. Each tile will be one row in a PostGIS raster table.
 
 For this, the package defines two models and one field:
 
@@ -45,14 +45,28 @@ After setting the package up, you can upload raster files through the admin inte
 
 Upon saving the raster file, django-raster automatically loads the raster data from the file into a raster column in the PostGIS database. These tiles will be stored in the RasterTile model, which should not be edited directly but only through adding and deleting entire RasterLayers instances.
 
-The RasterLayer instances have a *parse_log* field, which stores information about the parsing process.
+The RasterLayer instances have a *parse_log* field, which stores information about the parsing process. For debugging, there might be some useful information in the parse log.
 
 Asynchronous parsing with Celery
 --------------------------------
-Note that for large rasters this parsing step might take a while, so your html request might time out. It is therefore recommended to use `Celery <http://celeryproject.org/>`_ in combination with django-raster.
+For large rasters files the parsing step might take a while, so the html request that stored the raster might time out. To avoid this, django-raster can easily integrated with `Celery <http://celeryproject.org/>`_ .
 
 To use celery for the raster parsing step, which is triggered automatically after saving RasterLayer instances, add the following setting to your django settings file::
 
         RASTER_USE_CELERY = True
 
-If this setting is enabled, Celery is used for parsing the raster asynchronously.
+If this setting is enabled, Celery pushes one task to the queue for each raster that is saved. The raster is then parsed upon execution of the task by a worker. The default of this setting is ``False``.
+
+Tile size
+---------
+The default tile size is 100x100 pixels. The tile size can be changed by providing an integer value in the ``RASTER_TILESIZE`` setting. The tiles are always saquares, so the tileize is set by one integer that specifies the number of pixels in each tile. For instance, setting::
+
+        ``RASTER_TILESIZE=200``
+        
+will import the raster in tiles of 200x200 pixels. Note that if you change this setting after uploading rasters, the tile size will not be updated on the existing rasters.
+
+Raster padding
+--------------
+By default, the tiles on the edge of the raster file are padded such that all raster tiles for one rasterlayer are of the same size. If you dont want the raster tiles to be padded at the edges of the raster, you can disable padding through the following setting::
+
+        RASTER_PADDING = False

@@ -1,13 +1,13 @@
 import inspect, os, shutil
 
 from django.conf import settings
-from django.test import TestCase
+from django.test import TransactionTestCase
 from django.test.utils import override_settings
 from django.core.files import File
 
 from raster.models import RasterLayer
-
-class RasterLayerParserWithoutCeleryTests(TestCase):
+@override_settings(DEBUG=True)
+class RasterLayerParserWithoutCeleryTests(TransactionTestCase):
 
     def setUp(self):
         # Instantiate Django file instances with nodes and links
@@ -47,3 +47,12 @@ class RasterLayerParserWithoutCeleryTests(TestCase):
                    RASTER_USE_CELERY=True)
 class RasterLayerParserWithCeleryTests(RasterLayerParserWithoutCeleryTests):
     pass
+
+@override_settings(RASTER_PADDING=False)
+class RasterLayerParserNoPaddingTests(RasterLayerParserWithoutCeleryTests):
+    pass
+
+@override_settings(RASTER_TILESIZE=90)
+class RasterLayerParserChangeTilesizeTests(RasterLayerParserWithoutCeleryTests):
+    pass
+
