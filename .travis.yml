@@ -9,10 +9,6 @@ before_script:
   - psql -c 'CREATE DATABASE travis_ci_test' -U postgres
   - psql -c 'CREATE EXTENSION postgis' -U postgres -d travis_ci_test
 
-before_install:
-  - sudo apt-get update -qq
-  - sudo apt-get install -qq python-gdal
-
 install: 
   - sudo rm /etc/apt/sources.list.d/ubuntugis-stable-source.list
   - sudo apt-get update -qq
