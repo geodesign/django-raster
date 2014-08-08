@@ -14,17 +14,17 @@ setup(
     license='BSD',
     description='Simple raster file implementation for Django based on PostGis',
     long_description=README,
-    url='https://github.com/yellowcap/django-raster',
+    url='https://github.com/geodesign/django-raster',
+    download_url = 'https://github.com/geodesign/django-raster/tarball/v0.1.0',
     author='Daniel Wiesmann',
     author_email='daniel@urbmet.com',
-    requires=[
-        'python (>= 2.7)',
-        'psycopg2 (>=2.5.3)',
-        'GDAL (>=1.11.0)',
-        'django (>= 1.6)',
-        'South (>=1.0)'
+    install_requires=[
+        'psycopg2>=2.5.3',
+        'GDAL>=1.10.0',
+        'Django>=1.6',
+        'South>=0.8.4',
     ],
-    zip_safe=False,
+    keywords=['django', 'raster', 'gis', 'gdal', 'celery'],
     classifiers=[
         'Environment :: Web Environment',
         'Framework :: Django',

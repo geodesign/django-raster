@@ -1,13 +1,13 @@
 Rasters for Django
 ==================
-Django-raster provides the simplest possible raster data integration for Django projects using PostGIS database back-ends.
+Django-raster provides the simplest possible raster data integration for Django projects using a PostGIS database backend.
 
 .. image:: https://travis-ci.org/geodesign/django-raster.svg?branch=master
     :target: https://travis-ci.org/geodesign/django-raster
 
 Setup
 -----
-**Note: This package requires a PostGIS >= 2.0 database back-end**
+**Note: This package requires a PostGIS >= 2.0**
 
 1. Install package with ``pip install django-raster``
 
@@ -25,7 +25,7 @@ Setup
 Description
 -----------
 Django-raster provides the simplest possible integration of raster
-data in Django. It is based on the python bindings provided by the `GDAL <https://pypi.python.org/pypi/GDAL/>` package. Raster files can be uploaded and parsed through the admin interface. The raw raster data can be parsed asynchronously if `Celery <http://celeryproject.org/>`_ is integrated into the Django project (see below).
+data in Django. It is based on the python bindings provided by the `GDAL <https://pypi.python.org/pypi/GDAL/>`_ package. Raster files can be uploaded and parsed through the admin interface. The raw raster data can be parsed asynchronously if `Celery <http://celeryproject.org/>`_ is integrated into the Django project (see below).
 
 Once a raster file is uploaded, the parser will extract the data in the raster file and store the rasters in regular tiles of 100x100 pixels in a PostGIS raster table. Each tile will be one row in a PostGIS raster table.
 
@@ -61,7 +61,7 @@ Tile size
 ---------
 The default tile size is 100x100 pixels. The tile size can be changed by providing an integer value in the ``RASTER_TILESIZE`` setting. The tiles are always saquares, so the tileize is set by one integer that specifies the number of pixels in each tile. For instance, setting::
 
-        ``RASTER_TILESIZE=200``
+        RASTER_TILESIZE = 200
         
 will import the raster in tiles of 200x200 pixels. Note that if you change this setting after uploading rasters, the tile size will not be updated on the existing rasters.
 
