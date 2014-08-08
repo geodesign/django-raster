@@ -19,8 +19,9 @@ setup(
     author_email='daniel@urbmet.com',
     requires=[
         'python (>= 2.7)',
-        'django (>= 1.6)',
         'psycopg2 (>=2.5.3)',
+        'GDAL (>=1.11.0)',
+        'django (>= 1.6)',
         'South (>=1.0)'
     ],
     zip_safe=False,
