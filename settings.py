@@ -6,7 +6,7 @@ import os
 SECRET_KEY = 'testkey'
 
 INSTALLED_APPS = (
-    'raster'
+    'raster',
 )
 
 DATABASES = {
