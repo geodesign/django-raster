@@ -1,5 +1,4 @@
 from django.db import models
-from south.modelsinspector import add_introspection_rules
 
 class RasterField(models.Field):
     """
@@ -10,5 +9,3 @@ class RasterField(models.Field):
 
     def db_type(self, connection):
         return 'raster'
-
-add_introspection_rules([], ["^raster\.fields\.RasterField"])

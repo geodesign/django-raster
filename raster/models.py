@@ -58,4 +58,4 @@ class RasterTile(models.Model):
     rid = models.AutoField(primary_key=True)
     rast = RasterField(null=True, blank=True)
     rasterlayer = models.ForeignKey(RasterLayer, null=True, blank=True)
-    filename = models.TextField(null=True, blank=True)
+    filename = models.TextField(null=True, blank=True, db_index=True)
