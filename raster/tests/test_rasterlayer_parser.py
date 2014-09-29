@@ -6,7 +6,7 @@ from django.test.utils import override_settings
 from django.core.files import File
 
 from raster.models import RasterLayer
-@override_settings(DEBUG=True)
+
 class RasterLayerParserWithoutCeleryTests(TransactionTestCase):
 
     def setUp(self):

@@ -20,6 +20,4 @@ DATABASES = {
     }
 }
 
-
-
 DEBUG = True

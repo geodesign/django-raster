@@ -1,7 +1,7 @@
 from django.conf import settings
-from django.db import models
-from django.db.models.signals import pre_save, post_save
+from django.db import models, connection
 from django.dispatch import receiver
+from django.contrib.gis.geos import GEOSGeometry
 
 from raster.fields import RasterField
 
@@ -31,7 +31,61 @@ class RasterLayer(models.Model):
             info = 'not parsed yet'
         return '{name} ({info})'.format(name=self.name, info=info)
 
-@receiver(pre_save, sender=RasterLayer)
+    def _collect_tiles_sql(self):
+        """SQL query string for selecting all tiles for this layer"""
+        return "SELECT rast FROM raster_rastertile \
+                WHERE rasterlayer_id = {0}".format(self.id)
+    
+    def _clip_tiles_sql(self, geom):
+        """Returns intersection of tiles with geom"""
+        return "SELECT ST_Clip(rast, ST_GeomFromText('{geom}')) AS rast \
+                FROM ({base}) AS cliptiles \
+                WHERE ST_Intersects(rast, ST_GeomFromText('{geom}'))\
+                ".format(geom=geom.ewkt, base=self._collect_tiles_sql())
+
+    def _value_count_sql(self, geom):
+        """SQL query string for counting pixels per distinct value"""
+        if geom:
+            tile_sql = self._clip_tiles_sql(geom)
+        else:
+            tile_sql = self._collect_tiles_sql()
+
+        count_sql = "SELECT ST_ValueCount(rast) AS pvc\
+                     FROM ({0}) AS cliprast WHERE ST_Count(rast) != 0\
+                     ".format(tile_sql)
+
+        return "SELECT (pvc).value, SUM((pvc).count) AS count FROM \
+                ({0}) AS pvctable GROUP BY (pvc).value".format(count_sql)
+
+    def value_count(self, geom=None):
+        """Get a count by distinct pixel value within the given geometry"""
+        # Make sure geometry is GEOS Geom
+        if geom:
+            geom = GEOSGeometry(geom)
+        # Query data and return results
+        cursor = connection.cursor()
+        cursor.execute(self._value_count_sql(geom))
+        desc = cursor.description
+        return cursor.fetchall()
+    
+    _pixelsize = None
+
+    def _pixelsize_sql(self):
+        """SQL query string to get pixel size in the units of the layer"""
+        return "SELECT ST_ScaleX(rast) AS scalex, ST_ScaleY(rast) AS scaley\
+                FROM ({0}) AS tiles LIMIT 1".format(self._collect_tiles_sql())
+
+    def pixelsize(self):
+        """Returns pixel area in units of raster layer"""
+        if not self._pixelsize:
+            cursor = connection.cursor()
+            cursor.execute(self._pixelsize_sql())
+            res = cursor.fetchone()
+            self._pixelsize = (abs(res[0]), abs(res[1]))
+
+        return self._pixelsize
+
+@receiver(models.signals.pre_save, sender=RasterLayer)
 def reset_parse_log_if_data_changed(sender, instance, **kwargs):
     try:
         obj = RasterLayer.objects.get(pk=instance.pk)
@@ -41,7 +95,7 @@ def reset_parse_log_if_data_changed(sender, instance, **kwargs):
         if obj.rasterfile.name != instance.rasterfile.name:
             instance.parse_log = ''
 
-@receiver(post_save, sender=RasterLayer)
+@receiver(models.signals.post_save, sender=RasterLayer)
 def parse_raster_layer_if_log_is_empty(sender, instance, **kwargs):
     if instance.rasterfile.name and instance.parse_log == '':
         if hasattr(settings, 'RASTER_USE_CELERY') and\
@@ -59,3 +113,5 @@ class RasterTile(models.Model):
     rast = RasterField(null=True, blank=True)
     rasterlayer = models.ForeignKey(RasterLayer, null=True, blank=True)
     filename = models.TextField(null=True, blank=True, db_index=True)
+    def __unicode__(self):
+        return '{0} {1}'.format(self.rid, self.filename)
