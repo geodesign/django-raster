@@ -62,6 +62,7 @@ class RasterLayer(models.Model):
         # Make sure geometry is GEOS Geom
         if geom:
             geom = GEOSGeometry(geom)
+            geom.transform(self.srid)
         # Query data and return results
         cursor = connection.cursor()
         cursor.execute(self._value_count_sql(geom))
