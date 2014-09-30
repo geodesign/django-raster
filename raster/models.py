@@ -66,9 +66,13 @@ class RasterLayer(models.Model):
         # Query data and return results
         cursor = connection.cursor()
         cursor.execute(self._value_count_sql(geom))
+        # Retruns all rows as dict
         desc = cursor.description
-        return cursor.fetchall()
-    
+        return [
+            dict(zip([col[0] for col in desc], row))
+            for row in cursor.fetchall()
+        ]
+
     _pixelsize = None
 
     def _pixelsize_sql(self):
