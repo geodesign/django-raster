@@ -36,7 +36,7 @@ class RasterLayerValueCountTests(TransactionTestCase):
         expected = {1:319, 2:26, 3:1885, 4:14320, 8:612, 9:1335}
 
         for res in results:
-            self.assertEqual(res[1], expected[res[0]])      
+            self.assertEqual(res['count'], expected[res['value']])
 
     def test_value_count_full(self):
         results = self.rasterlayer\
@@ -49,7 +49,7 @@ class RasterLayerValueCountTests(TransactionTestCase):
         expected = {1:319, 2:26, 3:1885, 4:14320, 8:612, 9:1335}
 
         for res in results:
-            self.assertEqual(res[1], expected[res[0]])
+            self.assertEqual(res['count'], expected[res['value']])
 
 
     def test_value_count_miss(self):
