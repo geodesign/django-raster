@@ -70,3 +70,15 @@ Raster padding
 By default, the tiles on the edge of the raster file are padded such that all raster tiles for one rasterlayer are of the same size. If you dont want the raster tiles to be padded at the edges of the raster, you can disable padding through the following setting::
 
         RASTER_PADDING = False
+
+Value count functionality
+-------------------------
+The RasterLayer model has a method to calculate counts for categorical layers. This function only works with categorical or mask raster layers. It returns a count in pixels for each distinct raster pixel value in the polygon provided to the function. If no polygon is provided, the counts are performed on the entire raster layer. For example::
+
+         mylayer = RasterLayer.objects.first()
+         mylayer.value_count('POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10))')
+         >> [{'count': 90679, 'value': 5.0},
+             {'count': 4252237, 'value': 1.0},
+             {'count': 4752665, 'value': 2.0},
+             {'count': 685432, 'value': 3.0},
+             {'count': 153598, 'value': 9.0}]

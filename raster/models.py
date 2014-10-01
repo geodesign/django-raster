@@ -59,6 +59,11 @@ class RasterLayer(models.Model):
 
     def value_count(self, geom=None):
         """Get a count by distinct pixel value within the given geometry"""
+        # Check that raster is categorical or mask
+        if not self.datatype in ['ca', 'ma']:
+            raise TypeError('Wrong rastertype, value counts can only be '\
+                            'calculated for categorical or mask raster tpyes')
+
         # Make sure geometry is GEOS Geom
         if geom:
             geom = GEOSGeometry(geom)
