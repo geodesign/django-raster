@@ -75,17 +75,17 @@ The projection of the pyramid tiles can be changed to any valid EPSG code using 
 
 To change the overview levels that are computed, use following setting::
 
-        RASTER_OVERVIEW_LEVELS = [1,2,4,8,16,32,]
-
-Re-parsing data
----------------
-Note: changing the fundamental settings will not automatically lead to an update for rasters that are already parsed. Only upon re-parsing of the rasters in the database, the data will be updated to the new values. When changing settings that change the raster tile structure, re-parse existing rasters to keep the database consistent. RasterLayers have a re-parse admin action to facilitate this.
+        RASTER_OVERVIEW_LEVELS = [1,2,4,8,16,32]
 
 Raster padding
 --------------
 By default, the tiles on the edge of the raster file are padded such that all raster tiles for one rasterlayer are of the same size. If you dont want the raster tiles to be padded at the edges of the raster, you can disable padding through the following setting::
 
         RASTER_PADDING = False
+
+Re-parsing data
+---------------
+Changing any of the fundamental settings (tile size, pyramid settings and padding) will not automatically lead to an update for rasters that are already parsed. Only upon re-parsing of the rasters in the database, the data will be updated to the new values. When changing settings that change the raster tile structure, re-parse existing rasters to keep the database consistent. RasterLayers have a re-parse admin action to facilitate this.
 
 Value count functionality
 -------------------------
