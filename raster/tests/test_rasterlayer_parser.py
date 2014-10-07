@@ -61,9 +61,9 @@ class RasterLayerParserChangeTilesizeTests(RasterLayerParserWithoutCeleryTests):
         self.assertEqual(self.rasterlayer.rastertile_set.filter(level=1).count(), 16)
         self.assertEqual(self.rasterlayer.rastertile_set.filter(level=2).count(), 4)
         self.assertEqual(self.rasterlayer.rastertile_set.filter(level=4).count(), 1)
-        self.assertEqual(self.rasterlayer.rastertile_set.filter(level=10).count(), 1)
-        self.assertEqual(self.rasterlayer.rastertile_set.filter(level=20).count(), 1)
-        self.assertEqual(self.rasterlayer.rastertile_set.filter(level=50).count(), 1)
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(level=8).count(), 1)
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(level=16).count(), 1)
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(level=32).count(), 1)
 
     def test_raster_layer_parsing_after_file_change(self):
         self.rasterlayer.rastertile_set.all().delete()

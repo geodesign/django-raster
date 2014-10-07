@@ -37,7 +37,7 @@ class RasterLayerPixelsizeTests(TransactionTestCase):
         self.assertEqual((100,100), result)
 
     def test_pixel_size_level20(self):
-        result = self.rasterlayer.pixelsize(level=20)
+        result = self.rasterlayer.pixelsize(level=16)
         result = (round(result[0], 3), round(result[1], 3))
-        val = round(20*113.307138294017, 3)
+        val = round(16*113.307138294017, 3)
         self.assertEqual((val, val), result)

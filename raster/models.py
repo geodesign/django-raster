@@ -80,13 +80,13 @@ class RasterLayer(models.Model):
 
     _pixelsize = None
 
-    def _pixelsize_sql(self, level=1):
+    def _pixelsize_sql(self, level=0):
         """SQL query string to get pixel size in the units of the layer"""
         return "SELECT ST_ScaleX(rast) AS scalex, ST_ScaleY(rast) AS scaley\
                 FROM ({0}) AS tiles LIMIT 1"\
                 .format(self._collect_tiles_sql(level))
 
-    def pixelsize(self, level=1):
+    def pixelsize(self, level=0):
         """Returns pixel area in units of raster layer"""
         if not self._pixelsize:
             cursor = connection.cursor()
