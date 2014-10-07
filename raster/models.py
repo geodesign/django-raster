@@ -31,17 +31,17 @@ class RasterLayer(models.Model):
             info = 'not parsed yet'
         return '{name} ({info})'.format(name=self.name, info=info)
 
-    def _collect_tiles_sql(self):
+    def _collect_tiles_sql(self, level=1):
         """SQL query string for selecting all tiles for this layer"""
-        return "SELECT rast FROM raster_rastertile \
-                WHERE rasterlayer_id = {0}".format(self.id)
+        return "SELECT rast, level FROM raster_rastertile \
+                WHERE rasterlayer_id={0} AND level={1}".format(self.id, level)
     
-    def _clip_tiles_sql(self, geom):
+    def _clip_tiles_sql(self, geom, level=1):
         """Returns intersection of tiles with geom"""
         return "SELECT ST_Clip(rast, ST_GeomFromText('{geom}')) AS rast \
                 FROM ({base}) AS cliptiles \
                 WHERE ST_Intersects(rast, ST_GeomFromText('{geom}'))\
-                ".format(geom=geom.ewkt, base=self._collect_tiles_sql())
+                ".format(geom=geom.ewkt, base=self._collect_tiles_sql(level))
 
     def _value_count_sql(self, geom):
         """SQL query string for counting pixels per distinct value"""
@@ -80,16 +80,17 @@ class RasterLayer(models.Model):
 
     _pixelsize = None
 
-    def _pixelsize_sql(self):
+    def _pixelsize_sql(self, level=1):
         """SQL query string to get pixel size in the units of the layer"""
         return "SELECT ST_ScaleX(rast) AS scalex, ST_ScaleY(rast) AS scaley\
-                FROM ({0}) AS tiles LIMIT 1".format(self._collect_tiles_sql())
+                FROM ({0}) AS tiles LIMIT 1"\
+                .format(self._collect_tiles_sql(level))
 
-    def pixelsize(self):
+    def pixelsize(self, level=1):
         """Returns pixel area in units of raster layer"""
         if not self._pixelsize:
             cursor = connection.cursor()
-            cursor.execute(self._pixelsize_sql())
+            cursor.execute(self._pixelsize_sql(level))
             res = cursor.fetchone()
             self._pixelsize = (abs(res[0]), abs(res[1]))
 
@@ -123,5 +124,6 @@ class RasterTile(models.Model):
     rast = RasterField(null=True, blank=True)
     rasterlayer = models.ForeignKey(RasterLayer, null=True, blank=True)
     filename = models.TextField(null=True, blank=True, db_index=True)
+    level = models.IntegerField(db_index=True)
     def __unicode__(self):
         return '{0} {1}'.format(self.rid, self.filename)

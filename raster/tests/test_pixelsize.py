@@ -30,6 +30,10 @@ class RasterLayerPixelsizeTests(TransactionTestCase):
             self.pwd, '../..', self.rasterlayer.rasterfile.name)))
         self.rasterlayer.rastertile_set.all().delete()
 
-    def test_value_count_full(self):
-        result = self.rasterlayer.pixelsize()
+    def test_pixel_size_level1(self):
+        result = self.rasterlayer.pixelsize(level=1)
         self.assertEqual((100,100), result)
+
+    def test_pixel_size_level2(self):
+        result = self.rasterlayer.pixelsize(level=2)
+        self.assertEqual((200,200), result)

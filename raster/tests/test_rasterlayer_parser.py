@@ -31,7 +31,8 @@ class RasterLayerParserWithoutCeleryTests(TransactionTestCase):
         self.rasterlayer.rastertile_set.all().delete()
 
     def test_raster_layer_parsing(self):
-        self.assertEqual(self.rasterlayer.rastertile_set.all().count(), 4)
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(level=1).count(), 4)
+        self.assertEqual(self.rasterlayer.rastertile_set.all().count(), 9)
 
     def test_raster_layer_parsing_after_file_change(self):
         self.rasterlayer.rastertile_set.all().delete()
@@ -40,7 +41,8 @@ class RasterLayerParserWithoutCeleryTests(TransactionTestCase):
                           'raster_new.tif')
         self.rasterlayer.rasterfile = sourcefile
         self.rasterlayer.save()
-        self.assertEqual(self.rasterlayer.rastertile_set.all().count(), 4)
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(level=1).count(), 4)
+        self.assertEqual(self.rasterlayer.rastertile_set.all().count(), 9)
 
 @override_settings(CELERY_ALWAYS_EAGER=True,
                    CELERY_EAGER_PROPAGATES_EXCEPTIONS=True,
@@ -52,7 +54,22 @@ class RasterLayerParserWithCeleryTests(RasterLayerParserWithoutCeleryTests):
 class RasterLayerParserNoPaddingTests(RasterLayerParserWithoutCeleryTests):
     pass
 
-@override_settings(RASTER_TILESIZE=90)
+@override_settings(RASTER_TILESIZE=50)
 class RasterLayerParserChangeTilesizeTests(RasterLayerParserWithoutCeleryTests):
-    pass
+    def test_raster_layer_parsing(self):
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(level=1).count(), 16)
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(level=2).count(), 4)
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(level=4).count(), 1)
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(level=10).count(), 1)
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(level=20).count(), 1)
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(level=50).count(), 1)
 
+    def test_raster_layer_parsing_after_file_change(self):
+        self.rasterlayer.rastertile_set.all().delete()
+        self.rasterlayer.rasterfile.name = 'raster_new.tif'
+        sourcefile = File(open(os.path.join(self.pwd, 'raster.tif')),
+                          'raster_new.tif')
+        self.rasterlayer.rasterfile = sourcefile
+        self.rasterlayer.save()
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(level=1).count(), 16)
+        self.assertEqual(self.rasterlayer.rastertile_set.all().count(), 24)

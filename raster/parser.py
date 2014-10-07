@@ -24,7 +24,7 @@ class RasterLayerParser:
         
         self.hextypes = {
             4: 'B', 5: 'h', 6: 'H', 7: 'i', 8: 'I', 10: 'f', 11: 'd'}
-
+        
         self.tmpdir = ''
 
         # Set raster tilesize
@@ -38,6 +38,12 @@ class RasterLayerParser:
             self.padding = settings.RASTER_PADDING
         else:
             self.padding = True
+
+        # Set overview levels for pyramid building
+        if hasattr(settings, 'RASTER_OVERVIEW_LEVELS'):
+            self.overview_levels = settings.RASTER_OVERVIEW_LEVELS
+        else:
+            self.overview_levels = [1, 2, 4, 10, 20, 50]
 
     def log(self, msg, reset=False):
         """Writes a message to the parse log of the rasterlayer instance"""
@@ -85,7 +91,8 @@ class RasterLayerParser:
         self.pixelWidth = self.geotransform[1]
         self.pixelHeight = self.geotransform[5]
 
-    def get_raster_header(self, originx=None, originy=None, sizex=None, sizey=None):
+    def get_raster_header(self, originx=None, originy=None,
+                          sizex=None, sizey=None):
         """Gets the raster header in HEX format"""
 
         # Get data from objects if not set by user
@@ -146,19 +153,20 @@ class RasterLayerParser:
         return header
 
     def get_raster_content(self, startpixelx=0, startpixely=0,
-                           sizex=None, sizey=None):
+                           sizex=None, sizey=None, level=1):
         """Extracts the pixel values from the raster in HEX format"""
         sizex = sizex or self.cols
         sizey = sizey or self.rows
+        level_ts = self.tilesize*level
 
         # Add column padding
-        if self.padding and sizex < self.tilesize:
+        if self.padding and sizex < level_ts:
             # Get rows individually
             data = [self.band.ReadRaster(startpixelx, startpixely + i, sizex, 1) for i in range(0, sizey)]
             # Convert rows to hex
             data = [binascii.hexlify(dat).upper() for dat in data]
             # Add column padding to each row
-            xpad = self.nodata_hex * (self.tilesize - sizex)
+            xpad = self.nodata_hex * (level_ts - sizex)
             data = [dat + xpad for dat in data]
             # Combine rows to block
             data = ''.join(data)
@@ -167,15 +175,79 @@ class RasterLayerParser:
             data = binascii.hexlify(data).upper()
 
         # Add row padding
-        if self.padding and sizey < self.tilesize:
-            ypad = self.nodata_hex * self.tilesize
-            data += ypad * (self.tilesize - sizey)
+        if self.padding and sizey < level_ts:
+            ypad = self.nodata_hex * level_ts
+            data += ypad * (level_ts - sizey)
 
         return data
 
     def bin2hex(self, fmt, data):
         """Converts binary data to HEX, using little-endian byte order"""
         return binascii.hexlify(struct.pack('<' + fmt, data)).upper()
+
+    def rescale_tile(self, tile, level):
+        """Returns sql string for rescaling a tile"""
+        # Get pixelsize in raster units
+        pixelsize = (self.geotransform[1], self.geotransform[5])
+
+        # Rescale raster using postgis
+        cursor = connection.cursor()
+        sql = "SELECT ST_Rescale('{0}', {1}) AS rast"\
+              .format(tile, pixelsize[0]*level, pixelsize[1]*level)
+        cursor.execute(sql)
+
+        return cursor.fetchone()[0]
+
+    def create_tiles(self, level):
+        """
+        Creates tiles for a certain overview level by rescaling raster to the
+        corresponding pixel size.
+        """
+        # Setup tile size in pixel depending on level
+        level_ts = self.tilesize*level
+
+        # Create corresponding blocks
+        for yblock in range(0, self.rows, level_ts):
+            if yblock + level_ts < self.rows:
+                numRows = level_ts
+            else:
+                numRows = self.rows - yblock
+            
+            for xblock in range(0, self.cols, level_ts):
+                if xblock + level_ts < self.cols:
+                    numCols = level_ts
+                else:
+                    numCols = self.cols - xblock
+                
+                # Calculate raster tile origin
+                xorigin = self.originX + self.pixelWidth*xblock
+                yorigin = self.originY + self.pixelHeight*yblock
+
+                # Raster header
+                if self.padding:
+                    rasterheader = self.get_raster_header(xorigin, yorigin, level_ts, level_ts)
+                else:
+                    rasterheader = self.get_raster_header(xorigin, yorigin, numCols, numRows)
+                
+                # Raster band header
+                bandheader = self.get_band_header()
+
+                # Raster body content
+                data = self.get_raster_content(xblock, yblock, numCols, numRows, level)
+
+                # Combine headers with data for inserting into postgis
+                data = rasterheader + bandheader + data
+
+                # For overview levels, rescale raster
+                if(level > 1):
+                    data = self.rescale_tile(data, level)
+
+                # Create raster tile
+                RasterTile.objects.create(
+                    rast=data,
+                    rasterlayer=self.rasterlayer,
+                    filename=self.rastername,
+                    level=level)
 
     def parse_raster_layer(self):
         """
@@ -196,43 +268,9 @@ class RasterLayerParser:
         cursor.execute("SELECT DropRasterConstraints("\
                        "'raster_rastertile'::name,'rast'::name)")
 
-        # Create corresponding blocks
-        for yblock in range(0, self.rows, self.tilesize):
-            if yblock + self.tilesize < self.rows:
-                numRows = self.tilesize
-            else:
-                numRows = self.rows - yblock
-            
-            for xblock in range(0, self.cols, self.tilesize):
-                if xblock + self.tilesize < self.cols:
-                    numCols = self.tilesize
-                else:
-                    numCols = self.cols - xblock
-                
-                # Calculate raster tile origin
-                xorigin = self.originX + self.pixelWidth*xblock
-                yorigin = self.originY + self.pixelHeight*yblock
-
-                # Raster header
-                if self.padding:
-                    rasterheader = self.get_raster_header(xorigin, yorigin, self.tilesize, self.tilesize)
-                else:
-                    rasterheader = self.get_raster_header(xorigin, yorigin, numCols, numRows)
-                
-                # Raster band header
-                bandheader = self.get_band_header()
-
-                # Raster body content
-                data = self.get_raster_content(xblock, yblock, numCols, numRows)
-
-                # Combine headers with data for inserting into postgis
-                data = rasterheader + bandheader + data
-
-                # Create raster tile
-                RasterTile.objects.create(
-                    rast=data,
-                    rasterlayer=self.rasterlayer,
-                    filename=self.rastername)
+        # Create tiles including pyramid
+        for level in self.overview_levels:
+            self.create_tiles(level)
 
         # Set raster constraints
         cursor.execute("SELECT AddRasterConstraints("\
