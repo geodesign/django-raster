@@ -65,6 +65,23 @@ The default tile size is 100x100 pixels. The tile size can be changed by providi
         
 will import the raster in tiles of 200x200 pixels. Note that if you change this setting after uploading rasters, the tile size will not be updated on the existing rasters.
 
+Pyramid building
+----------------
+Overview levels (or pyramids) are automatically created at the moment of importing the raster. The pyramid levels are stored in the ``levels`` field on the RasterTile model. By default, djago-raster will import the raster file in its original projection (as specified in the RasterLayer instance) and subsequently create a set of pyramids in the raster table. The original projection will be stored as Level ``0``, then the overview levels ``[1,2,4,8,16,32]`` will be computed and stored in tiles with increasing pixel scales. So level ``0`` is the original raster in its original scale, level ``1`` is the raster at the same scale but at a global projection (the default global projection is the "web mercator" EPSG ``3857``), and level ``16`` will aggregate ``16x16`` pixels to one. The size of one pixel is N times the original scale, where N is the overview level index.
+
+The projection of the pyramid tiles can be changed to any valid EPSG code using the following setting::
+
+        RASTER_GLOBAL_SRID = 3857
+
+To change the overview levels that are computed, use following setting::
+
+        RASTER_OVERVIEW_LEVELS = [1,2,4,8,16,32,]
+
+
+.. warning::
+        
+        Changing these settings will not automatically lead to an update for rasters that are already parsed. Only upon re-parsing of the rasters in the database, the data will be updated to the new values. When changing thes fundamental settings re-parse existing rasters to keep the database consistent. RasterLayers have a re-parse admin action to facilitate this.
+
 Raster padding
 --------------
 By default, the tiles on the edge of the raster file are padded such that all raster tiles for one rasterlayer are of the same size. If you dont want the raster tiles to be padded at the edges of the raster, you can disable padding through the following setting::

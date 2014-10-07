@@ -43,10 +43,10 @@ class RasterLayerParser:
         if hasattr(settings, 'RASTER_OVERVIEW_LEVELS'):
             self.overview_levels = settings.RASTER_OVERVIEW_LEVELS
         else:
-            self.overview_levels = [1, 2, 4, 10, 20, 50]
+            self.overview_levels = [1, 2, 4, 8, 16, 32]
 
-        if hasattr(settings, 'GLOBAL_RASTER_SRID'):
-            self.global_srid = int(settings.GLOBAL_RASTER_SRID)
+        if hasattr(settings, 'RASTER_GLOBAL_SRID'):
+            self.global_srid = int(settings.RASTER_GLOBAL_SRID)
         else:
             self.global_srid = 3857
 
