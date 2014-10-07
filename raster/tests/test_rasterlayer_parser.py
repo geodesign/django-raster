@@ -32,7 +32,7 @@ class RasterLayerParserWithoutCeleryTests(TransactionTestCase):
 
     def test_raster_layer_parsing(self):
         self.assertEqual(self.rasterlayer.rastertile_set.filter(level=1).count(), 4)
-        self.assertEqual(self.rasterlayer.rastertile_set.all().count(), 9)
+        self.assertEqual(self.rasterlayer.rastertile_set.all().count(), 4+4+1+1+1+1+1)
 
     def test_raster_layer_parsing_after_file_change(self):
         self.rasterlayer.rastertile_set.all().delete()
@@ -42,7 +42,7 @@ class RasterLayerParserWithoutCeleryTests(TransactionTestCase):
         self.rasterlayer.rasterfile = sourcefile
         self.rasterlayer.save()
         self.assertEqual(self.rasterlayer.rastertile_set.filter(level=1).count(), 4)
-        self.assertEqual(self.rasterlayer.rastertile_set.all().count(), 9)
+        self.assertEqual(self.rasterlayer.rastertile_set.all().count(), 4+4+1+1+1+1+1)
 
 @override_settings(CELERY_ALWAYS_EAGER=True,
                    CELERY_EAGER_PROPAGATES_EXCEPTIONS=True,
@@ -57,6 +57,7 @@ class RasterLayerParserNoPaddingTests(RasterLayerParserWithoutCeleryTests):
 @override_settings(RASTER_TILESIZE=50)
 class RasterLayerParserChangeTilesizeTests(RasterLayerParserWithoutCeleryTests):
     def test_raster_layer_parsing(self):
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(level=0).count(), 16)
         self.assertEqual(self.rasterlayer.rastertile_set.filter(level=1).count(), 16)
         self.assertEqual(self.rasterlayer.rastertile_set.filter(level=2).count(), 4)
         self.assertEqual(self.rasterlayer.rastertile_set.filter(level=4).count(), 1)
@@ -72,4 +73,4 @@ class RasterLayerParserChangeTilesizeTests(RasterLayerParserWithoutCeleryTests):
         self.rasterlayer.rasterfile = sourcefile
         self.rasterlayer.save()
         self.assertEqual(self.rasterlayer.rastertile_set.filter(level=1).count(), 16)
-        self.assertEqual(self.rasterlayer.rastertile_set.all().count(), 24)
+        self.assertEqual(self.rasterlayer.rastertile_set.all().count(), 16+16+4+1+1+1+1)

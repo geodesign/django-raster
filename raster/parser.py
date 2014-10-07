@@ -1,6 +1,6 @@
 import os, tempfile, shutil, datetime, struct, binascii
 
-from osgeo import gdal
+from osgeo import gdal, osr
 from osgeo.gdalconst import GA_ReadOnly, GDT_Byte, GDT_Int16, GDT_UInt16, GDT_Int32,\
     GDT_UInt32, GDT_Float32, GDT_Float64
 
@@ -45,6 +45,11 @@ class RasterLayerParser:
         else:
             self.overview_levels = [1, 2, 4, 10, 20, 50]
 
+        if hasattr(settings, 'GLOBAL_RASTER_SRID'):
+            self.global_srid = int(settings.GLOBAL_RASTER_SRID)
+        else:
+            self.global_srid = 3857
+
     def log(self, msg, reset=False):
         """Writes a message to the parse log of the rasterlayer instance"""
         # Prepare datetime stamp for log
@@ -75,10 +80,27 @@ class RasterLayerParser:
             self.log('Error: Library error for download')
             return False
 
-    def open_raster_file(self):
+    def reproject_raster(self):
+        """
+        Reprojects the gdal raster to the global srid setting.
+        """
+        srs = osr.SpatialReference()
+        srs.ImportFromEPSG(self.global_srid)
+        dest_wkt = srs.ExportToWkt()
+        source_wkt = self.dataset.GetProjection()
+        intermediate_data = gdal.AutoCreateWarpedVRT(self.dataset, source_wkt, dest_wkt)
+        gdal.ReprojectImage(self.dataset, intermediate_data, source_wkt, dest_wkt)
+        self.dataset = intermediate_data
+    
+    def open_raster_file(self, reproject=False):
         """Opens the raster file through gdal and extracts data values"""
         # Open raster file
         self.dataset = gdal.Open(os.path.join(self.tmpdir, self.rastername), GA_ReadOnly)
+        # Reproject to global srid if requested
+        if reproject:
+            self.reproject_raster()
+
+        # Get data for first band
         self.band = self.dataset.GetRasterBand(1)
         self.geotransform = self.dataset.GetGeoTransform()
 
@@ -203,6 +225,11 @@ class RasterLayerParser:
         Creates tiles for a certain overview level by rescaling raster to the
         corresponding pixel size.
         """
+        # Store orig level in case its zero
+        orig_level = level
+        if level == 0:
+            level = 1
+
         # Setup tile size in pixel depending on level
         level_ts = self.tilesize*level
 
@@ -247,7 +274,7 @@ class RasterLayerParser:
                     rast=data,
                     rasterlayer=self.rasterlayer,
                     filename=self.rastername,
-                    level=level)
+                    level=orig_level)
 
     def parse_raster_layer(self):
         """
@@ -268,7 +295,13 @@ class RasterLayerParser:
         cursor.execute("SELECT DropRasterConstraints("\
                        "'raster_rastertile'::name,'rast'::name)")
 
-        # Create tiles including pyramid
+        # Create tiles in original projection and resolution
+        self.create_tiles(0)
+
+        # Open raster in reprojected version
+        self.open_raster_file(reproject=True)
+
+        # Create tiles including pyramid in global srid
         for level in self.overview_levels:
             self.create_tiles(level)
 

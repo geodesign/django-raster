@@ -31,12 +31,12 @@ class RasterLayer(models.Model):
             info = 'not parsed yet'
         return '{name} ({info})'.format(name=self.name, info=info)
 
-    def _collect_tiles_sql(self, level=1):
+    def _collect_tiles_sql(self, level=0):
         """SQL query string for selecting all tiles for this layer"""
         return "SELECT rast, level FROM raster_rastertile \
                 WHERE rasterlayer_id={0} AND level={1}".format(self.id, level)
     
-    def _clip_tiles_sql(self, geom, level=1):
+    def _clip_tiles_sql(self, geom, level=0):
         """Returns intersection of tiles with geom"""
         return "SELECT ST_Clip(rast, ST_GeomFromText('{geom}')) AS rast \
                 FROM ({base}) AS cliptiles \

@@ -25,15 +25,19 @@ class RasterLayerPixelsizeTests(TransactionTestCase):
             nodata='0',
             rasterfile=sourcefile)
 
+        self.pixval = 113.307138294017
+
     def tearDown(self):
         shutil.rmtree(os.path.dirname(os.path.join(
             self.pwd, '../..', self.rasterlayer.rasterfile.name)))
         self.rasterlayer.rastertile_set.all().delete()
 
     def test_pixel_size_level1(self):
-        result = self.rasterlayer.pixelsize(level=1)
+        result = self.rasterlayer.pixelsize(level=0)
         self.assertEqual((100,100), result)
 
-    def test_pixel_size_level2(self):
-        result = self.rasterlayer.pixelsize(level=2)
-        self.assertEqual((200,200), result)
+    def test_pixel_size_level20(self):
+        result = self.rasterlayer.pixelsize(level=20)
+        result = (round(result[0], 3), round(result[1], 3))
+        val = round(20*113.307138294017, 3)
+        self.assertEqual((val, val), result)
