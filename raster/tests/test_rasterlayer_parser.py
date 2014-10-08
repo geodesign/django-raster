@@ -44,6 +44,9 @@ class RasterLayerParserWithoutCeleryTests(TransactionTestCase):
         self.assertEqual(self.rasterlayer.rastertile_set.filter(level=1).count(), 4)
         self.assertEqual(self.rasterlayer.rastertile_set.all().count(), 4+4+1+1+1+1+1)
 
+    def test_layermeta_creation(self):
+        self.assertEqual(self.rasterlayer.rasterlayermetadata.width, 163)
+
 @override_settings(CELERY_ALWAYS_EAGER=True,
                    CELERY_EAGER_PROPAGATES_EXCEPTIONS=True,
                    RASTER_USE_CELERY=True)

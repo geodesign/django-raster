@@ -7,7 +7,7 @@ from osgeo.gdalconst import GA_ReadOnly, GDT_Byte, GDT_Int16, GDT_UInt16, GDT_In
 from django.db import connection
 from django.conf import settings
 
-from raster.models import RasterTile
+from raster.models import RasterTile, RasterLayerMetadata
 
 class RasterLayerParser:
     """Class to parse raster layers using gdal python bindings"""
@@ -80,6 +80,23 @@ class RasterLayerParser:
             self.log('Error: Library error for download')
             return False
 
+    def store_original_metadata(self):
+        """
+        Exports the input raster meta data to a RasterLayerMetadata object
+        """
+        lyrmeta = RasterLayerMetadata.objects.get_or_create(
+            rasterlayer=self.rasterlayer)[0]
+        lyrmeta.uperleftx=self.geotransform[0]
+        lyrmeta.uperlefty=self.geotransform[3]
+        lyrmeta.width=self.dataset.RasterXSize
+        lyrmeta.height=self.dataset.RasterYSize
+        lyrmeta.scalex=self.geotransform[1]
+        lyrmeta.scaley=self.geotransform[5]
+        lyrmeta.skewx=self.geotransform[2]
+        lyrmeta.skewy=self.geotransform[4]
+        lyrmeta.numbands=self.dataset.RasterCount
+        lyrmeta.save()
+
     def reproject_raster(self):
         """
         Reprojects the gdal raster to the global srid setting.
@@ -88,14 +105,15 @@ class RasterLayerParser:
         srs.ImportFromEPSG(self.global_srid)
         dest_wkt = srs.ExportToWkt()
         source_wkt = self.dataset.GetProjection()
-        intermediate_data = gdal.AutoCreateWarpedVRT(self.dataset, source_wkt, dest_wkt)
-        gdal.ReprojectImage(self.dataset, intermediate_data, source_wkt, dest_wkt)
-        self.dataset = intermediate_data
+        self.dataset = gdal.AutoCreateWarpedVRT(self.dataset, 
+                                                source_wkt,
+                                                dest_wkt)
     
     def open_raster_file(self, reproject=False):
         """Opens the raster file through gdal and extracts data values"""
         # Open raster file
         self.dataset = gdal.Open(os.path.join(self.tmpdir, self.rastername), GA_ReadOnly)
+       
         # Reproject to global srid if requested
         if reproject:
             self.reproject_raster()
@@ -103,6 +121,10 @@ class RasterLayerParser:
         # Get data for first band
         self.band = self.dataset.GetRasterBand(1)
         self.geotransform = self.dataset.GetGeoTransform()
+
+        # Store original metadata for this raster
+        if not reproject:
+            self.store_original_metadata()
 
         # Get raster meta info
         self.cols = self.dataset.RasterXSize
@@ -114,7 +136,7 @@ class RasterLayerParser:
         self.pixelHeight = self.geotransform[5]
 
     def get_raster_header(self, originx=None, originy=None,
-                          sizex=None, sizey=None):
+                          sizex=None, sizey=None, srid=None):
         """Gets the raster header in HEX format"""
 
         # Get data from objects if not set by user
@@ -141,8 +163,8 @@ class RasterLayerParser:
         header += self.bin2hex('d', originx)
         header += self.bin2hex('d', originy)
         header += self.bin2hex('d', self.geotransform[2]) # Skew x
-        header += self.bin2hex('d', self.geotransform[4]) # Skew y
-        header += self.bin2hex('i', int(self.rasterlayer.srid))
+        header += self.bin2hex('d', self.geotransform[4]) # Skew y        
+        header += self.bin2hex('i', srid) # Set EPSG/SRID
         
         # Number of columns and rows
         header += self.bin2hex('H', sizex)
@@ -225,10 +247,12 @@ class RasterLayerParser:
         Creates tiles for a certain overview level by rescaling raster to the
         corresponding pixel size.
         """
-        # Store orig level in case its zero
+        # Select srid based on level
+        level_srid = self.global_srid if level == 0 else self.rasterlayer.srid
+
+        # Store orig level in case its zero, set level to one in that case
         orig_level = level
-        if level == 0:
-            level = 1
+        level = 1 if level == 0 else level
 
         # Setup tile size in pixel depending on level
         level_ts = self.tilesize*level
@@ -252,10 +276,10 @@ class RasterLayerParser:
 
                 # Raster header
                 if self.padding:
-                    rasterheader = self.get_raster_header(xorigin, yorigin, level_ts, level_ts)
+                    rasterheader = self.get_raster_header(xorigin, yorigin, level_ts, level_ts, orig_level)
                 else:
-                    rasterheader = self.get_raster_header(xorigin, yorigin, numCols, numRows)
-                
+                    rasterheader = self.get_raster_header(xorigin, yorigin, numCols, numRows, orig_level)
+
                 # Raster band header
                 bandheader = self.get_band_header()
 

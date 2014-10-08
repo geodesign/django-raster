@@ -118,6 +118,22 @@ def parse_raster_layer_if_log_is_empty(sender, instance, **kwargs):
             parser = RasterLayerParser(instance)
             parser.parse_raster_layer()
 
+class RasterLayerMetadata(models.Model):
+    """Stores meta data for a raster layer"""
+    rasterlayer = models.OneToOneField(RasterLayer)
+    uperleftx = models.FloatField(null=True, blank=True)
+    uperlefty = models.FloatField(null=True, blank=True)
+    width = models.IntegerField(null=True, blank=True)
+    height = models.IntegerField(null=True, blank=True)
+    scalex = models.FloatField(null=True, blank=True)
+    scaley = models.FloatField(null=True, blank=True)
+    skewx = models.FloatField(null=True, blank=True)
+    skewy = models.FloatField(null=True, blank=True)
+    numbands = models.IntegerField(null=True, blank=True)
+
+    def __unicode__(self):
+        return self.rasterlayer.name
+
 class RasterTile(models.Model):
     """Model to store individual tiles of a raster data source layer"""
     rid = models.AutoField(primary_key=True)
