@@ -130,7 +130,6 @@ class RasterLayerMetadata(models.Model):
     skewx = models.FloatField(null=True, blank=True)
     skewy = models.FloatField(null=True, blank=True)
     numbands = models.IntegerField(null=True, blank=True)
-
     def __unicode__(self):
         return self.rasterlayer.name
 

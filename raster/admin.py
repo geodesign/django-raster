@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import RasterLayer, RasterTile
+from .models import RasterLayer, RasterLayerMetadata, RasterTile
 
 # Register raster layer in admin
 class RasterLayerModelAdmin(admin.ModelAdmin):
@@ -21,6 +21,18 @@ class RasterLayerModelAdmin(admin.ModelAdmin):
             self.message_user(request, msg)
 
 admin.site.register(RasterLayer, RasterLayerModelAdmin)
+
+# Register read-only raster metadata in admin
+class RasterLayerMetadataModelAdmin(admin.ModelAdmin):
+    readonly_fields = ('rasterlayer', 'uperleftx', 'uperlefty',
+                       'width', 'height', 'scalex', 'scaley', 'skewx',
+                       'skewy', 'numbands')
+    def has_add_permission(self, request, obj=None):
+        return False
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+admin.site.register(RasterLayerMetadata, RasterLayerMetadataModelAdmin)
 
 # Register read-only raster tile in admin
 class RasterTileModelAdmin(admin.ModelAdmin):
