@@ -250,7 +250,7 @@ class RasterLayerParser:
         corresponding pixel size.
         """
         # Select srid based on level
-        level_srid = self.global_srid if level == 0 else self.rasterlayer.srid
+        level_srid = self.rasterlayer.srid if level == 0 else self.global_srid
 
         # Store orig level in case its zero, set level to one in that case
         orig_level = level
