@@ -20,10 +20,11 @@ class RasterLayerParser:
         self.gdalpixel2wktpixel = {
             GDT_Byte: 4, GDT_Int16: 5, GDT_UInt16: 6, GDT_Int32: 7,
             GDT_UInt32: 8, GDT_Float32: 10, GDT_Float64: 11
-            }
+        }
         
         self.hextypes = {
-            4: 'B', 5: 'h', 6: 'H', 7: 'i', 8: 'I', 10: 'f', 11: 'd'}
+            4: 'B', 5: 'h', 6: 'H', 7: 'i', 8: 'I', 10: 'f', 11: 'd'
+        }
         
         self.tmpdir = ''
 
@@ -45,6 +46,7 @@ class RasterLayerParser:
         else:
             self.overview_levels = [1, 2, 4, 8, 16, 32]
 
+        # Set srid for pyramids
         if hasattr(settings, 'RASTER_GLOBAL_SRID'):
             self.global_srid = int(settings.RASTER_GLOBAL_SRID)
         else:
@@ -113,7 +115,7 @@ class RasterLayerParser:
         """Opens the raster file through gdal and extracts data values"""
         # Open raster file
         self.dataset = gdal.Open(os.path.join(self.tmpdir, self.rastername), GA_ReadOnly)
-       
+
         # Reproject to global srid if requested
         if reproject:
             self.reproject_raster()
