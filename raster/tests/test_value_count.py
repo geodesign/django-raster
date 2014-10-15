@@ -25,7 +25,7 @@ class RasterLayerValueCountTests(TransactionTestCase):
             nodata='0',
             rasterfile=sourcefile)
 
-        self.wktgeom = 'SRID=3086;POLYGON((511700.468 417703.377,\
+        self.wktgeom = 'POLYGON((511700.468 417703.377,\
                           511700.468 435103.377,\
                           528000.468 435103.377,\
                           528000.468 417703.377,\
@@ -46,7 +46,7 @@ class RasterLayerValueCountTests(TransactionTestCase):
 
     def test_value_count_full(self):
         results = self.rasterlayer\
-            .value_count(self.wktgeom)
+            .value_count('SRID=3086;' + self.wktgeom)
 
         expected = {1:319, 2:26, 3:1885, 4:14320, 8:612, 9:1335}
 
@@ -56,6 +56,6 @@ class RasterLayerValueCountTests(TransactionTestCase):
 
     def test_value_count_miss(self):
         results = self.rasterlayer\
-            .value_count(self.wktgeom)
+            .value_count('SRID=3857;' + self.wktgeom)
 
         self.assertEqual(results, [])

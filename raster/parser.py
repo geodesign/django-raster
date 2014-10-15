@@ -250,7 +250,7 @@ class RasterLayerParser:
         corresponding pixel size.
         """
         # Select srid based on level
-        level_srid = self.rasterlayer.srid if level == 0 else self.global_srid
+        level_srid = int(self.rasterlayer.srid) if level == 0 else self.global_srid
 
         # Store orig level in case its zero, set level to one in that case
         orig_level = level
@@ -278,9 +278,9 @@ class RasterLayerParser:
 
                 # Raster header
                 if self.padding:
-                    rasterheader = self.get_raster_header(xorigin, yorigin, level_ts, level_ts, orig_level)
+                    rasterheader = self.get_raster_header(xorigin, yorigin, level_ts, level_ts, level_srid)
                 else:
-                    rasterheader = self.get_raster_header(xorigin, yorigin, numCols, numRows, orig_level)
+                    rasterheader = self.get_raster_header(xorigin, yorigin, numCols, numRows, level_srid)
 
                 # Raster band header
                 bandheader = self.get_band_header()
