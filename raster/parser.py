@@ -1,5 +1,4 @@
-import os, tempfile, shutil, datetime, struct, binascii
-
+import os, tempfile, zipfile, shutil, datetime, struct, binascii, glob
 from osgeo import gdal, osr
 from osgeo.gdalconst import GA_ReadOnly, GDT_Byte, GDT_Int16, GDT_UInt16, GDT_Int32,\
     GDT_UInt32, GDT_Float32, GDT_Float64
@@ -76,11 +75,62 @@ class RasterLayerParser:
             for chunk in self.rasterlayer.rasterfile.chunks():
                 rasterfile.write(chunk)
             rasterfile.close()
-            return True
-        except IOError:
+            # return True
+        except:
             shutil.rmtree(self.tmpdir)
             self.log('Error: Library error for download')
             return False
+
+        # If the raster file is compress, decompress it
+        fileName, fileExtension = os.path.splitext(self.rastername)
+        if fileExtension == '.zip':
+            try:
+                # Open and extract zipfile
+                zf = zipfile.ZipFile(os.path.join(self.tmpdir, self.rastername))
+                zf.extractall(self.tmpdir)
+                # Remove zipfile
+                os.remove(os.path.join(self.tmpdir, self.rastername))
+                # Get filelist from directory
+                raster_list = glob.glob(os.path.join(self.tmpdir, "*.*"))
+                # Check if only one file is found in zipfile
+                if len(raster_list) > 1:
+                    self.log('WARNING: Found more than one file in zipfile '\
+                             'using only first file found. This might lead '\
+                             'to problems if its not a raster file.')
+                # Return first one as raster file
+                self.rastername = os.path.basename(raster_list[0])
+            except:
+                shutil.rmtree(self.tmpdir)
+                self.log('Error: Could not open zipfile')
+                return False
+
+        return True
+
+    def open_raster_file(self, reproject=False):
+        """Opens the raster file through gdal and extracts data values"""
+        # Open raster file
+        self.dataset = gdal.Open(os.path.join(self.tmpdir, self.rastername), GA_ReadOnly)
+
+        # Reproject to global srid if requested
+        if reproject:
+            self.reproject_raster()
+
+        # Get data for first band
+        self.band = self.dataset.GetRasterBand(1)
+        self.geotransform = self.dataset.GetGeoTransform()
+
+        # Store original metadata for this raster
+        if not reproject:
+            self.store_original_metadata()
+
+        # Get raster meta info
+        self.cols = self.dataset.RasterXSize
+        self.rows = self.dataset.RasterYSize
+        self.bands = self.dataset.RasterCount
+        self.originX = self.geotransform[0]
+        self.originY = self.geotransform[3]
+        self.pixelWidth = self.geotransform[1]
+        self.pixelHeight = self.geotransform[5]
 
     def store_original_metadata(self):
         """
@@ -111,32 +161,6 @@ class RasterLayerParser:
                                                 source_wkt,
                                                 dest_wkt)
     
-    def open_raster_file(self, reproject=False):
-        """Opens the raster file through gdal and extracts data values"""
-        # Open raster file
-        self.dataset = gdal.Open(os.path.join(self.tmpdir, self.rastername), GA_ReadOnly)
-
-        # Reproject to global srid if requested
-        if reproject:
-            self.reproject_raster()
-
-        # Get data for first band
-        self.band = self.dataset.GetRasterBand(1)
-        self.geotransform = self.dataset.GetGeoTransform()
-
-        # Store original metadata for this raster
-        if not reproject:
-            self.store_original_metadata()
-
-        # Get raster meta info
-        self.cols = self.dataset.RasterXSize
-        self.rows = self.dataset.RasterYSize
-        self.bands = self.dataset.RasterCount
-        self.originX = self.geotransform[0]
-        self.originY = self.geotransform[3]
-        self.pixelWidth = self.geotransform[1]
-        self.pixelHeight = self.geotransform[5]
-
     def get_raster_header(self, originx=None, originy=None,
                           sizex=None, sizey=None, srid=None):
         """Gets the raster header in HEX format"""
@@ -225,7 +249,11 @@ class RasterLayerParser:
             ypad = self.nodata_hex * level_ts
             data += ypad * (level_ts - sizey)
 
-        return data
+        # Check if raster is only null values
+        if data == self.nodata_hex * level_ts * level_ts:
+            return None
+        else:
+            return data
 
     def bin2hex(self, fmt, data):
         """Converts binary data to HEX, using little-endian byte order"""
@@ -287,6 +315,8 @@ class RasterLayerParser:
 
                 # Raster body content
                 data = self.get_raster_content(xblock, yblock, numCols, numRows, level)
+                if not data:
+                    continue
 
                 # Combine headers with data for inserting into postgis
                 data = rasterheader + bandheader + data

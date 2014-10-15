@@ -60,8 +60,8 @@ class RasterLayerParserNoPaddingTests(RasterLayerParserWithoutCeleryTests):
 @override_settings(RASTER_TILESIZE=50)
 class RasterLayerParserChangeTilesizeTests(RasterLayerParserWithoutCeleryTests):
     def test_raster_layer_parsing(self):
-        self.assertEqual(self.rasterlayer.rastertile_set.filter(level=0).count(), 16)
-        self.assertEqual(self.rasterlayer.rastertile_set.filter(level=1).count(), 16)
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(level=0).count(), 15)
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(level=1).count(), 15)
         self.assertEqual(self.rasterlayer.rastertile_set.filter(level=2).count(), 4)
         self.assertEqual(self.rasterlayer.rastertile_set.filter(level=4).count(), 1)
         self.assertEqual(self.rasterlayer.rastertile_set.filter(level=8).count(), 1)
@@ -75,5 +75,5 @@ class RasterLayerParserChangeTilesizeTests(RasterLayerParserWithoutCeleryTests):
                           'raster_new.tif')
         self.rasterlayer.rasterfile = sourcefile
         self.rasterlayer.save()
-        self.assertEqual(self.rasterlayer.rastertile_set.filter(level=1).count(), 16)
-        self.assertEqual(self.rasterlayer.rastertile_set.all().count(), 16+16+4+1+1+1+1)
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(level=1).count(), 15)
+        self.assertEqual(self.rasterlayer.rastertile_set.all().count(), 15+15+4+1+1+1+1)
