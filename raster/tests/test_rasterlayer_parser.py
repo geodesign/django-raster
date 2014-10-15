@@ -14,7 +14,7 @@ class RasterLayerParserWithoutCeleryTests(TransactionTestCase):
         self.pwd = os.path.dirname(os.path.abspath(
             inspect.getfile(inspect.currentframe())))
 
-        sourcefile = File(open(os.path.join(self.pwd, 'raster.tif')))
+        sourcefile = File(open(os.path.join(self.pwd, 'raster.tif.zip')))
 
         # Create network with csv data attached
         self.rasterlayer = RasterLayer.objects.create(
@@ -36,9 +36,9 @@ class RasterLayerParserWithoutCeleryTests(TransactionTestCase):
 
     def test_raster_layer_parsing_after_file_change(self):
         self.rasterlayer.rastertile_set.all().delete()
-        self.rasterlayer.rasterfile.name = 'raster_new.tif'
-        sourcefile = File(open(os.path.join(self.pwd, 'raster.tif')),
-                          'raster_new.tif')
+        self.rasterlayer.rasterfile.name = 'raster_new.tif.zip'
+        sourcefile = File(open(os.path.join(self.pwd, 'raster.tif.zip')),
+                          'raster_new.tif.zip')
         self.rasterlayer.rasterfile = sourcefile
         self.rasterlayer.save()
         self.assertEqual(self.rasterlayer.rastertile_set.filter(level=1).count(), 4)
@@ -70,9 +70,9 @@ class RasterLayerParserChangeTilesizeTests(RasterLayerParserWithoutCeleryTests):
 
     def test_raster_layer_parsing_after_file_change(self):
         self.rasterlayer.rastertile_set.all().delete()
-        self.rasterlayer.rasterfile.name = 'raster_new.tif'
-        sourcefile = File(open(os.path.join(self.pwd, 'raster.tif')),
-                          'raster_new.tif')
+        self.rasterlayer.rasterfile.name = 'raster_new.tif.zip'
+        sourcefile = File(open(os.path.join(self.pwd, 'raster.tif.zip')),
+                          'raster_new.tif.zip')
         self.rasterlayer.rasterfile = sourcefile
         self.rasterlayer.save()
         self.assertEqual(self.rasterlayer.rastertile_set.filter(level=1).count(), 15)
