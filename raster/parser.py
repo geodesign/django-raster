@@ -382,19 +382,19 @@ class RasterLayerParser:
         shift = res / 2.0
 
         zoom_scales = [res/2**i/256 for i in range(1,18)]
-        match = min(zoom_scales, key=lambda x:abs(x - scale))
         index = min(range(len(zoom_scales)), key=lambda i: abs(zoom_scales[i] - scale)) + 1
 
-        return index, match
+        return index
 
-    def get_tile_range(self, bbox, zoomscale):
+    def get_tile_range(self, bbox, z):
         res = 2 * pi * 6378137
         shift = res / 2.0
+        scale = res / 2**z
         return [
-            int((bbox[0] + shift)/(256*zoomscale)),
-            int((shift - bbox[3])/(256*zoomscale)),
-            int((bbox[2] + shift)/(256*zoomscale)),
-            int((shift - bbox[1])/(256*zoomscale))
+            int((bbox[0] + shift)/scale),
+            int((shift - bbox[3])/scale),
+            int((bbox[2] + shift)/scale),
+            int((shift - bbox[1])/scale)
         ]
 
     def get_tile_bounds(self, x, y, z):
@@ -418,50 +418,51 @@ class RasterLayerParser:
         from django.contrib.gis.geos import Polygon
         scale = self.rasterlayer.pixelsize()[0]
         bbox = self.rasterlayer.extent()
-        zoom, zoomscale = self.get_max_zoom(scale)
-        indexrange = self.get_tile_range(bbox, zoomscale)
-        for ix in range(indexrange[0], indexrange[2]+1):
-            for iy in range(indexrange[1], indexrange[3]+1):
-                bounds = self.get_tile_bounds(ix, iy, zoom)
-                geom = Polygon.from_bbox(bounds)
+        zoom = self.get_max_zoom(scale)
+        for iz in range(10, zoom + 1):
+            indexrange = self.get_tile_range(bbox, iz)
+            for ix in range(indexrange[0], indexrange[2]+1):
+                for iy in range(indexrange[1], indexrange[3]+1):
+                    bounds = self.get_tile_bounds(ix, iy, iz)
+                    geom = Polygon.from_bbox(bounds)
 
-                var = """SELECT
-                ST_Clip(
-                    ST_Transform(
-                        ST_Union(rast),
-                        ST_MakeEmptyRaster({nrpixel}, {nrpixel}, {upperleftx}, {upperlefty}, {scalex}, {scaley}, {skewx}, {skewy}, {srid})
-                    ),
-                    ST_GeomFromEWKT('SRID={srid};{geomwkt}')
-                )
-                FROM raster_rastertile 
-                WHERE level={level}
-                AND rasterlayer_id={rasterlayer}
-                AND rast && ST_Transform(ST_GeomFromEWKT('SRID={srid};{geomwkt}'), ST_SRID(rast))
-                """
+                    var = """SELECT
+                    ST_Clip(
+                        ST_Transform(
+                            ST_Union(rast),
+                            ST_MakeEmptyRaster({nrpixel}, {nrpixel}, {upperleftx}, {upperlefty}, {scalex}, {scaley}, {skewx}, {skewy}, {srid})
+                        ),
+                        ST_GeomFromEWKT('SRID={srid};{geomwkt}')
+                    )
+                    FROM raster_rastertile 
+                    WHERE level={level}
+                    AND rasterlayer_id={rasterlayer}
+                    AND rast && ST_Transform(ST_GeomFromEWKT('SRID={srid};{geomwkt}'), ST_SRID(rast))
+                    """
 
-                sql = var.format(
-                    nrpixel=256,
-                    upperleftx=bounds[0],
-                    upperlefty=bounds[3],
-                    scalex=(bounds[2]-bounds[0])/256,
-                    scaley=-(bounds[3]-bounds[1])/256,
-                    skewx=0,
-                    skewy=0,
-                    srid=3857,
-                    geomwkt=geom.wkt,
-                    level=0,
-                    rasterlayer=self.rasterlayer.id,
-                )
+                    sql = var.format(
+                        nrpixel=256,
+                        upperleftx=bounds[0],
+                        upperlefty=bounds[3],
+                        scalex=(bounds[2]-bounds[0])/256,
+                        scaley=-(bounds[3]-bounds[1])/256,
+                        skewx=0,
+                        skewy=0,
+                        srid=3857,
+                        geomwkt=geom.wkt,
+                        level=0,
+                        rasterlayer=self.rasterlayer.id,
+                    )
 
-                cursor=connection.cursor()
-                cursor.execute(sql)
-                data = cursor.fetchone()[0]
+                    cursor=connection.cursor()
+                    cursor.execute(sql)
+                    data = cursor.fetchone()[0]
 
-                RasterTile.objects.create(
-                    rast=data,
-                    rasterlayer=self.rasterlayer,
-                    filename=self.rastername,
-                    tilex=ix,
-                    tiley=iy,
-                    tilez=zoom
-                )
+                    RasterTile.objects.create(
+                        rast=data,
+                        rasterlayer=self.rasterlayer,
+                        filename=self.rastername,
+                        tilex=ix,
+                        tiley=iy,
+                        tilez=iz
+                    )
