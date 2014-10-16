@@ -96,6 +96,25 @@ class RasterLayer(models.Model):
 
         return self._pixelsize
 
+    _bbox = None
+
+    def _extent_sql(self, srid=3857, level=0):
+        """SQL Query string to get bounding box of raster layer"""
+        return "SELECT ST_AsText(ST_Transform(ST_Envelope(ST_Union(rast)), {0})) FROM ({1}) AS tiles"\
+               .format(srid, self._collect_tiles_sql(level))
+
+    def extent(self):
+        """Returns bbox for layer"""
+        if not self._bbox:
+            cursor = connection.cursor()
+            cursor.execute(self._extent_sql())
+            res = cursor.fetchone()
+            geom = GEOSGeometry(res[0])
+            coords = geom.coords[0]
+            self._bbox = (coords[0][0], coords[0][1], coords[2][0], coords[2][1])
+
+        return self._bbox
+
 @receiver(models.signals.pre_save, sender=RasterLayer)
 def reset_parse_log_if_data_changed(sender, instance, **kwargs):
     try:
@@ -135,10 +154,18 @@ class RasterLayerMetadata(models.Model):
 
 class RasterTile(models.Model):
     """Model to store individual tiles of a raster data source layer"""
+    ZOOMLEVELS = (
+        (1,1), (2,2), (3,3), (4,4), (5,5), (6,6), (7,7),
+        (8,8), (9,9), (10,10), (11,11), (12,12), (13,13),
+        (14,14), (15,15), (16,16), (17,17), (18,18)
+    )
     rid = models.AutoField(primary_key=True)
     rast = RasterField(null=True, blank=True)
     rasterlayer = models.ForeignKey(RasterLayer, null=True, blank=True)
     filename = models.TextField(null=True, blank=True, db_index=True)
-    level = models.IntegerField(db_index=True)
+    level = models.IntegerField(db_index=True, null=True)
+    tilex = models.IntegerField(db_index=True, null=True)
+    tiley = models.IntegerField(db_index=True, null=True)
+    tilez = models.IntegerField(db_index=True, null=True, choices=ZOOMLEVELS)
     def __unicode__(self):
         return '{0} {1}'.format(self.rid, self.filename)

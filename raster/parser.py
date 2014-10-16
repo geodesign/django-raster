@@ -2,6 +2,7 @@ import os, tempfile, zipfile, shutil, datetime, struct, binascii, glob
 from osgeo import gdal, osr
 from osgeo.gdalconst import GA_ReadOnly, GDT_Byte, GDT_Int16, GDT_UInt16, GDT_Int32,\
     GDT_UInt32, GDT_Float32, GDT_Float64
+from math import pi
 
 from django.db import connection
 from django.conf import settings
@@ -43,7 +44,7 @@ class RasterLayerParser:
         if hasattr(settings, 'RASTER_OVERVIEW_LEVELS'):
             self.overview_levels = settings.RASTER_OVERVIEW_LEVELS
         else:
-            self.overview_levels = [1, 2, 4, 8, 16, 32]
+            self.overview_levels = [1]#, 2, 4, 8, 16, 32]
 
         # Set srid for pyramids
         if hasattr(settings, 'RASTER_GLOBAL_SRID'):
@@ -361,6 +362,8 @@ class RasterLayerParser:
         for level in self.overview_levels:
             self.create_tiles(level)
 
+        self.make_tms_tiles()
+
         # Set raster constraints
         cursor.execute("SELECT AddRasterConstraints("\
                        "'raster_rastertile'::name,'rast'::name)")
@@ -373,3 +376,92 @@ class RasterLayerParser:
 
         # Remove tempdir with source file
         shutil.rmtree(self.tmpdir)
+
+    def get_max_zoom(self, scale):
+        res = 2 * pi * 6378137
+        shift = res / 2.0
+
+        zoom_scales = [res/2**i/256 for i in range(1,18)]
+        match = min(zoom_scales, key=lambda x:abs(x - scale))
+        index = min(range(len(zoom_scales)), key=lambda i: abs(zoom_scales[i] - scale)) + 1
+
+        return index, match
+
+    def get_tile_range(self, bbox, zoomscale):
+        res = 2 * pi * 6378137
+        shift = res / 2.0
+        return [
+            int((bbox[0] + shift)/(256*zoomscale)),
+            int((shift - bbox[3])/(256*zoomscale)),
+            int((bbox[2] + shift)/(256*zoomscale)),
+            int((shift - bbox[1])/(256*zoomscale))
+        ]
+
+    def get_tile_bounds(self, x, y, z):
+        """
+        Calculates tile bounding box from Tile Map Service XYZ indices.
+        """
+        # Setup scale factor for bounds calculations
+        res = 2 * pi * 6378137
+        shift = res / 2.0
+        scale = res / 2**z
+
+        # Calculate bounds
+        minx = x * scale - shift
+        maxx = (x+1) * scale - shift
+        miny = shift - (y+1) * scale
+        maxy = shift - y * scale
+
+        return [minx, miny, maxx, maxy]
+
+    def make_tms_tiles(self):
+        from django.contrib.gis.geos import Polygon
+        scale = self.rasterlayer.pixelsize()[0]
+        bbox = self.rasterlayer.extent()
+        zoom, zoomscale = self.get_max_zoom(scale)
+        indexrange = self.get_tile_range(bbox, zoomscale)
+        for ix in range(indexrange[0], indexrange[2]+1):
+            for iy in range(indexrange[1], indexrange[3]+1):
+                bounds = self.get_tile_bounds(ix, iy, zoom)
+                geom = Polygon.from_bbox(bounds)
+
+                var = """SELECT
+                ST_Clip(
+                    ST_Transform(
+                        ST_Union(rast),
+                        ST_MakeEmptyRaster({nrpixel}, {nrpixel}, {upperleftx}, {upperlefty}, {scalex}, {scaley}, {skewx}, {skewy}, {srid})
+                    ),
+                    ST_GeomFromEWKT('SRID={srid};{geomwkt}')
+                )
+                FROM raster_rastertile 
+                WHERE level={level}
+                AND rasterlayer_id={rasterlayer}
+                AND rast && ST_Transform(ST_GeomFromEWKT('SRID={srid};{geomwkt}'), ST_SRID(rast))
+                """
+
+                sql = var.format(
+                    nrpixel=256,
+                    upperleftx=bounds[0],
+                    upperlefty=bounds[3],
+                    scalex=(bounds[2]-bounds[0])/256,
+                    scaley=-(bounds[3]-bounds[1])/256,
+                    skewx=0,
+                    skewy=0,
+                    srid=3857,
+                    geomwkt=geom.wkt,
+                    level=0,
+                    rasterlayer=self.rasterlayer.id,
+                )
+
+                cursor=connection.cursor()
+                cursor.execute(sql)
+                data = cursor.fetchone()[0]
+
+                RasterTile.objects.create(
+                    rast=data,
+                    rasterlayer=self.rasterlayer,
+                    filename=self.rastername,
+                    tilex=ix,
+                    tiley=iy,
+                    tilez=zoom
+                )
