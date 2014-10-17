@@ -310,11 +310,6 @@ class RasterLayerParser:
         # Remove existing tiles for this layer before loading new ones
         self.rasterlayer.rastertile_set.all().delete()
 
-        # Drop current raster constraints before adding more data
-        cursor = connection.cursor()
-        cursor.execute("SELECT DropRasterConstraints("\
-                       "'raster_rastertile'::name,'rast'::name)")
-
         # Create tiles in original projection and resolution
         self.create_tiles()
 
@@ -326,13 +321,6 @@ class RasterLayerParser:
 
         # Setup TMS aligned tiles in world mercator
         self.make_tms_tiles()
-
-        # Set raster constraints
-        cursor.execute("SELECT AddRasterConstraints("\
-                       "'raster_rastertile'::name,'rast'::name)")
-
-        # Vacuum table
-        cursor.execute('VACUUM ANALYZE "raster_rastertile"')
 
         # Log success of parsing
         self.log('Successfully finished parsing patch collection')
