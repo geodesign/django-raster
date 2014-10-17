@@ -40,12 +40,6 @@ class RasterLayerParser:
         else:
             self.padding = True
 
-        # Set overview levels for pyramid building
-        if hasattr(settings, 'RASTER_OVERVIEW_LEVELS'):
-            self.overview_levels = settings.RASTER_OVERVIEW_LEVELS
-        else:
-            self.overview_levels = [1]#, 2, 4, 8, 16, 32]
-
         # Set srid for pyramids
         if hasattr(settings, 'RASTER_GLOBAL_SRID'):
             self.global_srid = int(settings.RASTER_GLOBAL_SRID)
@@ -107,22 +101,17 @@ class RasterLayerParser:
 
         return True
 
-    def open_raster_file(self, reproject=False):
+    def open_raster_file(self):
         """Opens the raster file through gdal and extracts data values"""
         # Open raster file
         self.dataset = gdal.Open(os.path.join(self.tmpdir, self.rastername), GA_ReadOnly)
-
-        # Reproject to global srid if requested
-        if reproject:
-            self.reproject_raster()
 
         # Get data for first band
         self.band = self.dataset.GetRasterBand(1)
         self.geotransform = self.dataset.GetGeoTransform()
 
         # Store original metadata for this raster
-        if not reproject:
-            self.store_original_metadata()
+        self.store_original_metadata()
 
         # Get raster meta info
         self.cols = self.dataset.RasterXSize
@@ -163,7 +152,7 @@ class RasterLayerParser:
                                                 dest_wkt)
     
     def get_raster_header(self, originx=None, originy=None,
-                          sizex=None, sizey=None, srid=None):
+                          sizex=None, sizey=None):
         """Gets the raster header in HEX format"""
 
         # Get data from objects if not set by user
@@ -191,7 +180,7 @@ class RasterLayerParser:
         header += self.bin2hex('d', originy)
         header += self.bin2hex('d', self.geotransform[2]) # Skew x
         header += self.bin2hex('d', self.geotransform[4]) # Skew y        
-        header += self.bin2hex('i', srid) # Set EPSG/SRID
+        header += self.bin2hex('i', int(self.rasterlayer.srid)) # Set EPSG/SRID
         
         # Number of columns and rows
         header += self.bin2hex('H', sizex)
@@ -224,20 +213,19 @@ class RasterLayerParser:
         return header
 
     def get_raster_content(self, startpixelx=0, startpixely=0,
-                           sizex=None, sizey=None, level=1):
+                           sizex=None, sizey=None):
         """Extracts the pixel values from the raster in HEX format"""
         sizex = sizex or self.cols
         sizey = sizey or self.rows
-        level_ts = self.tilesize*level
 
         # Add column padding
-        if self.padding and sizex < level_ts:
+        if self.padding and sizex < self.tilesize:
             # Get rows individually
             data = [self.band.ReadRaster(startpixelx, startpixely + i, sizex, 1) for i in range(0, sizey)]
             # Convert rows to hex
             data = [binascii.hexlify(dat).upper() for dat in data]
             # Add column padding to each row
-            xpad = self.nodata_hex * (level_ts - sizex)
+            xpad = self.nodata_hex * (self.tilesize - sizex)
             data = [dat + xpad for dat in data]
             # Combine rows to block
             data = ''.join(data)
@@ -246,12 +234,12 @@ class RasterLayerParser:
             data = binascii.hexlify(data).upper()
 
         # Add row padding
-        if self.padding and sizey < level_ts:
-            ypad = self.nodata_hex * level_ts
-            data += ypad * (level_ts - sizey)
+        if self.padding and sizey < self.tilesize:
+            ypad = self.nodata_hex * self.tilesize
+            data += ypad * (self.tilesize - sizey)
 
         # Check if raster is only null values
-        if data == self.nodata_hex * level_ts * level_ts:
+        if data == self.nodata_hex * self.tilesize * self.tilesize:
             return None
         else:
             return data
@@ -260,44 +248,22 @@ class RasterLayerParser:
         """Converts binary data to HEX, using little-endian byte order"""
         return binascii.hexlify(struct.pack('<' + fmt, data)).upper()
 
-    def rescale_tile(self, tile, level):
-        """Returns sql string for rescaling a tile"""
-        # Get pixelsize in raster units
-        pixelsize = (self.geotransform[1], self.geotransform[5])
-
-        # Rescale raster using postgis
-        cursor = connection.cursor()
-        sql = "SELECT ST_Rescale('{0}', {1}) AS rast"\
-              .format(tile, pixelsize[0]*level, pixelsize[1]*level)
-        cursor.execute(sql)
-
-        return cursor.fetchone()[0]
-
-    def create_tiles(self, level):
+    def create_tiles(self):
         """
-        Creates tiles for a certain overview level by rescaling raster to the
-        corresponding pixel size.
+        Creates base tiles in original projection. These tiles are not intended
+        for rendering but for analysis in the original projection. This makes
+        value count statistics etc more accurate.
         """
-        # Select srid based on level
-        level_srid = int(self.rasterlayer.srid) if level == 0 else self.global_srid
 
-        # Store orig level in case its zero, set level to one in that case
-        orig_level = level
-        level = 1 if level == 0 else level
-
-        # Setup tile size in pixel depending on level
-        level_ts = self.tilesize*level
-
-        # Create corresponding blocks
-        for yblock in range(0, self.rows, level_ts):
-            if yblock + level_ts < self.rows:
-                numRows = level_ts
+        for yblock in range(0, self.rows, self.tilesize):
+            if yblock + self.tilesize < self.rows:
+                numRows = self.tilesize
             else:
                 numRows = self.rows - yblock
             
-            for xblock in range(0, self.cols, level_ts):
-                if xblock + level_ts < self.cols:
-                    numCols = level_ts
+            for xblock in range(0, self.cols, self.tilesize):
+                if xblock + self.tilesize < self.cols:
+                    numCols = self.tilesize
                 else:
                     numCols = self.cols - xblock
                 
@@ -307,31 +273,28 @@ class RasterLayerParser:
 
                 # Raster header
                 if self.padding:
-                    rasterheader = self.get_raster_header(xorigin, yorigin, level_ts, level_ts, level_srid)
+                    rasterheader = self.get_raster_header(xorigin, yorigin, self.tilesize, self.tilesize)
                 else:
-                    rasterheader = self.get_raster_header(xorigin, yorigin, numCols, numRows, level_srid)
+                    rasterheader = self.get_raster_header(xorigin, yorigin, numCols, numRows)
 
                 # Raster band header
                 bandheader = self.get_band_header()
 
                 # Raster body content
-                data = self.get_raster_content(xblock, yblock, numCols, numRows, level)
+                data = self.get_raster_content(xblock, yblock, numCols, numRows)
                 if not data:
                     continue
 
                 # Combine headers with data for inserting into postgis
                 data = rasterheader + bandheader + data
 
-                # For overview levels, rescale raster
-                if(level > 1):
-                    data = self.rescale_tile(data, level)
-
                 # Create raster tile
                 RasterTile.objects.create(
                     rast=data,
                     rasterlayer=self.rasterlayer,
                     filename=self.rastername,
-                    level=orig_level)
+                    is_base=True
+                )
 
     def parse_raster_layer(self):
         """
@@ -353,15 +316,15 @@ class RasterLayerParser:
                        "'raster_rastertile'::name,'rast'::name)")
 
         # Create tiles in original projection and resolution
-        self.create_tiles(0)
+        self.create_tiles()
 
         # Open raster in reprojected version
-        self.open_raster_file(reproject=True)
+        self.open_raster_file()
 
-        # Create tiles including pyramid in global srid
-        for level in self.overview_levels:
-            self.create_tiles(level)
+        # Create base tiles in original projection
+        self.create_tiles()
 
+        # Setup TMS aligned tiles in world mercator
         self.make_tms_tiles()
 
         # Set raster constraints
@@ -435,7 +398,7 @@ class RasterLayerParser:
                         ST_GeomFromEWKT('SRID={srid};{geomwkt}')
                     )
                     FROM raster_rastertile 
-                    WHERE level={level}
+                    WHERE tilez IS NULL
                     AND rasterlayer_id={rasterlayer}
                     AND rast && ST_Transform(ST_GeomFromEWKT('SRID={srid};{geomwkt}'), ST_SRID(rast))
                     """

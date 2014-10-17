@@ -31,17 +31,17 @@ class RasterLayer(models.Model):
             info = 'not parsed yet'
         return '{name} ({info})'.format(name=self.name, info=info)
 
-    def _collect_tiles_sql(self, level=0):
+    def _collect_tiles_sql(self):
         """SQL query string for selecting all tiles for this layer"""
-        return "SELECT rast, level FROM raster_rastertile \
-                WHERE rasterlayer_id={0} AND level={1}".format(self.id, level)
+        return "SELECT rast FROM raster_rastertile \
+                WHERE rasterlayer_id={0} AND is_base".format(self.id)
     
-    def _clip_tiles_sql(self, geom, level=0):
+    def _clip_tiles_sql(self, geom):
         """Returns intersection of tiles with geom"""
         return "SELECT ST_Clip(rast, ST_GeomFromText('{geom}')) AS rast \
                 FROM ({base}) AS cliptiles \
                 WHERE ST_Intersects(rast, ST_GeomFromText('{geom}'))\
-                ".format(geom=geom.ewkt, base=self._collect_tiles_sql(level))
+                ".format(geom=geom.ewkt, base=self._collect_tiles_sql())
 
     def _value_count_sql(self, geom):
         """SQL query string for counting pixels per distinct value"""
@@ -80,17 +80,17 @@ class RasterLayer(models.Model):
 
     _pixelsize = None
 
-    def _pixelsize_sql(self, level=0):
+    def _pixelsize_sql(self):
         """SQL query string to get pixel size in the units of the layer"""
         return "SELECT ST_ScaleX(rast) AS scalex, ST_ScaleY(rast) AS scaley\
                 FROM ({0}) AS tiles LIMIT 1"\
-                .format(self._collect_tiles_sql(level))
+                .format(self._collect_tiles_sql())
 
-    def pixelsize(self, level=0):
+    def pixelsize(self):
         """Returns pixel area in units of raster layer"""
         if not self._pixelsize:
             cursor = connection.cursor()
-            cursor.execute(self._pixelsize_sql(level))
+            cursor.execute(self._pixelsize_sql())
             res = cursor.fetchone()
             self._pixelsize = (abs(res[0]), abs(res[1]))
 
@@ -98,10 +98,10 @@ class RasterLayer(models.Model):
 
     _bbox = None
 
-    def _extent_sql(self, srid=3857, level=0):
+    def _extent_sql(self, srid=3857):
         """SQL Query string to get bounding box of raster layer"""
         return "SELECT ST_AsText(ST_Transform(ST_Envelope(ST_Union(rast)), {0})) FROM ({1}) AS tiles"\
-               .format(srid, self._collect_tiles_sql(level))
+               .format(srid, self._collect_tiles_sql())
 
     def extent(self):
         """Returns bbox for layer"""
@@ -163,7 +163,7 @@ class RasterTile(models.Model):
     rast = RasterField(null=True, blank=True)
     rasterlayer = models.ForeignKey(RasterLayer, null=True, blank=True)
     filename = models.TextField(null=True, blank=True, db_index=True)
-    level = models.IntegerField(db_index=True, null=True)
+    is_base = models.BooleanField(default=False)
     tilex = models.IntegerField(db_index=True, null=True)
     tiley = models.IntegerField(db_index=True, null=True)
     tilez = models.IntegerField(db_index=True, null=True, choices=ZOOMLEVELS)
