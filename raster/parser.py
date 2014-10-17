@@ -391,14 +391,14 @@ class RasterLayerParser:
         self.log('Tiles max zoom level: {0}'.format(zoom))
         
         # Loop through all lower zoom levels and create tiles
-        for iz in range(1, zoom + 1):
+        for iz in range(zoom, -1, -1):
 
             # For this zoomlevel, calculate xy tile index range
             indexrange = self.get_tile_index_range(bbox, iz)
-            self.log('Parsing tiles at zoom {0} (xindex range {1}-{2},'\
-                     ' yindexrange {3}-{4}'.format(iz,
-                        indexrange[0], indexrange[2]+1,
-                        indexrange[1], indexrange[3]+1 ))
+            self.log('Parsing tiles at Zoom {0}, X index range {1}-{2},'\
+                     ' Y index range {3}-{4}'.format(iz,
+                        indexrange[0], indexrange[2],
+                        indexrange[1], indexrange[3]))
 
             # Loop over all overlapping xy tiles at this zoom
             for ix in range(indexrange[0], indexrange[2]+1):
@@ -409,38 +409,72 @@ class RasterLayerParser:
 
                     # Convert bounds to WKT
                     bounds_wkt = Polygon.from_bbox(bounds).wkt
-
-                    # Setup tile creator query
-                    var = """
-                    WITH tile AS (
-                    SELECT
-                        ST_Clip(
-                        ST_Transform(
-                        ST_Union(rast),
-                        ST_MakeEmptyRaster({nrpixel}, {nrpixel}, {upperleftx}, {upperlefty}, {scalex}, {scaley}, {skewx}, {skewy}, {srid})
-                        ),
-                        ST_GeomFromEWKT('SRID={srid};{geomwkt}')
-                        ) AS rast
-                        FROM raster_rastertile
-                        WHERE tilez IS NULL
-                        AND rasterlayer_id={rasterlayer}
-                        AND rast && ST_Transform(ST_GeomFromEWKT('SRID={srid};{geomwkt}'), ST_SRID(rast))
-                    ) SELECT rast FROM tile WHERE NOT ST_IsEmpty(rast)
-                    """
-                    # Fill query text with specific values
-                    sql = var.format(
-                        nrpixel=256,
-                        upperleftx=bounds[0],
-                        upperlefty=bounds[3],
-                        scalex=(bounds[2]-bounds[0])/256,
-                        scaley=-(bounds[3]-bounds[1])/256,
-                        skewx=0,
-                        skewy=0,
-                        srid=3857,
-                        geomwkt=bounds_wkt,
-                        level=0,
-                        rasterlayer=self.rasterlayer.id,
-                    )
+                    if iz == zoom:
+                        # Setup tile creator query
+                        var = """
+                        WITH tile AS (
+                            SELECT
+                            ST_Intersection(
+                                ST_SnapToGrid(
+                                    ST_Transform(ST_Union(rast), {srid}),
+                                    {upperleftx}, {upperlefty}, {scalex}, {scaley}
+                                ),
+                                ST_MakeEmptyRaster({nrpixel}, {nrpixel}, {upperleftx}, {upperlefty}, {scalex}, {scaley}, {skewx}, {skewy}, {srid})
+                            ) AS rast
+                            FROM raster_rastertile
+                            WHERE tilez IS NULL
+                            AND rasterlayer_id={rasterlayer}
+                            AND rast && ST_Transform(ST_GeomFromEWKT('SRID={srid};{geomwkt}'), ST_SRID(rast))
+                        ) SELECT rast FROM tile WHERE NOT ST_Count(rast)=0
+                        """
+                        # Fill query text with specific values
+                        sql = var.format(
+                            nrpixel=256,
+                            upperleftx=bounds[0],
+                            upperlefty=bounds[3],
+                            scalex=(bounds[2]-bounds[0])/256,
+                            scaley=-(bounds[3]-bounds[1])/256,
+                            skewx=0,
+                            skewy=0,
+                            srid=3857,
+                            geomwkt=bounds_wkt,
+                            rasterlayer=self.rasterlayer.id
+                        )
+                        print sql
+                    else:
+                        print 'elsecase ', iz, zoom
+                        # Setup tile creator query
+                        var = """
+                        --WITH tile AS (
+                        SELECT
+                            ST_Clip(
+                            --ST_Transform(
+                            ST_Union(rast),
+                            --ST_MakeEmptyRaster({nrpixel}, {nrpixel}, {upperleftx}, {upperlefty}, {scalex}, {scaley}, {skewx}, {skewy}, {srid})
+                            --),
+                            ST_GeomFromEWKT('SRID={srid};{geomwkt}'),
+                            false
+                            ) AS rast
+                            FROM raster_rastertile
+                            WHERE tilez={previous_zl}
+                            AND rasterlayer_id={rasterlayer}
+                            AND rast && ST_GeomFromEWKT('SRID={srid};{geomwkt}')
+                        --) SELECT rast FROM tile WHERE NOT ST_Count(rast)=0
+                        """
+                        # Fill query text with specific values
+                        sql = var.format(
+                            nrpixel=256,
+                            upperleftx=bounds[0],
+                            upperlefty=bounds[3],
+                            scalex=(bounds[2]-bounds[0])/256,
+                            scaley=-(bounds[3]-bounds[1])/256,
+                            skewx=0,
+                            skewy=0,
+                            srid=3857,
+                            geomwkt=bounds_wkt,
+                            rasterlayer=self.rasterlayer.id,
+                            previous_zl=iz + 1
+                        )           
 
                     # Calculate tile in DB
                     cursor=connection.cursor()

@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.db import models, connection
 from django.dispatch import receiver
-from django.contrib.gis.geos import GEOSGeometry
+from django.contrib.gis.geos import GEOSGeometry, Polygon
 
 from raster.fields import RasterField
 
@@ -98,20 +98,20 @@ class RasterLayer(models.Model):
 
     _bbox = None
 
-    def _extent_sql(self, srid=3857):
-        """SQL Query string to get bounding box of raster layer"""
-        return "SELECT ST_AsText(ST_Transform(ST_Envelope(ST_Union(rast)), {0})) FROM ({1}) AS tiles"\
-               .format(srid, self._collect_tiles_sql())
-
-    def extent(self):
+    def extent(self, srid=3857):
         """Returns bbox for layer"""
         if not self._bbox:
-            cursor = connection.cursor()
-            cursor.execute(self._extent_sql())
-            res = cursor.fetchone()
-            geom = GEOSGeometry(res[0])
+            meta = self.rasterlayermetadata
+            xmin = meta.uperleftx
+            ymax = meta.uperlefty
+            xmax = xmin + meta.width * meta.scalex
+            ymin = ymax + meta.height * meta.scaley
+            geom = Polygon.from_bbox((xmin, ymin, xmax, ymax))
+            geom.srid = int(self.srid)
+            geom.transform(srid)
             coords = geom.coords[0]
-            self._bbox = (coords[0][0], coords[0][1], coords[2][0], coords[2][1])
+            self._bbox = (coords[0][0], coords[0][1],
+                          coords[2][0], coords[2][1])
 
         return self._bbox
 
