@@ -1,11 +1,12 @@
 import os, tempfile, zipfile, shutil, datetime, struct, binascii, glob
+from math import pi
 from osgeo import gdal, osr
 from osgeo.gdalconst import GA_ReadOnly, GDT_Byte, GDT_Int16, GDT_UInt16, GDT_Int32,\
     GDT_UInt32, GDT_Float32, GDT_Float64
-from math import pi
 
 from django.db import connection
 from django.conf import settings
+from django.contrib.gis.geos import Polygon
 
 from raster.models import RasterTile, RasterLayerMetadata
 
@@ -40,11 +41,10 @@ class RasterLayerParser:
         else:
             self.padding = True
 
-        # Set srid for pyramids
-        if hasattr(settings, 'RASTER_GLOBAL_SRID'):
-            self.global_srid = int(settings.RASTER_GLOBAL_SRID)
-        else:
-            self.global_srid = 3857
+        # Set tile srid and basic tile geometry parameters
+        self.global_srid = 3857
+        self.worldsize = 2 * pi * 6378137
+        self.tileshift = self.worldsize / 2.0
 
     def log(self, msg, reset=False):
         """Writes a message to the parse log of the rasterlayer instance"""
@@ -304,19 +304,17 @@ class RasterLayerParser:
         # Clean previous parse log
         self.log('Started parsing raster file', reset=True)
 
+        self.log('Getting raster file from storage')
         self.get_raster_file()
+
+        self.log('Opening raster file with gdal')
         self.open_raster_file()
 
         # Remove existing tiles for this layer before loading new ones
         self.rasterlayer.rastertile_set.all().delete()
 
         # Create tiles in original projection and resolution
-        self.create_tiles()
-
-        # Open raster in reprojected version
-        self.open_raster_file()
-
-        # Create base tiles in original projection
+        self.log('Creating tiles for base level in original projection')
         self.create_tiles()
 
         # Setup TMS aligned tiles in world mercator
@@ -328,69 +326,108 @@ class RasterLayerParser:
         # Remove tempdir with source file
         shutil.rmtree(self.tmpdir)
 
-    def get_max_zoom(self, scale):
-        res = 2 * pi * 6378137
-        shift = res / 2.0
+    def get_max_zoom(self, pixelsize):
+        """
+        Calculates the zoom level index z that is closest to the given scale.
+        The input scale needs to be provided in meters per pixel. It is then
+        compared to a list of pixel sizes for all TMS zoom levels.
+        """
+        # Calculate all pixelsizes for the TMS zoom levels
+        tms_pixelsizes = [self.worldsize/(2**i*256.0) for i in range(1,19)]
 
-        zoom_scales = [res/2**i/256 for i in range(1,18)]
-        index = min(range(len(zoom_scales)), key=lambda i: abs(zoom_scales[i] - scale)) + 1
+        # If the pixelsize is smaller than all tms sizes, default to level
+        zoomlevel = 18
 
-        return index
+        # Find zoomlevel for the input pixel size
+        for i in range(0,18):
+            if pixelsize - tms_pixelsizes[i] >= 0:
+                zoomlevel = i + 1
+                break
 
-    def get_tile_range(self, bbox, z):
-        res = 2 * pi * 6378137
-        shift = res / 2.0
-        scale = res / 2**z
+        return zoomlevel
+
+    def get_tile_index_range(self, bbox, z):
+        """
+        Calculates index range for a given bounding box and zoomlevel.
+        It returns maximum and minimum x and y tile indices that overlap
+        with the input bbox at zoomlevel z.
+        """
+        # Calculate tile size for given zoom level
+        zscale = self.worldsize / 2**z
+
+        # Calculate overlaying tile indices
         return [
-            int((bbox[0] + shift)/scale),
-            int((shift - bbox[3])/scale),
-            int((bbox[2] + shift)/scale),
-            int((shift - bbox[1])/scale)
+            int((bbox[0] + self.tileshift)/zscale),
+            int((self.tileshift - bbox[3])/zscale),
+            int((bbox[2] + self.tileshift)/zscale),
+            int((self.tileshift - bbox[1])/zscale)
         ]
 
     def get_tile_bounds(self, x, y, z):
         """
-        Calculates tile bounding box from Tile Map Service XYZ indices.
+        Calculates bounding box from Tile Map Service XYZ indices.
         """
-        # Setup scale factor for bounds calculations
-        res = 2 * pi * 6378137
-        shift = res / 2.0
-        scale = res / 2**z
+        zscale = self.worldsize / 2**z
 
-        # Calculate bounds
-        minx = x * scale - shift
-        maxx = (x+1) * scale - shift
-        miny = shift - (y+1) * scale
-        maxy = shift - y * scale
+        xmin = x * zscale - self.tileshift
+        xmax = (x+1) * zscale - self.tileshift
+        ymin = self.tileshift - (y+1) * zscale
+        ymax = self.tileshift - y * zscale
 
-        return [minx, miny, maxx, maxy]
+        return [xmin, ymin, xmax, ymax]
 
     def make_tms_tiles(self):
-        from django.contrib.gis.geos import Polygon
+        """
+        Creates pyramid tiles that overlay with TMS xyz tiles'
+        """
+        self.log('Creating XYZ tiles')
+
+        # Get layer extent and pixel size from DB
         scale = self.rasterlayer.pixelsize()[0]
         bbox = self.rasterlayer.extent()
+
+        # Calculate the closest zoomlevel for the raster scale
         zoom = self.get_max_zoom(scale)
-        for iz in range(10, zoom + 1):
-            indexrange = self.get_tile_range(bbox, iz)
+        self.log('Tiles max zoom level: {0}'.format(zoom))
+        
+        # Loop through all lower zoom levels and create tiles
+        for iz in range(1, zoom + 1):
+
+            # For this zoomlevel, calculate xy tile index range
+            indexrange = self.get_tile_index_range(bbox, iz)
+            self.log('Parsing tiles at zoom {0} (xindex range {1}-{2},'\
+                     ' yindexrange {3}-{4}'.format(iz,
+                        indexrange[0], indexrange[2]+1,
+                        indexrange[1], indexrange[3]+1 ))
+
+            # Loop over all overlapping xy tiles at this zoom
             for ix in range(indexrange[0], indexrange[2]+1):
                 for iy in range(indexrange[1], indexrange[3]+1):
+                    
+                    # Calculate the bounds of this tile
                     bounds = self.get_tile_bounds(ix, iy, iz)
-                    geom = Polygon.from_bbox(bounds)
 
-                    var = """SELECT
-                    ST_Clip(
+                    # Convert bounds to WKT
+                    bounds_wkt = Polygon.from_bbox(bounds).wkt
+
+                    # Setup tile creator query
+                    var = """
+                    WITH tile AS (
+                    SELECT
+                        ST_Clip(
                         ST_Transform(
-                            ST_Union(rast),
-                            ST_MakeEmptyRaster({nrpixel}, {nrpixel}, {upperleftx}, {upperlefty}, {scalex}, {scaley}, {skewx}, {skewy}, {srid})
+                        ST_Union(rast),
+                        ST_MakeEmptyRaster({nrpixel}, {nrpixel}, {upperleftx}, {upperlefty}, {scalex}, {scaley}, {skewx}, {skewy}, {srid})
                         ),
                         ST_GeomFromEWKT('SRID={srid};{geomwkt}')
-                    )
-                    FROM raster_rastertile 
-                    WHERE tilez IS NULL
-                    AND rasterlayer_id={rasterlayer}
-                    AND rast && ST_Transform(ST_GeomFromEWKT('SRID={srid};{geomwkt}'), ST_SRID(rast))
+                        ) AS rast
+                        FROM raster_rastertile
+                        WHERE tilez IS NULL
+                        AND rasterlayer_id={rasterlayer}
+                        AND rast && ST_Transform(ST_GeomFromEWKT('SRID={srid};{geomwkt}'), ST_SRID(rast))
+                    ) SELECT rast FROM tile WHERE NOT ST_IsEmpty(rast)
                     """
-
+                    # Fill query text with specific values
                     sql = var.format(
                         nrpixel=256,
                         upperleftx=bounds[0],
@@ -400,20 +437,23 @@ class RasterLayerParser:
                         skewx=0,
                         skewy=0,
                         srid=3857,
-                        geomwkt=geom.wkt,
+                        geomwkt=bounds_wkt,
                         level=0,
                         rasterlayer=self.rasterlayer.id,
                     )
 
+                    # Calculate tile in DB
                     cursor=connection.cursor()
                     cursor.execute(sql)
-                    data = cursor.fetchone()[0]
+                    data = cursor.fetchone()
 
-                    RasterTile.objects.create(
-                        rast=data,
-                        rasterlayer=self.rasterlayer,
-                        filename=self.rastername,
-                        tilex=ix,
-                        tiley=iy,
-                        tilez=iz
-                    )
+                    # If tile is not empty, create RasterTile instance
+                    if data and data[0]:
+                        RasterTile.objects.create(
+                            rast=data[0],
+                            rasterlayer=self.rasterlayer,
+                            filename=self.rastername,
+                            tilex=ix,
+                            tiley=iy,
+                            tilez=iz
+                        )
