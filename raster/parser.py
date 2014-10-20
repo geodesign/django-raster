@@ -33,7 +33,7 @@ class RasterLayerParser:
         if hasattr(settings, 'RASTER_TILESIZE'):
             self.tilesize = int(settings.RASTER_TILESIZE)
         else:
-            self.tilesize = 100
+            self.tilesize = 256
 
         # Turn padding on or off
         if hasattr(settings, 'RASTER_PADDING'):
@@ -139,18 +139,6 @@ class RasterLayerParser:
         lyrmeta.numbands=self.dataset.RasterCount
         lyrmeta.save()
 
-    def reproject_raster(self):
-        """
-        Reprojects the gdal raster to the global srid setting.
-        """
-        srs = osr.SpatialReference()
-        srs.ImportFromEPSG(self.global_srid)
-        dest_wkt = srs.ExportToWkt()
-        source_wkt = self.dataset.GetProjection()
-        self.dataset = gdal.AutoCreateWarpedVRT(self.dataset, 
-                                                source_wkt,
-                                                dest_wkt)
-    
     def get_raster_header(self, originx=None, originy=None,
                           sizex=None, sizey=None):
         """Gets the raster header in HEX format"""
@@ -376,6 +364,12 @@ class RasterLayerParser:
 
         return [xmin, ymin, xmax, ymax]
 
+    def get_tile_scale(self, z):
+        """Calculates pixel size scale for given zoom level"""
+
+        zscale = self.worldsize / 2.0**z / 256.0
+        return zscale, -zscale
+
     def make_tms_tiles(self):
         """
         Creates pyramid tiles that overlay with TMS xyz tiles'
@@ -395,10 +389,23 @@ class RasterLayerParser:
 
             # For this zoomlevel, calculate xy tile index range
             indexrange = self.get_tile_index_range(bbox, iz)
+
+            # Log this processing step
             self.log('Parsing tiles at Zoom {0}, X index range {1}-{2},'\
                      ' Y index range {3}-{4}'.format(iz,
                         indexrange[0], indexrange[2],
                         indexrange[1], indexrange[3]))
+
+            # Calculate zoom level constants
+            scalex, scaley = self.get_tile_scale(iz)
+
+            # Select current tile pyramid base level
+            if iz == zoom:
+                tilez_sql = 'tilez IS NULL'
+            else:
+                tilez_sql = 'tilez={previous_zl}'.format(previous_zl=iz+1)
+
+            print tilez_sql
 
             # Loop over all overlapping xy tiles at this zoom
             for ix in range(indexrange[0], indexrange[2]+1):
@@ -407,28 +414,22 @@ class RasterLayerParser:
                     # Calculate the bounds of this tile
                     bounds = self.get_tile_bounds(ix, iy, iz)
 
-                    # Convert bounds to WKT
+                    # Convert bounds to WKT for spatial filtering
                     bounds_wkt = Polygon.from_bbox(bounds).wkt
-
-                    # Select current tile pyramid base level
-                    if iz == zoom:
-                        tilez_sql = 'tilez IS NULL'
-                    else:
-                        tilez_sql = 'tilez={previous_zl}'.format(previous_zl=iz+1)                        
 
                     # Setup tile creator query
                     var = """
                     WITH tile AS (
                         SELECT
-                            ST_Intersection(
+                            ST_MapAlgebra(
                                 ST_SnapToGrid(
                                     ST_Transform(ST_Union(rast), {srid}), {upperleftx}, {upperlefty}, {scalex}, {scaley}
                                 ),
                                 ST_AddBand(
                                     ST_MakeEmptyRaster({nrpixel}, {nrpixel}, {upperleftx}, {upperlefty}, {scalex}, {scaley}, {skewx}, {skewy}, {srid}),
-                                    ARRAY[ROW(1, '1BB'::text, 0, NULL)]::addbandarg[]
+                                    ARRAY[ROW(1, '8BUI'::text, 0, NULL)]::addbandarg[]
                                 ),
-                                'BAND1'
+                                '[rast1]*[rast1.val]', NULL, 'SECOND'
                             ) AS rast
                         FROM raster_rastertile
                         WHERE rasterlayer_id={rasterlayer}
@@ -440,17 +441,17 @@ class RasterLayerParser:
                     # Fill query text with specific values
                     sql = var.format(
                         nrpixel=256,
-                        upperleftx=bounds[0],
-                        upperlefty=bounds[3],
-                        scalex=(bounds[2]-bounds[0])/256,
-                        scaley=-(bounds[3]-bounds[1])/256,
+                        upperleftx=repr(bounds[0]),
+                        upperlefty=repr(bounds[3]),
+                        scalex=repr(scalex),
+                        scaley=repr(scaley),
                         skewx=0,
                         skewy=0,
-                        srid=3857,
+                        srid=self.global_srid,
                         geomwkt=bounds_wkt,
                         rasterlayer=self.rasterlayer.id,
                         tilez_sql=tilez_sql
-                    )    
+                    )
 
                     # Calculate tile in DB
                     cursor=connection.cursor()
