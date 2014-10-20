@@ -409,72 +409,48 @@ class RasterLayerParser:
 
                     # Convert bounds to WKT
                     bounds_wkt = Polygon.from_bbox(bounds).wkt
+
+                    # Select current tile pyramid base level
                     if iz == zoom:
-                        # Setup tile creator query
-                        var = """
-                        WITH tile AS (
-                            SELECT
+                        tilez_sql = 'tilez IS NULL'
+                    else:
+                        tilez_sql = 'tilez={previous_zl}'.format(previous_zl=iz+1)                        
+
+                    # Setup tile creator query
+                    var = """
+                    WITH tile AS (
+                        SELECT
                             ST_Intersection(
                                 ST_SnapToGrid(
-                                    ST_Transform(ST_Union(rast), {srid}),
-                                    {upperleftx}, {upperlefty}, {scalex}, {scaley}
+                                    ST_Transform(ST_Union(rast), {srid}), {upperleftx}, {upperlefty}, {scalex}, {scaley}
                                 ),
-                                ST_MakeEmptyRaster({nrpixel}, {nrpixel}, {upperleftx}, {upperlefty}, {scalex}, {scaley}, {skewx}, {skewy}, {srid})
+                                ST_AddBand(
+                                    ST_MakeEmptyRaster({nrpixel}, {nrpixel}, {upperleftx}, {upperlefty}, {scalex}, {scaley}, {skewx}, {skewy}, {srid}),
+                                    ARRAY[ROW(1, '1BB'::text, 0, NULL)]::addbandarg[]
+                                ),
+                                'BAND1'
                             ) AS rast
-                            FROM raster_rastertile
-                            WHERE tilez IS NULL
-                            AND rasterlayer_id={rasterlayer}
-                            AND rast && ST_Transform(ST_GeomFromEWKT('SRID={srid};{geomwkt}'), ST_SRID(rast))
-                        ) SELECT rast FROM tile WHERE NOT ST_Count(rast)=0
-                        """
-                        # Fill query text with specific values
-                        sql = var.format(
-                            nrpixel=256,
-                            upperleftx=bounds[0],
-                            upperlefty=bounds[3],
-                            scalex=(bounds[2]-bounds[0])/256,
-                            scaley=-(bounds[3]-bounds[1])/256,
-                            skewx=0,
-                            skewy=0,
-                            srid=3857,
-                            geomwkt=bounds_wkt,
-                            rasterlayer=self.rasterlayer.id
-                        )
-                        print sql
-                    else:
-                        print 'elsecase ', iz, zoom
-                        # Setup tile creator query
-                        var = """
-                        --WITH tile AS (
-                        SELECT
-                            ST_Clip(
-                            --ST_Transform(
-                            ST_Union(rast),
-                            --ST_MakeEmptyRaster({nrpixel}, {nrpixel}, {upperleftx}, {upperlefty}, {scalex}, {scaley}, {skewx}, {skewy}, {srid})
-                            --),
-                            ST_GeomFromEWKT('SRID={srid};{geomwkt}'),
-                            false
-                            ) AS rast
-                            FROM raster_rastertile
-                            WHERE tilez={previous_zl}
-                            AND rasterlayer_id={rasterlayer}
-                            AND rast && ST_GeomFromEWKT('SRID={srid};{geomwkt}')
-                        --) SELECT rast FROM tile WHERE NOT ST_Count(rast)=0
-                        """
-                        # Fill query text with specific values
-                        sql = var.format(
-                            nrpixel=256,
-                            upperleftx=bounds[0],
-                            upperlefty=bounds[3],
-                            scalex=(bounds[2]-bounds[0])/256,
-                            scaley=-(bounds[3]-bounds[1])/256,
-                            skewx=0,
-                            skewy=0,
-                            srid=3857,
-                            geomwkt=bounds_wkt,
-                            rasterlayer=self.rasterlayer.id,
-                            previous_zl=iz + 1
-                        )           
+                        FROM raster_rastertile
+                        WHERE rasterlayer_id={rasterlayer}
+                        AND rast && ST_Transform(ST_GeomFromEWKT('SRID={srid};{geomwkt}'), ST_SRID(rast))
+                        AND {tilez_sql}
+                    ) SELECT rast FROM tile WHERE NOT ST_BandIsNoData(rast)
+                    """
+
+                    # Fill query text with specific values
+                    sql = var.format(
+                        nrpixel=256,
+                        upperleftx=bounds[0],
+                        upperlefty=bounds[3],
+                        scalex=(bounds[2]-bounds[0])/256,
+                        scaley=-(bounds[3]-bounds[1])/256,
+                        skewx=0,
+                        skewy=0,
+                        srid=3857,
+                        geomwkt=bounds_wkt,
+                        rasterlayer=self.rasterlayer.id,
+                        tilez_sql=tilez_sql
+                    )    
 
                     # Calculate tile in DB
                     cursor=connection.cursor()
