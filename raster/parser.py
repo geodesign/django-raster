@@ -60,7 +60,9 @@ class RasterLayerParser:
         self.rasterlayer.save()
 
     def get_raster_file(self):
-        """Make local copy of rasterfile (necessary if stored on CDS)"""
+        """Make local copy of rasterfile (necessary if stored on CDN)"""
+
+        self.log('Getting raster file from storage')
         
         self.tmpdir = tempfile.mkdtemp()
 
@@ -103,6 +105,9 @@ class RasterLayerParser:
 
     def open_raster_file(self):
         """Opens the raster file through gdal and extracts data values"""
+
+        self.log('Opening raster file with gdal')
+
         # Open raster file
         self.dataset = gdal.Open(os.path.join(self.tmpdir, self.rastername), GA_ReadOnly)
 
@@ -236,12 +241,14 @@ class RasterLayerParser:
         """Converts binary data to HEX, using little-endian byte order"""
         return binascii.hexlify(struct.pack('<' + fmt, data)).upper()
 
-    def create_tiles(self):
+    def create_base_tiles(self):
         """
         Creates base tiles in original projection. These tiles are not intended
         for rendering but for analysis in the original projection. This makes
         value count statistics etc more accurate.
         """
+
+        self.log('Creating tiles for base level in original projection')
 
         for yblock in range(0, self.rows, self.tilesize):
             if yblock + self.tilesize < self.rows:
@@ -292,27 +299,24 @@ class RasterLayerParser:
         # Clean previous parse log
         self.log('Started parsing raster file', reset=True)
 
-        self.log('Getting raster file from storage')
+        # Download, unzip and open raster file
         self.get_raster_file()
-
-        self.log('Opening raster file with gdal')
         self.open_raster_file()
 
         # Remove existing tiles for this layer before loading new ones
         self.rasterlayer.rastertile_set.all().delete()
 
         # Create tiles in original projection and resolution
-        self.log('Creating tiles for base level in original projection')
-        self.create_tiles()
+        self.create_base_tiles()
 
         # Setup TMS aligned tiles in world mercator
-        self.make_tms_tiles()
-
-        # Log success of parsing
-        self.log('Successfully finished parsing patch collection')
+        self.create_tms_tile_pyramid()
 
         # Remove tempdir with source file
         shutil.rmtree(self.tmpdir)
+
+        # Log success of parsing
+        self.log('Successfully finished parsing patch collection')
 
     def get_max_zoom(self, pixelsize):
         """
@@ -370,7 +374,7 @@ class RasterLayerParser:
         zscale = self.worldsize / 2.0**z / 256.0
         return zscale, -zscale
 
-    def make_tms_tiles(self):
+    def create_tms_tile_pyramid(self):
         """
         Creates pyramid tiles that overlay with TMS xyz tiles'
         """
