@@ -33,7 +33,7 @@ class RasterLayerParser:
         if hasattr(settings, 'RASTER_TILESIZE'):
             self.tilesize = int(settings.RASTER_TILESIZE)
         else:
-            self.tilesize = 256
+            self.tilesize = 100
 
         # Turn padding on or off
         if hasattr(settings, 'RASTER_PADDING'):
@@ -323,7 +323,7 @@ class RasterLayerParser:
         # Calculate all pixelsizes for the TMS zoom levels
         tms_pixelsizes = [self.worldsize/(2**i*256.0) for i in range(1,19)]
 
-        # If the pixelsize is smaller than all tms sizes, default to level
+        # If the pixelsize is smaller than all tms sizes, default to max level
         zoomlevel = 18
 
         # Find zoomlevel for the input pixel size
@@ -405,8 +405,6 @@ class RasterLayerParser:
             else:
                 tilez_sql = 'tilez={previous_zl}'.format(previous_zl=iz+1)
 
-            print tilez_sql
-
             # Loop over all overlapping xy tiles at this zoom
             for ix in range(indexrange[0], indexrange[2]+1):
                 for iy in range(indexrange[1], indexrange[3]+1):
@@ -429,7 +427,7 @@ class RasterLayerParser:
                                     ST_MakeEmptyRaster({nrpixel}, {nrpixel}, {upperleftx}, {upperlefty}, {scalex}, {scaley}, {skewx}, {skewy}, {srid}),
                                     ARRAY[ROW(1, '8BUI'::text, 0, NULL)]::addbandarg[]
                                 ),
-                                '[rast1]*[rast1.val]', NULL, 'SECOND'
+                                '[rast1]', NULL, 'SECOND'
                             ) AS rast
                         FROM raster_rastertile
                         WHERE rasterlayer_id={rasterlayer}
