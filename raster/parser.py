@@ -140,8 +140,9 @@ class RasterLayerParser:
         dest_geo = (bounds[0], scalex, 0.0, bounds[3], 0.0, scaley)
 
         # Create in-memory destination raster
-        driver = gdal.GetDriverByName('MEM')
-        dest = driver.Create('', nrpixelx, nrpixely, 1, self.band.DataType)
+        #driver = gdal.GetDriverByName('MEM')
+        driver=gdal.GetDriverByName('GTiff')
+        dest = driver.Create(os.path.join(self.tmpdir, 'djangowarpedraster.tif'), nrpixelx, nrpixely, 1, self.band.DataType)
         dest.SetGeoTransform(dest_geo)
         dest.SetProjection(dest_wkt)
 
@@ -293,7 +294,7 @@ class RasterLayerParser:
         value count statistics etc more accurate.
         """
 
-        self.log('Creating tiles for base level in original projection')
+        self.log('Creating tiles from gdal object')
         iy = -1
         for yblock in range(0, self.rows, self.tilesize):
             if yblock + self.tilesize < self.rows:
