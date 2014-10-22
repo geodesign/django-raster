@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunSQL(
-            "CREATE INDEX raster_rastertile_rast_st_convexhull_idx\
+            "DROP INDEX IF EXISTS raster_rastertile_rast_st_convexhull_idx; CREATE INDEX raster_rastertile_rast_st_convexhull_idx\
              ON raster_rastertile USING gist( ST_ConvexHull(rast) )",
             "DROP INDEX IF EXISTS raster_rastertile_rast_st_convexhull_idx"
         )
