@@ -513,7 +513,7 @@ class RasterLayerParser:
 
                     # Setup tile creator query
                     var = """
-                    --WITH tile AS (
+                    WITH tile AS (
                         SELECT ST_Rescale(ST_Union(rast), {scalexy}) AS rast
                         FROM raster_rastertile
                         WHERE rasterlayer_id={rasterlayer}
@@ -524,7 +524,7 @@ class RasterLayerParser:
                             (tilex={tilex}+1 AND tiley={tiley})   OR
                             (tilex={tilex}+1 AND tiley={tiley}+1)
                         )
-                    --) SELECT rast FROM tile WHERE NOT ST_BandIsNoData(rast)
+                    ) SELECT rast FROM tile WHERE NOT ST_BandIsNoData(rast)
                     """
 
                     # Fill query text with specific values
