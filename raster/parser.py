@@ -1,4 +1,5 @@
-import os, tempfile, zipfile, shutil, datetime, struct, binascii, glob
+import os, tempfile, zipfile, shutil, datetime, struct, binascii, glob,\
+    traceback
 from math import pi
 from osgeo import gdal, osr
 from osgeo.gdalconst import GA_ReadOnly, GDT_Byte, GDT_Int16, GDT_UInt16, GDT_Int32,\
@@ -67,41 +68,28 @@ class RasterLayerParser:
         self.tmpdir = tempfile.mkdtemp()
 
         # Access rasterfile and store locally
-        try:
-            rasterfile = open(os.path.join(self.tmpdir, self.rastername), 'wb')
-            for chunk in self.rasterlayer.rasterfile.chunks():
-                rasterfile.write(chunk)
-            rasterfile.close()
-            # return True
-        except:
-            shutil.rmtree(self.tmpdir)
-            self.log('Error: Library error for download')
-            return False
+        rasterfile = open(os.path.join(self.tmpdir, self.rastername), 'wb')
+        for chunk in self.rasterlayer.rasterfile.chunks():
+            rasterfile.write(chunk)
+        rasterfile.close()
 
         # If the raster file is compress, decompress it
         fileName, fileExtension = os.path.splitext(self.rastername)
         if fileExtension == '.zip':
-            try:
-                # Open and extract zipfile
-                zf = zipfile.ZipFile(os.path.join(self.tmpdir, self.rastername))
-                zf.extractall(self.tmpdir)
-                # Remove zipfile
-                os.remove(os.path.join(self.tmpdir, self.rastername))
-                # Get filelist from directory
-                raster_list = glob.glob(os.path.join(self.tmpdir, "*.*"))
-                # Check if only one file is found in zipfile
-                if len(raster_list) > 1:
-                    self.log('WARNING: Found more than one file in zipfile '\
-                             'using only first file found. This might lead '\
-                             'to problems if its not a raster file.')
-                # Return first one as raster file
-                self.rastername = os.path.basename(raster_list[0])
-            except:
-                shutil.rmtree(self.tmpdir)
-                self.log('Error: Could not open zipfile')
-                return False
-
-        return True
+            # Open and extract zipfile
+            zf = zipfile.ZipFile(os.path.join(self.tmpdir, self.rastername))
+            zf.extractall(self.tmpdir)
+            # Remove zipfile
+            os.remove(os.path.join(self.tmpdir, self.rastername))
+            # Get filelist from directory
+            raster_list = glob.glob(os.path.join(self.tmpdir, "*.*"))
+            # Check if only one file is found in zipfile
+            if len(raster_list) > 1:
+                self.log('WARNING: Found more than one file in zipfile '\
+                         'using only first file found. This might lead '\
+                         'to problems if its not a raster file.')
+            # Return first one as raster file
+            self.rastername = os.path.basename(raster_list[0])
 
     def open_raster_file(self):
         """Opens the raster file through gdal and extracts data values"""
@@ -133,6 +121,12 @@ class RasterLayerParser:
         """
         self.log('Starting raster warp')
 
+        # Get projections for source and destination
+        srs = osr.SpatialReference()
+        srs.ImportFromEPSG(self.global_srid)
+        dest_wkt = srs.ExportToWkt()
+        source_wkt = self.dataset.GetProjection()
+
         # Calculate warp conditions
         scale = self.rasterlayer.rasterlayermetadata.scalex
         bbox = self.rasterlayer.extent()
@@ -140,16 +134,10 @@ class RasterLayerParser:
         indexrange = self.get_tile_index_range(bbox, zoom)
         bounds = self.get_tile_bounds(indexrange[0], indexrange[1], zoom)
         scalex, scaley = self.get_tile_scale(zoom)
-        nrpixelx = (indexrange[2]-indexrange[0])*256
-        nrpixely = (indexrange[3]-indexrange[1])*256
+        nrpixelx = (indexrange[2]-indexrange[0])*self.tilesize
+        nrpixely = (indexrange[3]-indexrange[1])*self.tilesize
 
         dest_geo = (bounds[0], scalex, 0.0, bounds[3], 0.0, scaley)
-
-        # Get projections for source and destination
-        srs = osr.SpatialReference()
-        srs.ImportFromEPSG(self.global_srid)
-        dest_wkt = srs.ExportToWkt()
-        source_wkt = self.dataset.GetProjection()
 
         # Create in-memory destination raster
         driver = gdal.GetDriverByName('MEM')
@@ -158,11 +146,13 @@ class RasterLayerParser:
         dest.SetProjection(dest_wkt)
 
         # Warp image
-        gdal.ReprojectImage(self.dataset,
-                          dest,
-                          source_wkt,
-                          dest_wkt,
-                          gdal.GRA_NearestNeighbour)
+        gdal.ReprojectImage(
+            self.dataset,
+            dest,
+            source_wkt,
+            dest_wkt,
+            gdal.GRA_NearestNeighbour
+        )
 
         # Overwrite original dataset with warped version
         self.dataset = dest
@@ -179,6 +169,7 @@ class RasterLayerParser:
         self.originY = self.geotransform[3]
         self.pixelWidth = self.geotransform[1]
         self.pixelHeight = self.geotransform[5]
+
         self.log('Successfully finished raster warp')
 
     def store_original_metadata(self):
@@ -417,7 +408,7 @@ class RasterLayerParser:
             self.log('Successfully finished parsing raster')
 
         except:
-            import traceback
+            shutil.rmtree(self.tmpdir)
             self.log(traceback.format_exc())
 
     def get_max_zoom(self, pixelsize):
@@ -427,7 +418,7 @@ class RasterLayerParser:
         compared to a list of pixel sizes for all TMS zoom levels.
         """
         # Calculate all pixelsizes for the TMS zoom levels
-        tms_pixelsizes = [self.worldsize/(2**i*256.0) for i in range(1,19)]
+        tms_pixelsizes = [self.worldsize/(2.0**i*self.tilesize) for i in range(1,19)]
 
         # If the pixelsize is smaller than all tms sizes, default to max level
         zoomlevel = 18
@@ -473,7 +464,7 @@ class RasterLayerParser:
     def get_tile_scale(self, z):
         """Calculates pixel size scale for given zoom level"""
 
-        zscale = self.worldsize / 2.0**z / 256.0
+        zscale = self.worldsize / 2.0**z / self.tilesize
         return zscale, -zscale
 
     def create_tms_tile_pyramid(self):
@@ -522,22 +513,27 @@ class RasterLayerParser:
 
                     # Setup tile creator query
                     var = """
-                    WITH tile AS (
+                    --WITH tile AS (
                         SELECT ST_Rescale(ST_Union(rast), {scalexy}) AS rast
                         FROM raster_rastertile
                         WHERE rasterlayer_id={rasterlayer}
-                        AND rast && ST_GeomFromEWKT('SRID={srid};{geomwkt}')
                         AND tilez={tilez}
-                    ) SELECT rast FROM tile WHERE NOT ST_BandIsNoData(rast)
+                        AND (
+                            (tilex={tilex}   AND tiley={tiley})   OR
+                            (tilex={tilex}   AND tiley={tiley}+1) OR
+                            (tilex={tilex}+1 AND tiley={tiley})   OR
+                            (tilex={tilex}+1 AND tiley={tiley}+1)
+                        )
+                    --) SELECT rast FROM tile WHERE NOT ST_BandIsNoData(rast)
                     """
 
                     # Fill query text with specific values
                     sql = var.format(
                         scalexy=repr(scalex),
-                        srid=self.global_srid,
-                        geomwkt=bounds_wkt,
                         rasterlayer=self.rasterlayer.id,
-                        tilez=iz+1
+                        tilez=iz+1,
+                        tilex=2*ix,
+                        tiley=2*iy
                     )
 
                     # Calculate tile in DB
