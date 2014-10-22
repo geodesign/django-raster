@@ -386,34 +386,39 @@ class RasterLayerParser:
         This function pushes the raster data from the Raster Layer into the
         RasterTile table, in tiles of 100x100 pixels.
         """
-        # Clean previous parse log
-        self.log('Started parsing raster file', reset=True)
+        try:
+            # Clean previous parse log
+            self.log('Started parsing raster file', reset=True)
 
-        # Download, unzip and open raster file
-        self.get_raster_file()
-        self.open_raster_file()
+            # Download, unzip and open raster file
+            self.get_raster_file()
+            self.open_raster_file()
 
-        # Remove existing tiles for this layer before loading new ones
-        self.rasterlayer.rastertile_set.all().delete()
+            # Remove existing tiles for this layer before loading new ones
+            self.rasterlayer.rastertile_set.all().delete()
 
-        # Create tiles in original projection and resolution
-        self.create_base_tiles()
-        self.drop_empty_rasters()
+            # Create tiles in original projection and resolution
+            self.create_base_tiles()
+            self.drop_empty_rasters()
 
-        # Setup TMS aligned tiles in world mercator
-        # self.create_tms_tile_pyramid()
-        scale = self.rasterlayer.pixelsize()[0]
-        zoom = self.get_max_zoom(scale)
-        self.reproject_raster()
-        self.create_base_tiles(zoom)
-        self.create_tms_tile_pyramid()
-        self.drop_empty_rasters()
+            # Setup TMS aligned tiles in world mercator
+            # self.create_tms_tile_pyramid()
+            scale = self.rasterlayer.pixelsize()[0]
+            zoom = self.get_max_zoom(scale)
+            self.reproject_raster()
+            self.create_base_tiles(zoom)
+            self.create_tms_tile_pyramid()
+            self.drop_empty_rasters()
 
-        # Remove tempdir with source file
-        shutil.rmtree(self.tmpdir)
+            # Remove tempdir with source file
+            shutil.rmtree(self.tmpdir)
 
-        # Log success of parsing
-        self.log('Successfully finished parsing patch collection')
+            # Log success of parsing
+            self.log('Successfully finished parsing raster')
+
+        except:
+            import traceback
+            self.log(traceback.format_exc())
 
     def get_max_zoom(self, pixelsize):
         """
