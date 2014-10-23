@@ -427,7 +427,7 @@ class RasterLayerParser:
         # Find zoomlevel for the input pixel size
         for i in range(0,18):
             if pixelsize - tms_pixelsizes[i] >= 0:
-                zoomlevel = i + 1
+                zoomlevel = i
                 break
 
         return zoomlevel
