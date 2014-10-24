@@ -31,16 +31,13 @@ class RasterLayerParser:
         self.tmpdir = ''
 
         # Set raster tilesize
-        if hasattr(settings, 'RASTER_TILESIZE'):
-            self.tilesize = int(settings.RASTER_TILESIZE)
-        else:
-            self.tilesize = 256
+        self.tilesize = int(getattr(settings, 'RASTER_TILESIZE', 256))
 
         # Turn padding on or off
-        if hasattr(settings, 'RASTER_PADDING'):
-            self.padding = settings.RASTER_PADDING
-        else:
-            self.padding = True
+        self.padding = getattr(settings, 'RASTER_PADDING', 'True') == 'True'
+
+        # Next up vs next down
+        self.zoomdown = getattr(settings, 'RASTER_ZOOM_NEXT_HIGHER', 'True') == 'True'
 
         # Set tile srid and basic tile geometry parameters
         self.global_srid = 3857
@@ -424,11 +421,14 @@ class RasterLayerParser:
         # If the pixelsize is smaller than all tms sizes, default to max level
         zoomlevel = 18
 
-        # Find zoomlevel for the input pixel size
+        # Find zoomlevel (next-upper) for the input pixel size
         for i in range(0,18):
             if pixelsize - tms_pixelsizes[i] >= 0:
                 zoomlevel = i
                 break
+        # If nextdown setting is true, adjust level
+        if self.zoomdown:
+            zoomlevel += 1
 
         return zoomlevel
 
