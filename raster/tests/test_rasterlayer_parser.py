@@ -32,15 +32,19 @@ class RasterLayerParserWithoutCeleryTests(TransactionTestCase):
 
     def test_raster_layer_parsing(self):
         self.assertEqual(self.rasterlayer.rastertile_set.filter(is_base=True).count(), 4)
-        self.assertEqual(self.rasterlayer.rastertile_set.filter(is_base=False).count(), 4+4+1+1+1+1+1)
-        self.assertEqual(self.rasterlayer.rastertile_set.filter(tilez=12).count(), 4)
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(tilez=12).count(), 8)
         self.assertEqual(self.rasterlayer.rastertile_set.filter(tilez=11).count(), 4)
         self.assertEqual(self.rasterlayer.rastertile_set.filter(tilez=10).count(), 1)
         self.assertEqual(self.rasterlayer.rastertile_set.filter(tilez=9).count(), 1)
         self.assertEqual(self.rasterlayer.rastertile_set.filter(tilez=8).count(), 1)
         self.assertEqual(self.rasterlayer.rastertile_set.filter(tilez=7).count(), 1)
         self.assertEqual(self.rasterlayer.rastertile_set.filter(tilez=6).count(), 1)
-        self.assertEqual(self.rasterlayer.rastertile_set.filter(tilez=5).count(), 0)
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(tilez=5).count(), 1)
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(tilez=4).count(), 1)
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(tilez=3).count(), 0)
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(tilez=2).count(), 0)
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(tilez=1).count(), 0)
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(tilez=0).count(), 0)
 
     def test_raster_layer_parsing_after_file_change(self):
         self.rasterlayer.rastertile_set.all().delete()
@@ -51,7 +55,7 @@ class RasterLayerParserWithoutCeleryTests(TransactionTestCase):
         self.rasterlayer.save()
 
         self.assertEqual(self.rasterlayer.rastertile_set.filter(is_base=True).count(), 4)
-        self.assertEqual(self.rasterlayer.rastertile_set.filter(is_base=False).count(), 4+4+1+1+1+1+1)
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(is_base=False).count(), 8+4+7)
 
     def test_layermeta_creation(self):
         self.assertEqual(self.rasterlayer.rasterlayermetadata.width, 163)
@@ -71,8 +75,8 @@ class RasterLayerParserNoPaddingTests(RasterLayerParserWithoutCeleryTests):
 class RasterLayerParserChangeTilesizeTests(RasterLayerParserWithoutCeleryTests):
     def test_raster_layer_parsing(self):
         self.assertEqual(self.rasterlayer.rastertile_set.filter(is_base=True).count(), 15)
-        self.assertEqual(self.rasterlayer.rastertile_set.filter(is_base=False).count(), 27)
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(is_base=False).count(), 40)
 
     def test_raster_layer_parsing_after_file_change(self):
         self.assertEqual(self.rasterlayer.rastertile_set.filter(is_base=True).count(), 15)
-        self.assertEqual(self.rasterlayer.rastertile_set.filter(is_base=False).count(), 27)
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(is_base=False).count(), 40)

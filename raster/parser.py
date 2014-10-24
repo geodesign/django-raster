@@ -34,10 +34,10 @@ class RasterLayerParser:
         self.tilesize = int(getattr(settings, 'RASTER_TILESIZE', 256))
 
         # Turn padding on or off
-        self.padding = getattr(settings, 'RASTER_PADDING', 'True') == 'True'
+        self.padding = getattr(settings, 'RASTER_PADDING', True)
 
         # Next up vs next down
-        self.zoomdown = getattr(settings, 'RASTER_ZOOM_NEXT_HIGHER', 'True') == 'True'
+        self.zoomdown = getattr(settings, 'RASTER_ZOOM_NEXT_HIGHER', True)
 
         # Set tile srid and basic tile geometry parameters
         self.global_srid = 3857
@@ -72,19 +72,25 @@ class RasterLayerParser:
 
         # If the raster file is compress, decompress it
         fileName, fileExtension = os.path.splitext(self.rastername)
+
         if fileExtension == '.zip':
+
             # Open and extract zipfile
             zf = zipfile.ZipFile(os.path.join(self.tmpdir, self.rastername))
             zf.extractall(self.tmpdir)
+
             # Remove zipfile
             os.remove(os.path.join(self.tmpdir, self.rastername))
+
             # Get filelist from directory
             raster_list = glob.glob(os.path.join(self.tmpdir, "*.*"))
+
             # Check if only one file is found in zipfile
             if len(raster_list) > 1:
                 self.log('WARNING: Found more than one file in zipfile '\
                          'using only first file found. This might lead '\
                          'to problems if its not a raster file.')
+
             # Return first one as raster file
             self.rastername = os.path.basename(raster_list[0])
 
@@ -112,11 +118,11 @@ class RasterLayerParser:
         self.pixelWidth = self.geotransform[1]
         self.pixelHeight = self.geotransform[5]
 
-    def reproject_raster(self):
+    def reproject_raster(self, zoom):
         """
         Reprojects the gdal raster to the global srid setting.
         """
-        self.log('Starting raster warp')
+        self.log('Starting raster warp for zoom ' + str(zoom))
 
         # Get projections for source and destination
         srs = osr.SpatialReference()
@@ -124,26 +130,24 @@ class RasterLayerParser:
         dest_wkt = srs.ExportToWkt()
         source_wkt = self.dataset.GetProjection()
 
-        # Calculate warp conditions
-        scale = self.rasterlayer.rasterlayermetadata.scalex
+        # Calculate warp geotransform
         bbox = self.rasterlayer.extent()
-        zoom = self.get_max_zoom(scale)
         indexrange = self.get_tile_index_range(bbox, zoom)
         bounds = self.get_tile_bounds(indexrange[0], indexrange[1], zoom)
-        scalex, scaley = self.get_tile_scale(zoom)
-        nrpixelx = (indexrange[2]-indexrange[0])*self.tilesize
-        nrpixely = (indexrange[3]-indexrange[1])*self.tilesize
+        tilescalex, tilescaley = self.get_tile_scale(zoom)
 
-        dest_geo = (bounds[0], scalex, 0.0, bounds[3], 0.0, scaley)
+        dest_geo = (bounds[0], tilescalex, 0.0, bounds[3], 0.0, tilescaley)
 
-        # Create in-memory destination raster
-        #driver = gdal.GetDriverByName('MEM')
+        # Create destination raster file
+        sizex = (indexrange[2]-indexrange[0] + 1)*self.tilesize
+        sizey = (indexrange[3]-indexrange[1] + 1)*self.tilesize
+        dest_file = os.path.join(self.tmpdir, 'djangowarpedraster' + str(zoom) + '.tif')
         driver=gdal.GetDriverByName('GTiff')
-        dest = driver.Create(os.path.join(self.tmpdir, 'djangowarpedraster.tif'), nrpixelx, nrpixely, 1, self.band.DataType)
+        dest = driver.Create(dest_file, sizex, sizey, 1, self.band.DataType)
         dest.SetGeoTransform(dest_geo)
         dest.SetProjection(dest_wkt)
 
-        # Warp image
+        # Warp image using nearest neighbor resampling
         gdal.ReprojectImage(
             self.dataset,
             dest,
@@ -152,7 +156,7 @@ class RasterLayerParser:
             gdal.GRA_NearestNeighbour
         )
 
-        # Overwrite original dataset with warped version
+        # Replace original dataset with warped version
         self.dataset = dest
 
         # Get data for first band
@@ -167,8 +171,6 @@ class RasterLayerParser:
         self.originY = self.geotransform[3]
         self.pixelWidth = self.geotransform[1]
         self.pixelHeight = self.geotransform[5]
-
-        self.log('Successfully finished raster warp')
 
     def store_original_metadata(self):
         """
@@ -284,14 +286,14 @@ class RasterLayerParser:
         """Converts binary data to HEX, using little-endian byte order"""
         return binascii.hexlify(struct.pack('<' + fmt, data)).upper()
 
-    def create_base_tiles(self, zoom=None):
+    def create_tiles(self, zoom=None):
         """
         Creates base tiles in original projection. These tiles are not intended
         for rendering but for analysis in the original projection. This makes
         value count statistics etc more accurate.
         """
 
-        self.log('Creating tiles from gdal object')
+        self.log('Creating tiles for zoom ' + str(zoom))
         iy = -1
         for yblock in range(0, self.rows, self.tilesize):
             if yblock + self.tilesize < self.rows:
@@ -328,86 +330,42 @@ class RasterLayerParser:
                 # Combine headers with data for inserting into postgis
                 data = rasterheader + bandheader + data
 
-                if not zoom:
-                    # Create raster tile
-                    RasterTile.objects.create(
+                # Create tile
+                tile = RasterTile(
                         rast=data,
                         rasterlayer=self.rasterlayer,
-                        filename=self.rastername,
-                        is_base=True
-                    )
+                        filename=self.rastername)
+
+                # Set is_base flag or xyz tile indices
+                if not zoom:
+                    tile.is_base = True
                 else:
                     bbox = self.rasterlayer.extent()
                     indexrange = self.get_tile_index_range(bbox, zoom)
 
-                    # Create raster tile
-                    RasterTile.objects.create(
-                        rast=data,
-                        rasterlayer=self.rasterlayer,
-                        filename=self.rastername,
-                        is_base=False,
-                        tilez=zoom,
-                        tilex=indexrange[0] + ix,
-                        tiley=indexrange[1] + iy
-                    )
+                    tile.tilex = indexrange[0] + ix
+                    tile.tiley = indexrange[1] + iy
+                    tile.tilez = zoom
+
+                # Save tile
+                tile.save()
 
     def drop_empty_rasters(self):
-
-        self.log('Dropping empty rasters')
+        """
+        Remove rasters that are only no-data from the current rasterlayer.
+        """
 
         var = """
         DELETE FROM raster_rastertile
         WHERE ST_Count(rast)=0
-        AND rasterlayer_id={rasterlayer}
+        AND rasterlayer_id={0}
         """
 
-        # Fill query text with specific values
-        sql = var.format(
-            rasterlayer=self.rasterlayer.id,
-        )
+        sql = var.format(self.rasterlayer.id)
 
         # Calculate tile in DB
         cursor=connection.cursor()
         cursor.execute(sql)
-
-    def parse_raster_layer(self):
-        """
-        This function pushes the raster data from the Raster Layer into the
-        RasterTile table, in tiles of 100x100 pixels.
-        """
-        try:
-            # Clean previous parse log
-            self.log('Started parsing raster file', reset=True)
-
-            # Download, unzip and open raster file
-            self.get_raster_file()
-            self.open_raster_file()
-
-            # Remove existing tiles for this layer before loading new ones
-            self.rasterlayer.rastertile_set.all().delete()
-
-            # Create tiles in original projection and resolution
-            self.create_base_tiles()
-            self.drop_empty_rasters()
-
-            # Setup TMS aligned tiles in world mercator
-            # self.create_tms_tile_pyramid()
-            scale = self.rasterlayer.pixelsize()[0]
-            zoom = self.get_max_zoom(scale)
-            self.reproject_raster()
-            self.create_base_tiles(zoom)
-            self.create_tms_tile_pyramid()
-            self.drop_empty_rasters()
-
-            # Remove tempdir with source file
-            shutil.rmtree(self.tmpdir)
-
-            # Log success of parsing
-            self.log('Successfully finished parsing raster')
-
-        except:
-            shutil.rmtree(self.tmpdir)
-            self.log(traceback.format_exc())
 
     def get_max_zoom(self, pixelsize):
         """
@@ -468,87 +426,43 @@ class RasterLayerParser:
         zscale = self.worldsize / 2.0**z / self.tilesize
         return zscale, -zscale
 
-    def create_tms_tile_pyramid(self):
+    def parse_raster_layer(self):
         """
-        Creates pyramid tiles that overlay with TMS xyz tiles'
+        This function pushes the raster data from the Raster Layer into the
+        RasterTile table, in tiles of 100x100 pixels.
         """
-        self.log('Creating XYZ tiles')
+        try:
+            # Clean previous parse log
+            self.log('Started parsing raster file', reset=True)
 
-        # Get layer extent and pixel size from DB
-        scale = self.rasterlayer.pixelsize()[0]
-        bbox = self.rasterlayer.extent()
+            # Download, unzip and open raster file
+            self.get_raster_file()
+            self.open_raster_file()
 
-        # Calculate the closest zoomlevel for the raster scale
-        zoom = self.get_max_zoom(scale)
-        self.log('Tiles max zoom level: {0}'.format(zoom))
-        
-        # Loop through all lower zoom levels and create tiles
-        for iz in range(zoom - 1, -1, -1):
+            # Remove existing tiles for this layer before loading new ones
+            self.rasterlayer.rastertile_set.all().delete()
 
-            # For this zoomlevel, calculate xy tile index range
-            indexrange = self.get_tile_index_range(bbox, iz)
+            # Create tiles in original projection and resolution
+            self.create_tiles()
+            self.drop_empty_rasters()
 
-            # Log this processing step
-            self.log('Parsing tiles at Zoom {0}, X index range {1}-{2},'\
-                     ' Y index range {3}-{4}'.format(iz,
-                        indexrange[0], indexrange[2],
-                        indexrange[1], indexrange[3]))
+            # Setup TMS aligned tiles in world mercator
+            scale = self.rasterlayer.rasterlayermetadata.scalex
+            zoom = self.get_max_zoom(scale)
 
-            # Calculate zoom level constants
-            scalex, scaley = self.get_tile_scale(iz)
+            # Loop through all lower zoom levels and create tiles
+            for iz in range(zoom, -1, -1):
+                self.reproject_raster(iz)
+                self.create_tiles(iz)
+            
+            self.drop_empty_rasters()
 
-            # Loop over all overlapping xy tiles at this zoom
-            counter = 0
-            for ix in range(indexrange[0], indexrange[2]+1):
-                for iy in range(indexrange[1], indexrange[3]+1):
-                    # Report every 1000 tiles
-                    counter += 1
-                    if counter % 1000 == 0:
-                        self.log('{0} Tiles Processed'.format(counter))
-                    
-                    # Calculate the bounds of this tile
-                    bounds = self.get_tile_bounds(ix, iy, iz)
+            # Remove tempdir with raster files
+            shutil.rmtree(self.tmpdir)
 
-                    # Convert bounds to WKT for spatial filtering
-                    bounds_wkt = Polygon.from_bbox(bounds).wkt
+            # Log success of parsing
+            self.log('Successfully finished parsing raster')
 
-                    # Setup tile creator query
-                    var = """
-                    WITH tile AS (
-                        SELECT ST_Rescale(ST_Union(rast), {scalexy}) AS rast
-                        FROM raster_rastertile
-                        WHERE rasterlayer_id={rasterlayer}
-                        AND tilez={tilez}
-                        AND (
-                            (tilex={tilex}   AND tiley={tiley})   OR
-                            (tilex={tilex}   AND tiley={tiley}+1) OR
-                            (tilex={tilex}+1 AND tiley={tiley})   OR
-                            (tilex={tilex}+1 AND tiley={tiley}+1)
-                        )
-                    ) SELECT rast FROM tile WHERE NOT ST_BandIsNoData(rast)
-                    """
-
-                    # Fill query text with specific values
-                    sql = var.format(
-                        scalexy=repr(scalex),
-                        rasterlayer=self.rasterlayer.id,
-                        tilez=iz+1,
-                        tilex=2*ix,
-                        tiley=2*iy
-                    )
-
-                    # Calculate tile in DB
-                    cursor=connection.cursor()
-                    cursor.execute(sql)
-                    data = cursor.fetchone()
-
-                    # If tile is not empty, create RasterTile instance
-                    if data and data[0]:
-                        RasterTile.objects.create(
-                            rast=data[0],
-                            rasterlayer=self.rasterlayer,
-                            filename=self.rastername,
-                            tilex=ix,
-                            tiley=iy,
-                            tilez=iz
-                        )
+        except:
+            shutil.rmtree(self.tmpdir)
+            self.log(traceback.format_exc())
