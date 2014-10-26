@@ -292,22 +292,22 @@ class RasterLayerParser:
         for rendering but for analysis in the original projection. This makes
         value count statistics etc more accurate.
         """
+        if zoom:
+            self.log('Creating tiles for zoom ' + str(zoom))
+        else:
+            self.log('Creating tiles in original projection')
 
-        self.log('Creating tiles for zoom ' + str(zoom))
-        iy = -1
         for yblock in range(0, self.rows, self.tilesize):
             if yblock + self.tilesize < self.rows:
                 numRows = self.tilesize
             else:
                 numRows = self.rows - yblock
-            iy += 1
-            ix = -1
+
             for xblock in range(0, self.cols, self.tilesize):
                 if xblock + self.tilesize < self.cols:
                     numCols = self.tilesize
                 else:
                     numCols = self.cols - xblock
-                ix += 1
                 
                 # Calculate raster tile origin
                 xorigin = self.originX + self.pixelWidth*xblock
@@ -343,8 +343,8 @@ class RasterLayerParser:
                     bbox = self.rasterlayer.extent()
                     indexrange = self.get_tile_index_range(bbox, zoom)
 
-                    tile.tilex = indexrange[0] + ix
-                    tile.tiley = indexrange[1] + iy
+                    tile.tilex = indexrange[0] + xblock/self.tilesize
+                    tile.tiley = indexrange[1] + yblock/self.tilesize
                     tile.tilez = zoom
 
                 # Save tile

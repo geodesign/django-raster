@@ -36,7 +36,8 @@ admin.site.register(RasterLayerMetadata, RasterLayerMetadataModelAdmin)
 
 # Register read-only raster tile in admin
 class RasterTileModelAdmin(admin.ModelAdmin):
-    readonly_fields = ('rast', 'rasterlayer', 'filename', 'level')
+    readonly_fields = ('rast', 'rasterlayer', 'filename', 'is_base', 'tilex',
+                       'tiley', 'tilez')
     def has_add_permission(self, request, obj=None):
         return False
     def has_delete_permission(self, request, obj=None):
