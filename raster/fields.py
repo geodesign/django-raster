@@ -51,8 +51,6 @@ class OGRRaster(object):
     def from_postgis_raster(self, data):
         """Returns a gdal in-memory raster from a PostGIS Raster String"""
 
-
-
         # Split raster header from data
         header, data = self.chunk(data, 122)
 
@@ -65,32 +63,40 @@ class OGRRaster(object):
         for i in range(header['nr_of_bands']):
             # Get pixel type for this band
             pixeltype, data = self.chunk(data, 2)
+
+            # This assumes a nodata value is always specified
+            # TODO: Handle rasters without nodata values
             pixeltype = self.unpack('B', pixeltype)[0] - 64
+
+            # String with hex type name for unpacking
             pixeltype_hex = HEXTYPES[pixeltype]
+
+            # Length in bytes of the hex type
             pixeltype_len = HEXLENGTHS[pixeltype_hex]
+
+            # PostGIS datatypes mapped to Gdalconstants data types
             pixeltype_gdal = GDALTYPES[pixeltype]
 
             # Get band nodata value
             nodata, data = self.chunk(data, 2 * pixeltype_len)
             nodata = self.unpack(pixeltype_hex, nodata)[0]
 
-            # Get band data
+            # Chunnk and unpack band data
             nr_of_pixels = header['sizex'] * header['sizey']
             band_data, data = self.chunk(data, 2 * nr_of_pixels)
             band_data = self.unpack(pixeltype_hex * nr_of_pixels, band_data)
-            band_data_array = array(band_data)
-            band_data_array = band_data_array.reshape((header['sizex'], header['sizey']))
 
-            bands.append({
-                'type': pixeltype_gdal,
-                'nodata': nodata,
-                'data': band_data,
-                'array': band_data_array
-            })
+            # Convert data to numpy 2d array
+            band_data_array = array(band_data)
+            band_data_array = band_data_array.reshape((header['sizex'], 
+                                                       header['sizey']))
+
+            bands.append({'type': pixeltype_gdal, 'nodata': nodata,
+                          'data': band_data, 'array': band_data_array})
 
         # Check that all bands have the same pixeltype
         if len(set([x['type'] for x in bands])) != 1:
-            raise ValidationError("Pixeltypes of raster bands are not all equal.")
+            raise ValidationError("Band pixeltypes of  are not all equal.")
 
         # Create gdal in-memory raster
         driver = gdal.GetDriverByName('MEM')
@@ -98,56 +104,67 @@ class OGRRaster(object):
                             header['nr_of_bands'], bands[0]['type'])
 
         # Set GeoTransform
-        gt = (
-            header['originx'],
-            header['scalex'],
-            header['skewx'],
-            header['originy'],
-            header['skewy'],
-            header['scaley'],
-        )
-        ptr.SetGeoTransform(gt)
+        ptr.SetGeoTransform((
+            header['originx'], header['scalex'], header['skewx'],
+            header['originy'], header['skewy'], header['scaley']
+        ))
 
         # Set projection
         srs = osr.SpatialReference()
         srs.ImportFromEPSG(header['srid'])
         ptr.SetProjection(srs.ExportToWkt())
 
-        # Write bands
+        # Write bands to gdal raster
         for i in range(header['nr_of_bands']):
             gdalband = ptr.GetRasterBand(i + 1)
             gdalband.SetNoDataValue(bands[i]['nodata'])
             gdalband.WriteArray(bands[i]['array'])
 
+        # Return gdal raster
         return ptr
 
     def to_postgis_raster(self):
         """Retruns the raster as postgis raster string"""
 
-        # Create Raster Header string
+        # Get GDAL geotransform for header data
         gt = self.ptr.GetGeoTransform()
+
+        # Get other required header data
         num_bands = self.ptr.RasterCount
         pixelcount = self.ptr.RasterXSize * self.ptr.RasterYSize
+
+        # Setup raster header as array, first two numbers are 
+        # endianness and version, which are fixed by postgis at the moment
         rasterheader = (1, 0, num_bands, gt[1], gt[5], gt[0], gt[3], 
                   gt[2], gt[4], self.srid, self.ptr.RasterXSize,
                   self.ptr.RasterYSize)
 
-        rasterheader = self.pack(RASTER_HEADER_STRUCTURE, rasterheader)
+        # Pack header into binary data
+        result = self.pack(RASTER_HEADER_STRUCTURE, rasterheader)
 
-        # Create Band Strings
-        result = rasterheader
-        for i in range(1, num_bands + 1):
-            band = self.ptr.GetRasterBand(i)
-            
+        # Pack band data, add to result
+        for i in range(num_bands):
+            # Get band
+            band = self.ptr.GetRasterBand(i + 1)
+
+            # Get band header data
             nodata = band.GetNoDataValue()
             pixeltype = {v: k for k, v in GDALTYPES.items()}[band.DataType]
+
+            # Setup packing structure for header
             structure = 'B ' + HEXTYPES[pixeltype]
 
+            # Pack header
             bandheader = self.pack(structure, (pixeltype + 64, nodata))
+
+            # Read raster as binary and hexlify
             data = band.ReadRaster()
             data = binascii.hexlify(data).upper()
+
+            # Add band to result string
             result += bandheader + data
 
+        # Return PostGIS Raster String
         return result
 
 
@@ -164,6 +181,7 @@ class RasterField(models.Field):
         return 'raster'
 
     def from_db_value(self, value, connection):
+        # Convert PostGIS Raster string to OGR Rasters
         if value:
             value = OGRRaster(value)
 
