@@ -101,17 +101,25 @@ class RasterLayer(models.Model):
     def extent(self, srid=3857):
         """Returns bbox for layer"""
         if not self._bbox:
+            # Get bbox for raster in original coordinates
             meta = self.rasterlayermetadata
             xmin = meta.uperleftx
             ymax = meta.uperlefty
             xmax = xmin + meta.width * meta.scalex
             ymin = ymax + meta.height * meta.scaley
+
+            # Create Polygon box and transform to requested srid
             geom = Polygon.from_bbox((xmin, ymin, xmax, ymax))
             geom.srid = int(self.srid)
             geom.transform(srid)
+
+            # Calculate value range for bbox
             coords = geom.coords[0]
-            self._bbox = (coords[0][0], coords[0][1],
-                          coords[2][0], coords[2][1])
+            xvals = [x[0] for x in coords]
+            yvals = [x[1] for x in coords]
+
+            # Set bbox
+            self._bbox = (min(xvals), min(yvals), max(xvals), max(yvals))
 
         return self._bbox
 

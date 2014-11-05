@@ -10,7 +10,7 @@ from django.conf import settings
 from django.contrib.gis.geos import Polygon
 
 from raster.models import RasterTile, RasterLayerMetadata
-from raster.fields import OGRRaster
+from raster.ogrraster import OGRRaster
 
 class RasterLayerParser:
     """Class to parse raster layers using gdal python bindings"""
@@ -240,7 +240,6 @@ class RasterLayerParser:
                 else:
                     bbox = self.rasterlayer.extent()
                     indexrange = self.get_tile_index_range(bbox, zoom)
-
                     tile.tilex = indexrange[0] + xblock/self.tilesize
                     tile.tiley = indexrange[1] + yblock/self.tilesize
                     tile.tilez = zoom
@@ -329,37 +328,37 @@ class RasterLayerParser:
         This function pushes the raster data from the Raster Layer into the
         RasterTile table, in tiles of 100x100 pixels.
         """
-        # try:
-        # Clean previous parse log
-        self.log('Started parsing raster file', reset=True)
+        try:
+            # Clean previous parse log
+            self.log('Started parsing raster file', reset=True)
 
-        # Download, unzip and open raster file
-        self.get_raster_file()
-        self.open_raster_file()
+            # Download, unzip and open raster file
+            self.get_raster_file()
+            self.open_raster_file()
 
-        # Remove existing tiles for this layer before loading new ones
-        self.rasterlayer.rastertile_set.all().delete()
+            # Remove existing tiles for this layer before loading new ones
+            self.rasterlayer.rastertile_set.all().delete()
 
-        # Create tiles in original projection and resolution
-        self.crop()#create_tiles()
-        self.drop_empty_rasters()
+            # Create tiles in original projection and resolution
+            self.crop()
+            self.drop_empty_rasters()
 
-        # Setup TMS aligned tiles in world mercator
-        scale = self.rasterlayer.rasterlayermetadata.scalex
-        zoom = self.get_max_zoom(scale)
-        # Loop through all lower zoom levels and create tiles
-        for iz in range(zoom, -1, -1):
-            self.reproject_raster(iz)
-            self.crop(iz)#create_tiles(iz)
-        
-        self.drop_empty_rasters()
+            # Setup TMS aligned tiles in world mercator
+            scale = self.rasterlayer.rasterlayermetadata.scalex
+            zoom = self.get_max_zoom(scale)
+            # Loop through all lower zoom levels and create tiles
+            for iz in range(zoom, -1, -1):
+                self.reproject_raster(iz)
+                self.crop(iz)
+            
+            self.drop_empty_rasters()
 
-        # Remove tempdir with raster files
-        shutil.rmtree(self.tmpdir)
+            # Remove tempdir with raster files
+            shutil.rmtree(self.tmpdir)
 
-        # Log success of parsing
-        self.log('Successfully finished parsing raster')
+            # Log success of parsing
+            self.log('Successfully finished parsing raster')
 
-        # except:
-        #     shutil.rmtree(self.tmpdir)
-        #     self.log(traceback.format_exc())
+        except:
+            shutil.rmtree(self.tmpdir)
+            self.log(traceback.format_exc())

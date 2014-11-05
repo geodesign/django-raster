@@ -39,7 +39,7 @@ class RasterLayerValueCountTests(TransactionTestCase):
     def test_value_count_nogeom(self):
         results = self.rasterlayer.value_count()
 
-        expected = {1:319, 2:26, 3:1885, 4:14320, 8:612, 9:1335}
+        expected = {0:9865, 1:319, 2:26, 3:1885, 4:14320, 8:612, 9:1335}
 
         for res in results:
             self.assertEqual(res['count'], expected[res['value']])
@@ -48,7 +48,7 @@ class RasterLayerValueCountTests(TransactionTestCase):
         results = self.rasterlayer\
             .value_count('SRID=3086;' + self.wktgeom)
 
-        expected = {1:319, 2:26, 3:1885, 4:14320, 8:612, 9:1335}
+        expected = {0:9865, 1:319, 2:26, 3:1885, 4:14320, 8:612, 9:1335}
 
         for res in results:
             self.assertEqual(res['count'], expected[res['value']])
