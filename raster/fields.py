@@ -31,10 +31,12 @@ class OGRRaster(object):
         self.srid = srid
 
         # Validate input
-        if not isinstance(data, str):
+        if isinstance(data, str):
+            self.ptr = self.from_postgis_raster(data)
+        elif isinstance(data, gdal.Dataset):
+            self.ptr = data
+        else:
             raise ValidationError('Raster can only be a string at the moment')
-
-        self.ptr = self.from_postgis_raster(data)
 
     def pack(self, structure, data):
         """Packs data into binary data in little endian format"""
