@@ -367,6 +367,5 @@ class RasterLayerParser:
             self.log('Successfully finished parsing raster')
         except:
             self.log(traceback.format_exc())
-            raise
         finally:
             shutil.rmtree(self.tmpdir)
