@@ -55,7 +55,7 @@ class RasterLayerValueCountTests(TransactionTestCase):
     def test_value_count_full(self):
         results = self.rasterlayer\
             .value_count('SRID=3086;' + self.wktgeom)
-        import ipdb; ipdb.set_trace()
+
         for res in results:
             self.assertEqual(res, self.expected[res['value']])
 
