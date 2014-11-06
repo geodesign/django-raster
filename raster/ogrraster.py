@@ -1,6 +1,5 @@
-import struct, binascii
+import struct, binascii, numpy
 from osgeo import gdal, osr, gdalconst
-from numpy import array
 
 from django.core.exceptions import ValidationError
 
@@ -93,7 +92,7 @@ class OGRRaster(object):
             band_data = self.unpack(pixeltype_hex * nr_of_pixels, band_data)
 
             # Convert data to numpy 2d array
-            band_data_array = array(band_data)
+            band_data_array = numpy.array(band_data)
             band_data_array = band_data_array.reshape((header['sizex'], 
                                                        header['sizey']))
 
@@ -110,7 +109,7 @@ class OGRRaster(object):
                             header['nr_of_bands'], bands[0]['type'])
 
         # Set GeoTransform
-        ptr.SetGeoTransform((
+        self.ptr.SetGeoTransform((
             header['originx'], header['scalex'], header['skewx'],
             header['originy'], header['skewy'], header['scaley']
         ))
@@ -229,6 +228,8 @@ class OGRRaster(object):
         }
 
     @property
-    def value_count(self):
+    def value_count(self, band=1):
         """Value count statistics for this raster"""
-        
+        data = self.ptr.GetRasterBand(band).ReadAsArray()
+        unique, counts = numpy.unique(data, return_counts=True)
+        return numpy.asarray((unique, counts)).T

@@ -12,6 +12,7 @@ addons:
   postgresql : "9.3"
 
 before_install:
+  - which pg_config
   - shippable_retry sudo apt-get update
   - shippable_retry sudo apt-get install -y python-gdal
 
@@ -19,9 +20,9 @@ install:
   - pip install Django==1.7 psycopg2==2.5.3
 
 before_script:
-  - which pg_config
   - psql -c 'create database "ci_test";' -U postgres
   - psql -d travis_ci_test -c 'create extension postgis;' -U postgres
+  - ls $SHIPPABLE_VE_DIR/lib/python2.7/
   - rm $SHIPPABLE_VE_DIR/lib/python2.7/no-global-site-packages.txt
 
 script: django-admin.py test raster
