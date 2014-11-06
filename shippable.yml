@@ -12,7 +12,6 @@ addons:
   postgresql : "9.3"
 
 before_install:
-  - rm $HOME/build_ve/python/2.7/lib/python2.7/no-global-site-packages.txt
   - shippable_retry sudo apt-get update
   - shippable_retry sudo apt-get install python-gdal
 
