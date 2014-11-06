@@ -14,7 +14,7 @@ before_install:
   - shippable_retry sudo apt-get install -y python-gdal
 
 install:
-  - pip install Django==1.7 psycopg2==2.5.3
+  - pip install Django==1.7 psycopg2==2.5.3 celery==3.1.15
 
 before_script:
   - psql -c 'create database raster_test;' -U postgres
