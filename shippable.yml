@@ -29,6 +29,3 @@ script: django-admin.py test raster
 
 notifications:
    email: false
-
-
- shippable_retry sudo apt-get install -y python-psycopg2
