@@ -13,7 +13,7 @@ addons:
 
 before_install:
   - shippable_retry sudo apt-get update
-  - shippable_retry sudo apt-get install python-gdal
+  - shippable_retry sudo apt-get install -y python-gdal
 
 install:
   - pip install Django==1.7 psycopg2==2.5.3
