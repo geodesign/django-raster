@@ -25,17 +25,38 @@ GDALTYPES = {
 class OGRRaster(object):
     """Django Raster Object"""
 
-    def __init__(self, data, srid=3086):
+    def __init__(self, data, srid=None):
 
-        self.srid = srid
-
-        # Validate input
         if isinstance(data, str):
-            self.ptr = self.from_postgis_raster(data)
-        elif isinstance(data, gdal.Dataset):
+            self.set_ptr_from_postgis_raster(data)
+        elif isinstance(data, gdal.Dataset):            
             self.ptr = data
+
+            # If srid is provided explicitly, override projection
+            # Otherwise make sure projection is properly defined
+            if srid:
+                self.set_projection(srid)
+            elif not self.srid:
+                raise ValidationError('Raster SRID could not be determined, please specify.')
         else:
-            raise ValidationError('Raster can only be a string at the moment')
+            raise ValidationError('Raster must be a string or GdalRaster.')
+
+    def set_projection(self, srid):
+        """Updates projection to given srid"""
+        srs = osr.SpatialReference()
+        srs.ImportFromEPSG(srid)
+        self.ptr.SetProjection(srs.ExportToWkt())
+
+    @property
+    def srid(self):
+        """Returns srid of raster"""
+        prj = self.ptr.GetProjectionRef()
+        srs = osr.SpatialReference(prj)
+
+        if srs.IsProjected():
+            return int(srs.GetAuthorityCode('PROJCS'))
+        else:
+            return int(srs.GetAuthorityCode('GEOGCS'))
 
     def pack(self, structure, data):
         """Packs data into binary data in little endian format"""
@@ -49,7 +70,7 @@ class OGRRaster(object):
         """Splits string data into two halfs at the input index"""
         return data[:index], data[index:]
 
-    def from_postgis_raster(self, data):
+    def set_ptr_from_postgis_raster(self, data):
         """Returns a gdal in-memory raster from a PostGIS Raster String"""
 
         # Split raster header from data
@@ -101,7 +122,7 @@ class OGRRaster(object):
 
         # Create gdal in-memory raster
         driver = gdal.GetDriverByName('MEM')
-        ptr = driver.Create('OGRRaster', header['sizex'], header['sizey'], 
+        self.ptr = driver.Create('OGRRaster', header['sizex'], header['sizey'], 
                             header['nr_of_bands'], bands[0]['type'])
 
         # Set GeoTransform
@@ -111,18 +132,13 @@ class OGRRaster(object):
         ))
 
         # Set projection
-        srs = osr.SpatialReference()
-        srs.ImportFromEPSG(header['srid'])
-        ptr.SetProjection(srs.ExportToWkt())
+        self.set_projection(header['srid'])
 
         # Write bands to gdal raster
         for i in range(header['nr_of_bands']):
-            gdalband = ptr.GetRasterBand(i + 1)
+            gdalband = self.ptr.GetRasterBand(i + 1)
             gdalband.SetNoDataValue(bands[i]['nodata'])
             gdalband.WriteArray(bands[i]['array'])
-
-        # Return gdal raster
-        return ptr
 
     def to_postgis_raster(self):
         """Retruns the raster as postgis raster string"""

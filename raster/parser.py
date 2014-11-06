@@ -184,10 +184,10 @@ class RasterLayerParser:
         lyrmeta.save()
 
     def crop(self, zoom=None):
-        if zoom:
-            self.log('Creating tiles for zoom ' + str(zoom))
-        else:
+        if zoom is None:
             self.log('Creating tiles in original projection')
+        else:
+            self.log('Creating tiles for zoom ' + str(zoom))            
 
         for yblock in range(0, self.rows, self.tilesize):
             if yblock + self.tilesize < self.rows:
@@ -227,10 +227,16 @@ class RasterLayerParser:
                     source_wkt,
                     dest_wkt
                 )
+                if zoom is None:
+                    srid = self.rasterlayer.srid
+                else:
+                    srid = self.global_srid
+
+                rast = OGRRaster(dest, srid)
 
                 # Create tile
                 tile = RasterTile(
-                        rast=dest,
+                        rast=rast,
                         rasterlayer=self.rasterlayer,
                         filename=self.rastername)
 
@@ -346,6 +352,7 @@ class RasterLayerParser:
             # Setup TMS aligned tiles in world mercator
             scale = self.rasterlayer.rasterlayermetadata.scalex
             zoom = self.get_max_zoom(scale)
+
             # Loop through all lower zoom levels and create tiles
             for iz in range(zoom, -1, -1):
                 self.reproject_raster(iz)
@@ -353,12 +360,9 @@ class RasterLayerParser:
             
             self.drop_empty_rasters()
 
-            # Remove tempdir with raster files
-            shutil.rmtree(self.tmpdir)
-
             # Log success of parsing
             self.log('Successfully finished parsing raster')
-
         except:
-            shutil.rmtree(self.tmpdir)
             self.log(traceback.format_exc())
+        finally:
+            shutil.rmtree(self.tmpdir)
