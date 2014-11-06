@@ -14,7 +14,7 @@ class RasterLayerParserWithoutCeleryTests(TransactionTestCase):
         self.pwd = os.path.dirname(os.path.abspath(
             inspect.getfile(inspect.currentframe())))
 
-        sourcefile = File(open(os.path.join(self.pwd, 'raster.tif.zip')))
+        sourcefile = File(open(os.path.join(self.pwd, 'raster.tif')))
 
         # Create network with csv data attached
         self.rasterlayer = RasterLayer.objects.create(

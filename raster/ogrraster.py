@@ -21,6 +21,8 @@ GDALTYPES = {
         11: gdalconst.GDT_Float64
 }
 
+GDALTYPES_UNISGNED = [gdalconst.GDT_Byte, gdalconst.GDT_UInt16, gdalconst.GDT_UInt32]
+
 class OGRRaster(object):
     """Django Raster Object"""
 
@@ -147,15 +149,23 @@ class OGRRaster(object):
             # Get band
             band = self.ptr.GetRasterBand(i + 1)
 
+            # Set base structure for raster header - pixeltype
+            structure = 'B'
+
             # Get band header data
             nodata = band.GetNoDataValue()
             pixeltype = {v: k for k, v in GDALTYPES.items()}[band.DataType]
+            if nodata < 0 and pixeltype in GDALTYPES_UNISGNED:
+                nodata = abs(nodata)
 
-            # Setup packing structure for header
-            structure = 'B ' + HEXTYPES[pixeltype]
+            if nodata is not None:
+                # Setup packing structure for header with nodata
+                structure += HEXTYPES[pixeltype]
+                # Add flag to point to existing nodata type
+                pixeltype += 64
 
             # Pack header
-            bandheader = self.pack(structure, (pixeltype + 64, nodata))
+            bandheader = self.pack(structure, (pixeltype, nodata))
 
             # Read raster as binary and hexlify
             data = band.ReadRaster()

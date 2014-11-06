@@ -1,3 +1,5 @@
+build_image: shippableimages/ubuntu1404_python
+
 language: python
 
 python:
