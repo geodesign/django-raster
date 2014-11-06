@@ -1,0 +1,30 @@
+build_image: shippableimages/ubuntu1404_python
+
+language: python
+
+python:
+  - "2.7"
+
+env:
+  - DB_NAME=ci_test DJANGO_SETTINGS_MODULE=settings PYTHONPATH=$HOME/workspace/src/github.com/geodesign/django-raster
+
+addons:
+  postgresql : "9.3"
+
+before_install:
+  - lsb_release -a
+  - shippable_retry sudo apt-get update
+  - shippable_retry sudo apt-get install python-gdal
+  - rm $HOME/build_ve/python/2.7/lib/python2.7/no-global-site-packages.txt 
+
+install:
+  - pip install Django==1.7 psycopg2==2.5.3
+
+before_script:
+  - psql -c 'create database "ci_test";' -U postgres
+  - psql -d travis_ci_test -c 'create extension postgis;' -U postgres
+
+script: django-admin.py test raster
+
+notifications:
+   email: false
