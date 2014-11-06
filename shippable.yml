@@ -6,22 +6,14 @@ python:
   - "2.7"
 
 env:
-  - DB_NAME=ci_test DJANGO_SETTINGS_MODULE=settings PYTHONPATH=$HOME/workspace/src/github.com/geodesign/django-raster
-
-addons:
-  postgresql : "9.3"
-
-before_install:
-  - shippable_retry sudo apt-get update
-  - shippable_retry sudo apt-get install -y postgresql-server-dev-9.3 python-gdal python-dev
-  - shippable_retry sudo apt-get install -y postgresql-9.3 postgresql-client-9.3
+  - DB_NAME=raster_test DJANGO_SETTINGS_MODULE=settings PYTHONPATH=$HOME/workspace/src/github.com/geodesign/django-raster
 
 install:
-  - pip install Django==1.7 psycopg2==2.5.3
+  - pip install Django==1.7
 
 before_script:
-  - psql -c 'create database "ci_test";' -U postgres
-  - psql -d travis_ci_test -c 'create extension postgis;' -U postgres
+  - psql -c 'create database raster_test;' -U postgres
+  - psql -d raster_test -c 'create extension postgis;' -U postgres
   - ls $SHIPPABLE_VE_DIR/lib/python2.7/
   - rm $SHIPPABLE_VE_DIR/lib/python2.7/no-global-site-packages.txt
 
