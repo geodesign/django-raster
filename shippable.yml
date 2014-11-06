@@ -12,10 +12,9 @@ addons:
   postgresql : "9.3"
 
 before_install:
-  - lsb_release -a
+  - rm $HOME/build_ve/python/2.7/lib/python2.7/no-global-site-packages.txt
   - shippable_retry sudo apt-get update
   - shippable_retry sudo apt-get install python-gdal
-  - rm $HOME/build_ve/python/2.7/lib/python2.7/no-global-site-packages.txt 
 
 install:
   - pip install Django==1.7 psycopg2==2.5.3
