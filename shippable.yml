@@ -12,9 +12,8 @@ addons:
   postgresql : "9.3"
 
 before_install:
-  - locate pg_config
   - shippable_retry sudo apt-get update
-  - shippable_retry sudo apt-get install -y python-gdal
+  - shippable_retry sudo apt-get install -y python-gdal postgresql-server-dev-9.3
 
 install:
   - pip install Django==1.7 psycopg2==2.5.3
