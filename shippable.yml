@@ -14,6 +14,7 @@ addons:
 before_install:
   - shippable_retry sudo apt-get update
   - shippable_retry sudo apt-get install -y postgresql-server-dev-9.3 python-gdal python-dev
+  - shippable_retry sudo apt-get install -y postgresql-9.3 postgresql-client-9.3
 
 install:
   - pip install Django==1.7 psycopg2==2.5.3
@@ -28,3 +29,6 @@ script: django-admin.py test raster
 
 notifications:
    email: false
+
+
+ shippable_retry sudo apt-get install -y python-psycopg2
