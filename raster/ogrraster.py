@@ -41,23 +41,7 @@ class OGRRaster(object):
         else:
             raise ValidationError('Raster must be a string or GdalRaster.')
 
-    def set_projection(self, srid):
-        """Updates projection to given srid"""
-        srs = osr.SpatialReference()
-        srs.ImportFromEPSG(srid)
-        self.ptr.SetProjection(srs.ExportToWkt())
-
-    @property
-    def srid(self):
-        """Returns srid of raster"""
-        prj = self.ptr.GetProjectionRef()
-        srs = osr.SpatialReference(prj)
-
-        if srs.IsProjected():
-            return int(srs.GetAuthorityCode('PROJCS'))
-        else:
-            return int(srs.GetAuthorityCode('GEOGCS'))
-
+    # Data parser methods
     def pack(self, structure, data):
         """Packs data into binary data in little endian format"""
         return binascii.hexlify(struct.pack('<' + structure, *data)).upper()
@@ -183,3 +167,68 @@ class OGRRaster(object):
 
         # Return PostGIS Raster String
         return result
+
+    # GDAL Raster spatial methods
+    def set_projection(self, srid):
+        """Updates projection to given srid"""
+        srs = osr.SpatialReference()
+        srs.ImportFromEPSG(srid)
+        self.ptr.SetProjection(srs.ExportToWkt())
+
+    @property
+    def srid(self):
+        """Returns srid of raster"""
+        prj = self.ptr.GetProjectionRef()
+        srs = osr.SpatialReference(prj)
+
+        if srs.IsProjected():
+            return int(srs.GetAuthorityCode('PROJCS'))
+        else:
+            return int(srs.GetAuthorityCode('GEOGCS'))
+
+    @property
+    def upperleftx(self):
+        """X coordinate of origin (upper left corner)"""
+        return self.ptr.GetGeoTransform()[0]
+
+    @property
+    def upperlefty(self):
+        """Y coordinate of origin (upper left corner)"""
+        return self.ptr.GetGeoTransform()[3]
+
+    @property
+    def scalex(self):
+        """Scale of pixels in X directon"""
+        return self.ptr.GetGeoTransform()[1]
+
+    @property
+    def scaley(self):
+        """Scale of pixels in Y directon"""
+        return self.ptr.GetGeoTransform()[5]
+
+    @property
+    def skewx(self):
+        """Skew of pixels in X direction"""
+        return self.ptr.GetGeoTransform()[2]
+
+    @property
+    def skewy(self):
+        """Skew of pixels in Y directionX"""
+        return self.ptr.GetGeoTransform()[0]
+
+    @property
+    def metadata(self):
+        """Dictionary of meta data of the raster"""
+        return {
+            'upperleftx': self.upperleftx,
+            'upperlefty': self.upperlefty,
+            'scalex': self.scalex,
+            'scaley': self.scaley,
+            'skewx': self.skewx,
+            'skewy': self.skewy
+        }
+
+    @property
+    def value_count(self):
+        """Value count statistics for this raster"""
+        
