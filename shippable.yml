@@ -12,7 +12,7 @@ addons:
   postgresql : "9.3"
 
 before_install:
-  - which pg_config
+  - locate pg_config
   - shippable_retry sudo apt-get update
   - shippable_retry sudo apt-get install -y python-gdal
 
