@@ -227,11 +227,14 @@ class RasterLayerParser:
                     source_wkt,
                     dest_wkt
                 )
+
+                # Select srid for this zoomlevel
                 if zoom is None:
-                    srid = self.rasterlayer.srid
+                    srid = int(self.rasterlayer.srid)
                 else:
                     srid = self.global_srid
 
+                # Setup OGRRaster
                 rast = OGRRaster(dest, srid)
 
                 # Create tile
@@ -364,5 +367,6 @@ class RasterLayerParser:
             self.log('Successfully finished parsing raster')
         except:
             self.log(traceback.format_exc())
+            raise
         finally:
             shutil.rmtree(self.tmpdir)

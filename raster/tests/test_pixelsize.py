@@ -25,8 +25,6 @@ class RasterLayerPixelsizeTests(TransactionTestCase):
             nodata='0',
             rasterfile=sourcefile)
 
-        self.pixval = 113.307138294017
-
     def tearDown(self):
         shutil.rmtree(os.path.dirname(os.path.join(
             self.pwd, '../..', self.rasterlayer.rasterfile.name)))
