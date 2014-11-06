@@ -7,20 +7,21 @@ os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
 
 setup(
     name='django-raster',
-    version='0.1.3',
+    version='0.1.4',
     packages=['raster', 'raster.migrations'],
     include_package_data=True,
     license='BSD',
     description='Simple raster file implementation for Django based on PostGis',
     long_description=README,
     url='https://github.com/geodesign/django-raster',
-    download_url = 'https://github.com/geodesign/django-raster/tarball/v0.1.3',
+    download_url = 'https://github.com/geodesign/django-raster/tarball/v0.1.4',
     author='Daniel Wiesmann',
     author_email='daniel@urbmet.com',
     install_requires=[
         'psycopg2>=2.5.3',
         'GDAL>=1.10.0',
         'Django>=1.7',
+        'numpy>=1.9.1'
     ],
     keywords=['django', 'raster', 'gis', 'gdal', 'celery', 'geo', 'spatial'],
     classifiers=[

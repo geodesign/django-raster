@@ -45,7 +45,6 @@ class RasterLayerParserWithoutCeleryTests(TransactionTestCase):
         self.assertEqual(self.rasterlayer.rastertile_set.filter(tilez=2).count(), 1)
         self.assertEqual(self.rasterlayer.rastertile_set.filter(tilez=1).count(), 1)
         self.assertEqual(self.rasterlayer.rastertile_set.filter(tilez=0).count(), 1)
-        import ipdb; ipdb.set_trace()
 
     def test_raster_layer_parsing_after_file_change(self):
         self.rasterlayer.rastertile_set.all().delete()
