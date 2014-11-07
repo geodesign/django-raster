@@ -1,6 +1,6 @@
 Rasters for Django
 ==================
-Django-raster provides the simplest possible raster data integration for Django projects using a PostGIS database backend.
+Django-raster provides basic raster data integration for Django projects with a PostGIS database backend.
 
 .. image:: https://api.shippable.com/projects/5423d57480088cee586cd0c8/badge?branchName=master
     :target: https://app.shippable.com/projects/5423d57480088cee586cd0c8/builds/latest
@@ -24,7 +24,7 @@ Setup
 
 Description
 -----------
-Django-raster provides basic integration of `raster data <http://en.wikipedia.org/wiki/GIS_file_formats#Raster>` into Django. It is based on the python bindings provided by the `GDAL <https://pypi.python.org/pypi/GDAL/>`_ package and PostGIS. Raster files can be uploaded and parsed through the admin interface. The raw raster data can be parsed asynchronously if `Celery <http://celeryproject.org/>`_ is integrated into the Django project (see below).
+Django-raster provides basic integration of `raster data <http://en.wikipedia.org/wiki/GIS_file_formats#Raster>`_ into Django. It is based on the python bindings provided by the `GDAL <https://pypi.python.org/pypi/GDAL/>`_ package and PostGIS. Raster files can be uploaded and parsed through the admin interface. The raw raster data can be parsed asynchronously if `Celery <http://celeryproject.org/>`_ is integrated into the Django project (see below).
 
 Once a raster file is uploaded, the parser will extract the data in the raster file and store the rasters in regular tiles of 256x256 pixels in a PostGIS raster table. Each tile will be one row in a PostGIS raster table.
 
@@ -32,17 +32,17 @@ For this, the package defines two models and one field:
 
 * ``RasterLayer`` - storing the raw raster files and meta-data (for example rasterfile=raster.tif and srid=4326)
 
-* ``RasterTile`` - storing the parsed raster in PostGis. The raster data is split into tiles of 100x100 pixels and each tile is stored as an instance of RasterTile. The raster data itself is stored in a *RasterField* within the RasterTile model.
+* ``RasterTile`` - storing the parsed raster in PostGis. The raster data is split into tiles of 256x256 pixels and each tile is stored as an instance of RasterTile. The raster data itself is stored in a *RasterField* within the RasterTile model.
 
-* ``RasterField`` - an extension of the Django base `models.Field` class to store the raster data. The field converts PostGIS raster data coming from a database into Gdal Raster objects and vice versa.
+* ``RasterField`` - an extension of the Django base Field class to store the raster data. The field converts PostGIS raster data from a database into Gdal Raster python objects and vice versa.
 
-* ``OGRRaster`` - an object that stores raster data, in analogy to the OGRGeometry objects in GeoDjango. This object is used as the machinery to translate from PostGIS raster to gdal python objects.
+* ``OGRRaster`` - an object that stores raster data, in analogy to the OGRGeometry objects in GeoDjango.
 
 Due to the simplicity of the implementation, currently no spatial querying can be done on the raster data through python. This package is not integrated with GeoDjango and has a very limited set of features when compared with GeoDjango spatial models. If required however, custom SQL can be used to make spatial queries on the raster data.
 
 Usage
 -----
-After setting the package up, you can upload raster files through the admin interface using the RasterLayer model. Specify a layer name, the raster data type (continuous, categorical, mask or rank ordered), the raster's srid, the nodata value and the raster file to be uploaded.
+After setting the package up, raster files can be uploaded through the admin interface using the RasterLayer model. Specify a layer name, the raster data type (continuous, categorical, mask or rank ordered), the raster's srid, the nodata value and the raster file to be uploaded.
 
 Upon saving the a RasterLayer instance with a raster file, django-raster automatically loads the raster data from the file into a raster field in the RasterTile model. The RasterLayer instances have a *parse_log* field, which stores information about the parsing process. For debugging, there might be some useful information in the parse log.
 
@@ -58,7 +58,7 @@ If this setting is enabled, Celery pushes one task to the queue for each raster 
 
 Pyramid building
 ----------------
-Overview levels (or pyramids) are automatically created at the moment of importing the raster. The pyramid levels are aligned with the definition of a xyz style TMS service. Djago-raster will import the raster file in its original projection and flag those tiles with the ``is_base`` field. Subsequently a set of pyramids are created in the raster table. The pyramid is aligned with the XYZ tiles froma a tile map service, and will be accordingly indexed using the ``tilex``, ``tiley`` and ``tilez`` fields in the RasterTile table. The srid of the pyramid defaults is ``3857``.
+Overview levels (or pyramids) are automatically created at the moment of importing the raster. The pyramid levels are aligned with the definition of a xyz style TMS service. Djago-raster will import the raster file in its original projection and flag those tiles with the ``is_base`` field. Subsequently a set of pyramids are created in the raster table. The pyramid is aligned with the XYZ tiles froma a tile map service, and will be accordingly indexed using the ``tilex``, ``tiley`` and ``tilez`` fields in the RasterTile table. The srid of the pyramid tiles is ``3857``.
 
 Tile size
 ---------
