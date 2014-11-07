@@ -11,6 +11,11 @@ class RasterField(models.Field):
      
     __metaclass__ = models.SubfieldBase
 
+    def __init__(self, srid=4326, **kwargs):
+        self.srid = srid
+
+        super(RasterField, self).__init__(**kwargs)
+
     def db_type(self, connection):
         return 'raster'
 

@@ -170,7 +170,7 @@ class RasterTile(models.Model):
         (14,14), (15,15), (16,16), (17,17), (18,18)
     )
     rid = models.AutoField(primary_key=True)
-    rast = RasterField(null=True, blank=True)
+    rast = RasterField(null=True, blank=True, srid=3857)
     rasterlayer = models.ForeignKey(RasterLayer, null=True, blank=True)
     filename = models.TextField(null=True, blank=True, db_index=True)
     is_base = models.BooleanField(default=False)
