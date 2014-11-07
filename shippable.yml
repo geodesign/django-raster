@@ -12,6 +12,9 @@ env:
   - DB_NAME=raster_test DJANGO_SETTINGS_MODULE=settings PYTHONPATH=$HOME/workspace/src/github.com/geodesign/django-raster
 
 before_install:
+  - sudo echo "deb http://ppa.launchpad.net/ubuntugis/ubuntugis-unstable/ubuntu trusty main " >> /etc/apt/sources.list
+  - sudo echo "deb-src http://ppa.launchpad.net/ubuntugis/ubuntugis-unstable/ubuntu trusty main"  >> /etc/apt/sources.list
+  - shippable_retry sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 314DF160
   - shippable_retry sudo apt-get update
   - shippable_retry sudo apt-get install -y python-dev python-gdal
   - shippable_retry sudo apt-get install -y postgresql-9.3 postgresql-contrib-9.3 postgresql-server-dev-9.3 postgis postgresql-9.3-postgis-scripts
