@@ -14,7 +14,7 @@ env:
 before_install:
   - shippable_retry sudo apt-get update
   - shippable_retry sudo apt-get install -y build-essential python-setuptools python-dev
-  - shippable_retry sudo apt-get install -y postgresql-9.3 postgresql-contrib-9.3 postgresql-server-dev-9.3 postgis
+  - shippable_retry sudo apt-get install -y postgresql-9.3 postgresql-contrib-9.3 postgresql-server-dev-9.3 postgis postgresql-9.3-postgis-scripts
   - shippable_retry sudo apt-get install -y python-gdal
   - sudo echo "local all all trust" > /etc/postgresql/9.3/main/pg_hba.conf
   - sudo service postgresql start
