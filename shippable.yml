@@ -22,7 +22,7 @@ before_install:
   - psql -d raster_test -c 'create extension postgis;' -U postgres
 
 install:
-  - pip install Django==1.7 psycopg2==2.5.3 celery==3.1.15
+  - pip install Django==1.7 psycopg2==2.5.3 celery==3.1.15 numpy==1.9.1
 
 #before_script:
 #  - ls $SHIPPABLE_VE_DIR/lib/python2.7/
