@@ -1,4 +1,0 @@
-Django==1.7
-psycopg2==2.5.3
-celery==3.1.15
-numpy==1.9.1
