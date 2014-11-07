@@ -223,7 +223,7 @@ class OGRRaster(object):
     @property
     def skewy(self):
         """Skew of pixels in Y directionX"""
-        return self.ptr.GetGeoTransform()[0]
+        return self.ptr.GetGeoTransform()[4]
 
     @property
     def metadata(self):
