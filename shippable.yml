@@ -13,7 +13,8 @@ env:
 
 before_install:
   - shippable_retry sudo apt-get update
-  - shippable_retry sudo apt-get install -y python-gdal
+  - shippable_retry sudo apt-get upgrade -y
+  - shippable_retry sudo apt-get install -y postgresql-9.3 postgresql-server-dev-9.3 postgis python-gdal
 
 install:
   - pip install Django==1.7 psycopg2==2.5.3 celery==3.1.15
