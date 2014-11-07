@@ -16,12 +16,15 @@ before_install:
   - shippable_retry sudo apt-get install -y build-essential python-setuptools python-dev
   - shippable_retry sudo apt-get install -y postgresql-9.3 postgresql-contrib-9.3 postgresql-server-dev-9.3 postgis
   - shippable_retry sudo apt-get install -y python-gdal
+  - sudo echo "local all all trust" > /etc/postgresql/9.3/main/pg_hba.conf
+  - sudo service postgresql start
+  - psql -c 'create database raster_test;' -U postgres
+  - psql -d raster_test -c 'create extension postgis;' -U postgres
+
 install:
   - pip install Django==1.7 psycopg2==2.5.3 celery==3.1.15
 
 before_script:
-  - psql -c 'create database raster_test;' -U postgres
-  - psql -d raster_test -c 'create extension postgis;' -U postgres
   - ls $SHIPPABLE_VE_DIR/lib/python2.7/
   - rm $SHIPPABLE_VE_DIR/lib/python2.7/no-global-site-packages.txt
 
