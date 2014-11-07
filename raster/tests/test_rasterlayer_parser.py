@@ -66,7 +66,3 @@ class RasterLayerParserWithoutCeleryTests(TransactionTestCase):
                    RASTER_TILESIZE=100)
 class RasterLayerParserWithCeleryTests(RasterLayerParserWithoutCeleryTests):
     pass
-
-@override_settings(RASTER_PADDING=False, RASTER_TILESIZE=100)
-class RasterLayerParserNoPaddingTests(RasterLayerParserWithoutCeleryTests):
-    pass
