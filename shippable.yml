@@ -24,9 +24,9 @@ before_install:
 install:
   - pip install Django==1.7 psycopg2==2.5.3 celery==3.1.15
 
-before_script:
-  - ls $SHIPPABLE_VE_DIR/lib/python2.7/
-  - rm $SHIPPABLE_VE_DIR/lib/python2.7/no-global-site-packages.txt
+#before_script:
+#  - ls $SHIPPABLE_VE_DIR/lib/python2.7/
+#  - rm $SHIPPABLE_VE_DIR/lib/python2.7/no-global-site-packages.txt
 
 script: django-admin.py test raster
 
