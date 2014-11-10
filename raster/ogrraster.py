@@ -3,25 +3,9 @@ from osgeo import gdal, osr, gdalconst
 
 from django.core.exceptions import ValidationError
 
-RASTER_HEADER_STRUCTURE = 'B H H d d d d d d i H H'
+from utils import convert_pixeltype, HEADER_STRUCTURE, HEADER_NAMES,\
+    GDAL_PIXEL_TYPES_UNISGNED
 
-RASTER_HEADER_NAMES = [
-    'endianness', 'version', 'nr_of_bands', 'scalex', 'scaley',
-    'originx', 'originy', 'skewx', 'skewy', 'srid', 'sizex', 'sizey'
-]
-
-HEXTYPES = {4: 'B', 5: 'h', 6: 'H', 7: 'i', 8: 'I', 10: 'f', 11: 'd'}
-
-HEXLENGTHS = {'B': 1, 'h': 2, 'H': 2, 'i': 4, 'I': 4, 'f': 4, 'd': 8}
-
-GDALTYPES = {
-        4: gdalconst.GDT_Byte, 5: gdalconst.GDT_Int16, 
-        6: gdalconst.GDT_UInt16, 7: gdalconst.GDT_Int32,
-        8: gdalconst.GDT_UInt32, 10: gdalconst.GDT_Float32,
-        11: gdalconst.GDT_Float64
-}
-
-GDALTYPES_UNISGNED = [gdalconst.GDT_Byte, gdalconst.GDT_UInt16, gdalconst.GDT_UInt32]
 
 class OGRRaster(object):
     """Django Raster Object"""
@@ -62,36 +46,38 @@ class OGRRaster(object):
         header, data = self.chunk(data, 122)
 
         # Process header
-        header =  self.unpack(RASTER_HEADER_STRUCTURE, header)
-        header = dict(zip(RASTER_HEADER_NAMES, header))
+        header =  self.unpack(HEADER_STRUCTURE, header)
+        header = dict(zip(HEADER_NAMES, header))
 
         # Process bands
         bands = []
         for i in range(header['nr_of_bands']):
+
             # Get pixel type for this band
             pixeltype, data = self.chunk(data, 2)
+            pixeltype = self.unpack('B', pixeltype)[0]
 
-            # This assumes a nodata value is always specified
-            # TODO: Handle rasters without nodata values
-            pixeltype = self.unpack('B', pixeltype)[0] - 64
+            # Get band nodata value if exists
+            if pixeltype > 64:
+                pixeltype -= 64
+                nodata, data = self.chunk(data, 2 * pixeltype_len)
+                nodata = self.unpack(pack_type, nodata)[0]
+            else:
+                nodata = None
 
             # String with hex type name for unpacking
-            pixeltype_hex = HEXTYPES[pixeltype]
+            pack_type = convert_pixeltype(pixeltype, 'postgis', 'struct')
 
             # Length in bytes of the hex type
-            pixeltype_len = HEXLENGTHS[pixeltype_hex]
+            pixeltype_len = const.STRUCT_SIZE[pack_type]
 
             # PostGIS datatypes mapped to Gdalconstants data types
-            pixeltype_gdal = GDALTYPES[pixeltype]
-
-            # Get band nodata value
-            nodata, data = self.chunk(data, 2 * pixeltype_len)
-            nodata = self.unpack(pixeltype_hex, nodata)[0]
+            pixeltype_gdal = convert_pixeltype(pixeltype, 'postgis', 'gdal')
 
             # Chunnk and unpack band data
             nr_of_pixels = header['sizex'] * header['sizey']
             band_data, data = self.chunk(data, 2 * nr_of_pixels)
-            band_data = self.unpack(pixeltype_hex * nr_of_pixels, band_data)
+            band_data = self.unpack(pack_type * nr_of_pixels, band_data)
 
             # Convert data to numpy 2d array
             band_data_array = numpy.array(band_data)
@@ -121,9 +107,15 @@ class OGRRaster(object):
 
         # Write bands to gdal raster
         for i in range(header['nr_of_bands']):
+            # Get band
             gdalband = self.ptr.GetRasterBand(i + 1)
-            gdalband.SetNoDataValue(bands[i]['nodata'])
+
+            # Write data to band
             gdalband.WriteArray(bands[i]['array'])
+
+            # Set band nodata value if available
+            if bands[i]['nodata']:
+                gdalband.SetNoDataValue(bands[i]['nodata'])
 
     def to_postgis_raster(self):
         """Retruns the raster as postgis raster string"""
@@ -142,7 +134,7 @@ class OGRRaster(object):
                   self.ptr.RasterYSize)
 
         # Pack header into binary data
-        result = self.pack(RASTER_HEADER_STRUCTURE, rasterheader)
+        result = self.pack(HEADER_STRUCTURE, rasterheader)
 
         # Pack band data, add to result
         for i in range(num_bands):
@@ -154,13 +146,15 @@ class OGRRaster(object):
 
             # Get band header data
             nodata = band.GetNoDataValue()
-            pixeltype = {v: k for k, v in GDALTYPES.items()}[band.DataType]
-            if nodata < 0 and pixeltype in GDALTYPES_UNISGNED:
+            pixeltype = convert_pixeltype(band.DataType, 'gdal', 'postgis')
+
+            if nodata < 0 and pixeltype in GDAL_PIXEL_TYPES_UNISGNED:
                 nodata = abs(nodata)
 
             if nodata is not None:
                 # Setup packing structure for header with nodata
-                structure += HEXTYPES[pixeltype]
+                structure += convert_pixeltype(pixeltype, 'postgis', 'struct')
+
                 # Add flag to point to existing nodata type
                 pixeltype += 64
 
