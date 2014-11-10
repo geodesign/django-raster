@@ -4,7 +4,7 @@ from osgeo import gdal, osr, gdalconst
 from django.core.exceptions import ValidationError
 
 from utils import convert_pixeltype, HEADER_STRUCTURE, HEADER_NAMES,\
-    GDAL_PIXEL_TYPES_UNISGNED
+    GDAL_PIXEL_TYPES, GDAL_PIXEL_TYPES_UNISGNED
 
 
 class OGRRaster(object):
@@ -172,12 +172,6 @@ class OGRRaster(object):
         return result
 
     # GDAL Raster spatial methods
-    def set_projection(self, srid):
-        """Updates projection to given srid"""
-        srs = osr.SpatialReference()
-        srs.ImportFromEPSG(srid)
-        self.ptr.SetProjection(srs.ExportToWkt())
-
     @property
     def srid(self):
         """Returns srid of raster"""
@@ -231,9 +225,21 @@ class OGRRaster(object):
             'skewy': self.skewy
         }
 
-    @property
     def value_count(self, band=1):
         """Value count statistics for this raster"""
         data = self.ptr.GetRasterBand(band).ReadAsArray()
         unique, counts = numpy.unique(data, return_counts=True)
         return numpy.asarray((unique, counts)).T
+
+    def pixeltype(self, band=1, as_text=False):
+        datatype = self.ptr.GetRasterBand(band).DataType
+        if as_text:
+            return GDAL_PIXEL_TYPES[datatype]
+        else:
+            return datatype
+
+    def set_projection(self, srid):
+        """Updates projection to given srid"""
+        srs = osr.SpatialReference()
+        srs.ImportFromEPSG(srid)
+        self.ptr.SetProjection(srs.ExportToWkt())

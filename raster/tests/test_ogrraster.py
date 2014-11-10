@@ -42,7 +42,7 @@ class RasterFieldTest(TestCase):
 
     def test_value_count(self):
         self.assertTrue(numpy.array_equal(
-            self.d.rast.value_count, numpy.array([[1,2],[2,2],[3,2]])))
+            self.d.rast.value_count(), numpy.array([[1,2],[2,2],[3,2]])))
 
     def test_metadata(self):
         self.assertEqual(self.d.rast.metadata, {
@@ -53,3 +53,7 @@ class RasterFieldTest(TestCase):
             'skewx': 0.3,
             'skewy': 0.5
         })
+
+    def test_datatype(self):
+        self.assertEqual(self.d.rast.pixeltype(), 1)
+        self.assertEqual(self.d.rast.pixeltype(as_text=True), 'GDT_Byte')
