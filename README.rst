@@ -87,3 +87,16 @@ The RasterLayer model will be extended such that it has spatial operations that 
 OGRRaster objects
 -----------------
 The RasterField uses OGRRaster objects to make raster data available through the field. The OGRRaster object stores the raster data in a gdal raster python object in the attribute ``ptr``. There are several methods that allow interacting with the data, such as the ``metadata`` property, that will return a dictionary with the raster header information.
+
+Export raster as PIL Image
+--------------------------
+The OGRRaster objects that have discrete pixel values can be converted to a PIL image, through the img property. For each pixel value, an RGBA tuple can be specified in a dictionary colormap and passed to the img function. For example::
+
+        >>> categories =  {
+            1:  (225, 225, 225, 255),
+            2:  (156, 156, 156, 255),
+            3:  (255, 255, 190, 255),
+            }
+        >>> img = rast.img(categories)
+        >>> img.size
+        ... (200, 200)

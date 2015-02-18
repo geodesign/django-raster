@@ -1,10 +1,11 @@
 import struct, binascii, numpy
+from PIL import Image
 from osgeo import gdal, osr, gdalconst
 
 from django.core.exceptions import ValidationError
 
 from utils import convert_pixeltype, HEADER_STRUCTURE, HEADER_NAMES,\
-    GDAL_PIXEL_TYPES, GDAL_PIXEL_TYPES_UNISGNED
+    GDAL_PIXEL_TYPES, GDAL_PIXEL_TYPES_UNISGNED, STRUCT_SIZE
 
 
 class OGRRaster(object):
@@ -60,16 +61,21 @@ class OGRRaster(object):
             # Get band nodata value if exists
             if pixeltype > 64:
                 pixeltype -= 64
-                nodata, data = self.chunk(data, 2 * pixeltype_len)
-                nodata = self.unpack(pack_type, nodata)[0]
+                has_nodata = True
             else:
-                nodata = None
+                has_nodata = False
 
             # String with hex type name for unpacking
             pack_type = convert_pixeltype(pixeltype, 'postgis', 'struct')
 
             # Length in bytes of the hex type
-            pixeltype_len = const.STRUCT_SIZE[pack_type]
+            pixeltype_len = STRUCT_SIZE[pack_type]
+
+            nodata, data = self.chunk(data, 2 * pixeltype_len)
+            nodata = self.unpack(pack_type, nodata)[0]
+
+            if not has_nodata:
+                nodata = None
 
             # PostGIS datatypes mapped to Gdalconstants data types
             pixeltype_gdal = convert_pixeltype(pixeltype, 'postgis', 'gdal')
@@ -125,7 +131,6 @@ class OGRRaster(object):
 
         # Get other required header data
         num_bands = self.ptr.RasterCount
-        pixelcount = self.ptr.RasterXSize * self.ptr.RasterYSize
 
         # Setup raster header as array, first two numbers are 
         # endianness and version, which are fixed by postgis at the moment
@@ -225,6 +230,10 @@ class OGRRaster(object):
             'skewy': self.skewy
         }
 
+    @property
+    def nr_of_pixels(self):
+        return self.ptr.RasterXSize * self.ptr.RasterYSize
+
     def value_count(self, band=1):
         """Value count statistics for this raster"""
         data = self.ptr.GetRasterBand(band).ReadAsArray()
@@ -238,8 +247,40 @@ class OGRRaster(object):
         else:
             return datatype
 
+    def array(self, band=1):
+        """Returns band data as numpy array"""
+        return numpy.array(self.ptr.GetRasterBand(band).ReadAsArray())
+
+    def nodata_value(self, band=1):
+        """Returns the nodata value for a band"""
+        bnd = self.ptr.GetRasterBand(band)
+        return bnd.GetNoDataValue()
+
     def set_projection(self, srid):
         """Updates projection to given srid"""
         srs = osr.SpatialReference()
         srs.ImportFromEPSG(srid)
         self.ptr.SetProjection(srs.ExportToWkt())
+
+    def img(self, colormap, band=1):
+        """
+        Creates an python image from pixel values. Currently works for
+        discrete colormaps. The input is a dictionary that maps pixel
+        values to RGBA UInt8 colors.
+        """
+        # Get data as 1D array
+        dat = self.array()
+        dat = dat.reshape(dat.shape[0]*dat.shape[1],)
+
+        # Create zeros array
+        rgba = numpy.zeros((self.nr_of_pixels, 4))
+
+        # Replace matched rows with colors
+        for key, color in colormap.items():
+            rgba[dat == key] = color
+
+        # Reshape array to image size
+        rgba = rgba.reshape(self.ptr.RasterYSize, self.ptr.RasterXSize, 4)
+
+        # Create image from array
+        return Image.fromarray(numpy.uint8(rgba))

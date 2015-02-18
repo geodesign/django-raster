@@ -23,12 +23,12 @@ class RasterFieldTest(TestCase):
         raster.SetGeoTransform(( -0.1, -0.2, 0.3, 0.4, 0.5, 0.6))
 
         band1 = raster.GetRasterBand(1)
-        band1.SetNoDataValue(1)
+        band1.SetNoDataValue(11)
         data1 = numpy.array([1,1,2,2,3,3]).reshape(3, 2)
         band1.WriteArray(data1)
 
         band2 = raster.GetRasterBand(2)
-        band2.SetNoDataValue(2)
+        band2.SetNoDataValue(22)
         data2 = numpy.array([4,4,5,5,6,6]).reshape(3, 2)
         band2.WriteArray(data2)
 
@@ -57,3 +57,24 @@ class RasterFieldTest(TestCase):
     def test_datatype(self):
         self.assertEqual(self.d.rast.pixeltype(), 1)
         self.assertEqual(self.d.rast.pixeltype(as_text=True), 'GDT_Byte')
+
+    def test_numpy_array(self):
+        self.assertTrue((self.d.rast.array() ==
+                         numpy.array([1,1,2,2,3,3]).reshape(3, 2)).all())
+        self.assertTrue((self.d.rast.array(2) ==
+                         numpy.array([4,4,5,5,6,6]).reshape(3, 2)).all())
+
+    def test_nodata_value(self):
+        self.assertEqual(self.d.rast.nodata_value(), 11)
+        self.assertEqual(self.d.rast.nodata_value(2), 22)
+
+    def test_img(self):
+        categories =  {
+            1:  (225, 225, 225, 255),
+            2:  (156, 156, 156, 255),
+            3:  (255, 255, 190, 255),
+        }
+        img = self.d.rast.img(categories)
+
+        self.assertEqual(img.size, (2, 3))
+        self.assertEqual(img.tostring(), '\xe1\xe1\xe1\xff\xe1\xe1\xe1\xff\x9c\x9c\x9c\xff\x9c\x9c\x9c\xff\xff\xff\xbe\xff\xff\xff\xbe\xff')
