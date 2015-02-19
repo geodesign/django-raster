@@ -1,13 +1,13 @@
 import inspect, os, shutil
 
 from django.conf import settings
-from django.test import TransactionTestCase
+from django.test import TestCase
 from django.test.utils import override_settings
 from django.core.files import File
 
 from raster.models import RasterLayer
 
-class RasterLayerValueCountTests(TransactionTestCase):
+class RasterLayerValueCountTests(TestCase):
 
     def setUp(self):
         # Instantiate Django file instances with nodes and links

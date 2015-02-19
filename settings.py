@@ -22,3 +22,5 @@ DATABASES = {
 }
 
 DEBUG = True
+
+ROOT_URLCONF = 'raster.urls'

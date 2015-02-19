@@ -210,3 +210,11 @@ def convert_pixeltype(data, source, target):
             return GDAL_PIXEL_TYPES_INV[POSTGIS_TO_GDAL[data]]
         elif target == 'struct':
             return POSTGIS_TO_STRUCT[data]
+
+IMG_FORMATS = {'.png': 'PNG', '.jpg': 'JPEG'}
+
+def hex_to_rgba(value, alpha=255):
+    value = value.lstrip('#')
+    lv = len(value)
+    rgb = tuple(int(value[i:i + lv // 3], 16) for i in range(0, lv, lv // 3))
+    return rgb + (alpha, )

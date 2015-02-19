@@ -1,9 +1,105 @@
+import json
+
 from django.conf import settings
 from django.db import models, connection
 from django.dispatch import receiver
+from django.db.models.signals import pre_save, post_save, m2m_changed
 from django.contrib.gis.geos import GEOSGeometry, Polygon
 
+from colorful.fields import RGBColorField
+
 from raster.fields import RasterField
+from raster.utils import hex_to_rgba
+
+
+class LegendSemantics(models.Model):
+    """
+    Labels for pixel types (urban, forrest, warm, cold, etc)
+    """
+    name = models.CharField(max_length=50)
+    description = models.TextField(null=True, blank=True)
+    keyword = models.TextField(null=True, blank=True, max_length=100)
+
+    def __str__(self):
+        return self.name
+
+
+class LegendEntry(models.Model):
+    """
+    One row in a Legend.
+    """
+    semantics = models.ForeignKey(LegendSemantics)
+    expression = models.CharField(max_length=500)
+    color = RGBColorField()
+
+    def __str__(self):
+        return '{}, {}, {}'.format(self.semantics.name,
+                                   self.expression,
+                                   self.color)
+
+
+class Legend(models.Model):
+    """
+    Legend object for Rasters.
+    """
+    title = models.CharField(max_length=200)
+    description = models.TextField(null=True, blank=True)
+    entries = models.ManyToManyField(LegendEntry)
+    json = models.TextField(null=True, blank=True)
+
+    def __str__(self):
+        return self.title
+
+    def update_json(self):
+        data = []
+        for val in self.entries.all():
+            data.append({
+                'name': val.semantics.name,
+                'expression': val.expression,
+                'color': val.color
+            })
+        self.json = json.dumps(data)
+
+    @property
+    def colormap(self):
+        legend = json.loads(self.json)
+        cmap = {}
+        for leg in legend:
+            cmap[int(leg['expression'])] = hex_to_rgba(leg['color'])
+        return cmap
+
+
+def legend_entries_changed(sender, instance, action, **kwargs):
+    """
+    Updates style json upon adding or removing legend entries.
+    """
+    if action in ('post_add', 'post_remove'):
+        instance.update_json()
+        instance.save()
+
+m2m_changed.connect(legend_entries_changed, sender=Legend.entries.through)
+
+
+@receiver(post_save, sender=LegendEntry)
+def update_dependent_legends_on_entry_change(sender, instance, **kwargs):
+    """
+    Updates dependent Legends on a change in Legend entries.
+    """
+    for legend in Legend.objects.filter(entries__id=instance.id):
+        legend.update_json()
+        legend.save()
+
+
+@receiver(post_save, sender=LegendSemantics)
+def update_dependent_legends_on_semantics_change(sender, instance, **kwargs):
+    """
+    Updates dependent Legends on a change in Semantics.
+    """
+    for entry in LegendEntry.objects.filter(semantics_id=instance.id):
+        for legend in Legend.objects.filter(entries__id=entry.id):
+            legend.update_json()
+            legend.save()
+
 
 class RasterLayer(models.Model):
     """Source data model for raster layers"""
@@ -22,14 +118,12 @@ class RasterLayer(models.Model):
     nodata = models.CharField(max_length=100, default='-9999')
     parse_log = models.TextField(blank=True, null=True, default='',
                                  editable=False)
+    legend = models.ForeignKey(Legend, blank=True, null=True)
 
-    def __unicode__(self):
-        count = self.rastertile_set.count()
-        if count:
-            info = str(count) + ' raster tiles'
-        else:
-            info = 'not parsed yet'
-        return '{name} ({info})'.format(name=self.name, info=info)
+    def __str__(self):
+        return '{} (type: {}, srid: {})'.format(self.name,
+                                                self.datatype,
+                                                self.srid)
 
     def _collect_tiles_sql(self):
         """SQL query string for selecting all tiles for this layer"""
@@ -159,7 +253,7 @@ class RasterLayerMetadata(models.Model):
     skewx = models.FloatField(null=True, blank=True)
     skewy = models.FloatField(null=True, blank=True)
     numbands = models.IntegerField(null=True, blank=True)
-    def __unicode__(self):
+    def __str__(self):
         return self.rasterlayer.name
 
 class RasterTile(models.Model):
@@ -171,11 +265,11 @@ class RasterTile(models.Model):
     )
     rid = models.AutoField(primary_key=True)
     rast = RasterField(null=True, blank=True, srid=3857)
-    rasterlayer = models.ForeignKey(RasterLayer, null=True, blank=True)
+    rasterlayer = models.ForeignKey(RasterLayer, null=True, blank=True, db_index=True)
     filename = models.TextField(null=True, blank=True, db_index=True)
     is_base = models.BooleanField(default=False)
     tilex = models.IntegerField(db_index=True, null=True)
     tiley = models.IntegerField(db_index=True, null=True)
     tilez = models.IntegerField(db_index=True, null=True, choices=ZOOMLEVELS)
-    def __unicode__(self):
+    def __str__(self):
         return '{0} {1}'.format(self.rid, self.filename)

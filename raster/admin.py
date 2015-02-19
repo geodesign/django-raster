@@ -44,3 +44,22 @@ class RasterTileModelAdmin(admin.ModelAdmin):
         return False
 
 admin.site.register(RasterTile, RasterTileModelAdmin)
+
+
+from django.contrib import admin
+from raster.models import LegendSemantics, LegendEntry, Legend
+
+admin.site.register(LegendSemantics)
+admin.site.register(LegendEntry)
+
+
+class LegendEntriesInLine(admin.TabularInline):
+    model = Legend.entries.through
+
+
+class LegendAdmin(admin.ModelAdmin):
+    inlines = (
+        LegendEntriesInLine,
+    )
+
+admin.site.register(Legend, LegendAdmin)

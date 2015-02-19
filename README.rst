@@ -18,9 +18,19 @@ Setup
             'raster',
         )
 
-3. Run ``python manage.py migrate`` to create the raster models.
+3. Run ``python manage.py migrate`` to create the raster models
 
-4. (Optional) Add ``RASTER_USE_CELERY = True`` to your project's setting to enable asynchronous raster parsing.
+4. Add the TMS Endpoint to your urlconf::
+
+        urlpatterns = patterns('',
+            ...
+            url(r'tiles/', include('raster.urls')),
+        )
+
+5. (Optional) Add ``RASTER_USE_CELERY = True`` to your project's setting to enable asynchronous raster parsing.
+
+6. To add data, upload a raster file through the admin. Create a Legend object and call the tiles through the ``/tiles/myrasterfile.tif/{z}/{x}/{y}.png`` url setup previously.
+
 
 Description
 -----------
@@ -38,13 +48,15 @@ For this, the package defines two models and one field:
 
 * ``OGRRaster`` - an object that stores raster data, in analogy to the OGRGeometry objects in GeoDjango.
 
-Due to the simplicity of the implementation, currently no spatial querying can be done on the raster data through python. This package is not integrated with GeoDjango and has a very limited set of features when compared with GeoDjango spatial models. If required however, custom SQL can be used to make spatial queries on the raster data.
+Due to the simplicity of the implementation, currently no spatial querying can be done on the raster data through python. This package is not integrated with GeoDjango and has a very limited set of features when compared with GeoDjango spatial models (however, integration with GeoDjango is underway). If required, custom SQL can be used to make spatial queries on the raster data.
 
 Usage
 -----
 After setting the package up, raster files can be uploaded through the admin interface using the RasterLayer model. Specify a layer name, the raster data type (continuous, categorical, mask or rank ordered), the raster's srid, the nodata value and the raster file to be uploaded.
 
 Upon saving the a RasterLayer instance with a raster file, django-raster automatically loads the raster data from the file into a raster field in the RasterTile model. The RasterLayer instances have a *parse_log* field, which stores information about the parsing process. For debugging, there might be some useful information in the parse log.
+
+A simple TMS view is part of this package as well, to serve the tiles with dynamic symbology. The endpoint is briefly described below, it works as a ``{z}/{x}/{y}.png`` url.
 
 Asynchronous parsing with Celery
 --------------------------------
@@ -76,13 +88,13 @@ RasterLayer methods
 -------------------
 The RasterLayer model will be extended such that it has spatial operations that can be performed at the rasterlayer level. It currently has a method to calculate counts for categorical layers. This function only works with categorical or mask raster layers. It returns a count in pixels for each distinct raster pixel value in the polygon provided to the function. If no polygon is provided, the counts are performed on the entire raster layer. For example::
 
-         mylayer = RasterLayer.objects.first()
-         mylayer.value_count('POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10))')
-         >> [{'count': 90679, 'value': 5.0},
-             {'count': 4252237, 'value': 1.0},
-             {'count': 4752665, 'value': 2.0},
-             {'count': 685432, 'value': 3.0},
-             {'count': 153598, 'value': 9.0}]
+         >>> mylayer = RasterLayer.objects.first()
+         >>> mylayer.value_count('POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10))')
+         ... [{'count': 90679, 'value': 5.0},
+              {'count': 4252237, 'value': 1.0},
+              {'count': 4752665, 'value': 2.0},
+              {'count': 685432, 'value': 3.0},
+              {'count': 153598, 'value': 9.0}]
 
 OGRRaster objects
 -----------------
@@ -100,3 +112,33 @@ The OGRRaster objects that have discrete pixel values can be converted to a PIL 
         >>> img = rast.img(categories)
         >>> img.size
         ... (200, 200)
+
+TMS View
+--------
+Leveraging the img property of the rasters, a Tile Map Service (TMS) view is part of this package. The url can be included by::
+
+        url(r'tiles/', include('raster.urls'))
+
+The urlpattern will look for the filename of the raster to be shown, and xyz tiles in the RasterTiles table. A legend entry has to be created for the rasterlayer for any data to be shown. Any category that is not represented in the Legend will be invisible transparent pixels. An example request would be::
+
+        /tile/myraster.tif/9/141/216.png
+
+For use in javascript libraries such as leaflet or openlayers, the TMS enpoint for one rasterlayer can be included using::
+
+        var layer = new L.tileLayer(/tiles/myraster.tif/{z}/{x}/{y}.png)
+
+By default, the TMS view is cached for 24 hours, to change the timeout of the cache use the ``RASTER_TILE_CACHE_TIMEOUT`` setting. To disable caching, set this timeout to 0.
+
+Legend Objects
+--------------
+To render XYZ tiles through the TMS view, a colormap or legend has to be created. A ``Legend`` object basically consists of a many-to-many field to ``LegendEntries``, which in turn define the expression used to filter pixels, a color and a foreign key to a ``LegendSemantics`` object. The LegendSemantics object defines the name, it is separated from the LegendEntry to be able to directly associate the semantics of pixel values from several different raster layers for analysis.
+
+An example to create a Legend object with one LegendEntry is shown in the following snippet::
+
+        >>> from raster.models import LegendSemantics, LegendEntry, Legend
+        >>> semantics = LegendSemantics.objects.create(name='Earth')
+        >>> entry = LegendEntry.objects.create(semantics=semantics, expression='1', color='#FFFFFF')
+        >>> legend = Legend.objects.create(title='MyLegend')
+        >>> legend.entries.add(entry)
+        >>> legend.json
+        ... '[{"color": "#FFFFFF", "expression": "1", "name": "Earth"}]'
