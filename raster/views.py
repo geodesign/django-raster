@@ -24,23 +24,30 @@ def tms(request, layer, x, y, z, format):
             tilez=z,
             rasterlayer_id=lyr.id)
 
-    # Get Legend, check if custom legend has been requested
-    query_legend = request.GET.get('legend', None)
-    if query_legend:
-        legend = Legend.objects.filter(title__iexact=query_legend).first()
-    else:
-        legend = lyr.legend
 
-    # Get colormap
-    if legend:
-        colormap = legend.colormap
-        # Check if custom legend entries have been requested
-        entries = request.GET.get('entries', None)
-        if entries:
-            entries = entries.split(',')
-            colormap = {k:v for (k,v) in colormap.items() if str(k) in entries}
+    # Override color map if arg provided
+    clmp = request.GET.get('colormap', None)
+    if clmp:
+        colormap = json.loads(clmp)
+        colormap = {int(k):v for k,v in colormap.items()}
     else:
-        colormap = None
+        # Get Legend, check if custom legend has been requested
+        query_legend = request.GET.get('legend', None)
+        if query_legend:
+            legend = Legend.objects.filter(title__iexact=query_legend).first()
+        else:
+            legend = lyr.legend
+
+        # Get colormap
+        if legend:
+            colormap = legend.colormap
+            # Check if custom legend entries have been requested
+            entries = request.GET.get('entries', None)
+            if entries:
+                entries = entries.split(',')
+                colormap = {k:v for (k,v) in colormap.items() if str(k) in entries}
+        else:
+            colormap = None
 
     # Render tile
     if tile.exists() and colormap:
