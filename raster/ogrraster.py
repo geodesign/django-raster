@@ -273,7 +273,7 @@ class OGRRaster(object):
         dat = dat.reshape(dat.shape[0]*dat.shape[1],)
 
         # Create zeros array
-        rgba = numpy.zeros((self.nr_of_pixels, 4))
+        rgba = numpy.zeros((self.nr_of_pixels, 4), dtype='uint8')
 
         # Replace matched rows with colors
         for key, color in colormap.items():
@@ -283,4 +283,4 @@ class OGRRaster(object):
         rgba = rgba.reshape(self.ptr.RasterYSize, self.ptr.RasterXSize, 4)
 
         # Create image from array
-        return Image.fromarray(numpy.uint8(rgba))
+        return Image.fromarray(rgba)
