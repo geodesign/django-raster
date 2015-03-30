@@ -273,12 +273,19 @@ class RasterLayerParser:
         cursor=connection.cursor()
         cursor.execute(sql)
 
-    def get_max_zoom(self, pixelsize):
+    def get_max_zoom(self):
         """
         Calculates the zoom level index z that is closest to the given scale.
         The input scale needs to be provided in meters per pixel. It is then
         compared to a list of pixel sizes for all TMS zoom levels.
         """
+        # Check if max zoom was manually specified
+        if self.rasterlayer.max_zoom is not None:
+            return self.rasterlayer.max_zoom
+
+        # Get scale of raster
+        pixelsize = self.rasterlayer.rasterlayermetadata.scalex
+
         # Calculate all pixelsizes for the TMS zoom levels
         tms_pixelsizes = [self.worldsize/(2.0**i*self.tilesize) for i in range(1,19)]
 
@@ -353,8 +360,7 @@ class RasterLayerParser:
             self.drop_empty_rasters()
 
             # Setup TMS aligned tiles in world mercator
-            scale = self.rasterlayer.rasterlayermetadata.scalex
-            zoom = self.get_max_zoom(scale)
+            zoom = self.get_max_zoom()
 
             # Loop through all lower zoom levels and create tiles
             for iz in range(zoom, -1, -1):

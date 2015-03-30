@@ -119,6 +119,7 @@ class RasterLayer(models.Model):
     parse_log = models.TextField(blank=True, null=True, default='',
                                  editable=False)
     legend = models.ForeignKey(Legend, blank=True, null=True)
+    max_zoom = models.IntegerField(blank=True, null=True)
 
     def __str__(self):
         return '{} (type: {}, srid: {})'.format(self.name,
