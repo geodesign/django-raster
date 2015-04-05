@@ -4,21 +4,18 @@ from .models import RasterLayer, RasterLayerMetadata, RasterTile
 # Register raster layer in admin
 class RasterLayerModelAdmin(admin.ModelAdmin):
     readonly_fields = ('parse_log',)
-    actions = ['reparse_raster']
+    actions = ['reparse_rasters']
 
-    def reparse_raster(self, request, queryset):
-        """Admin action to re-parse a rasterlayer
+    def reparse_rasters(self, request, queryset):
         """
-        if queryset.count() > 1:
-            self.message_user(request,
-                              'You can only parse one RasterLayer at a time.',
-                              level=messages.ERROR)
-        else:
-            rasterlayer = queryset[0]
+        Admin action to re-parse a set of rasterlayers.
+        """
+        for rasterlayer in queryset:
             rasterlayer.parse_log = ''
             rasterlayer.save()
-            msg = 'Parsing Raster, check parse log for progress'
-            self.message_user(request, msg)
+
+        msg = 'Parsing Rasters, check parse logs for progress'
+        self.message_user(request, msg)
 
 admin.site.register(RasterLayer, RasterLayerModelAdmin)
 
