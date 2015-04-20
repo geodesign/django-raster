@@ -2,8 +2,6 @@ Rasters for Django
 ==================
 Django-raster provides basic raster data integration for Django projects with a PostGIS database backend.
 
-.. image:: https://api.shippable.com/projects/5423d57480088cee586cd0c8/badge?branchName=master
-    :target: https://app.shippable.com/projects/5423d57480088cee586cd0c8/builds/latest
 
 Setup
 -----
