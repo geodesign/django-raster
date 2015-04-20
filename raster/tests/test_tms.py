@@ -23,7 +23,7 @@ class RasterTmsTests(TestCase):
         leg = Legend.objects.create(title='MyLegend')
         leg.entries.add(ent1)
 
-        # Create network with csv data attached
+        # Create raster layer
         self.rasterlayer = RasterLayer.objects.create(
             name='Raster data',
             description='Small raster for testing',

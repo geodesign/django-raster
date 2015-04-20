@@ -1,4 +1,6 @@
 import json
+import numpy
+import string
 from PIL import Image
 
 from django.core.exceptions import ObjectDoesNotExist
@@ -8,6 +10,60 @@ from django.views.generic import View
 
 from .models import RasterLayer, RasterTile, Legend
 from .utils import IMG_FORMATS
+
+
+class AlgebraView(View):
+    """
+    A view to calculate map algebra on raster layers.
+    """
+    def get(self, request, *args, **kwargs):
+        # Get layer ids
+        ids = request.GET.get('layers').split(',')
+
+        # Get tile indexes
+        x, y, z = self.kwargs.get('x'), self.kwargs.get('y'), self.kwargs.get('z')
+
+        # Get tiles
+        tiles = [
+            RasterTile.objects.get(
+                tilex=x,
+                tiley=y,
+                tilez=z,
+                rasterlayer_id=id
+            ) for id in ids
+        ]
+
+        # Get raster data as 1D arrays and store in dict that can be used
+        # for formula evaluation.
+        data = {}
+        for index, tile in enumerate(tiles):
+            # Add tile to dict in order uising alphabetic keys
+            data[string.lowercase[index]] = tile.rast.array().ravel()
+
+        # Get formula
+        formula = request.GET.get('formula')
+
+        # Evaluate expression
+        result = eval(formula, data)
+
+        # Scale to grayscale rgb (can be colorscheme later on)
+        result = result.astype('float')
+        result = 255 * (result - numpy.min(result)) / (numpy.max(result) - numpy.min(result))
+
+        # Create rgba matrix from grayscale array
+        result = numpy.array((result, result, result, numpy.repeat(255, len(result)))).T
+        rgba = result.reshape(256, 256, 4).astype('uint8')
+
+        # Create image from array
+        img = Image.fromarray(rgba)
+
+        # Create response, add image and return
+        response = HttpResponse()
+        frmt = IMG_FORMATS[self.kwargs.get('format')]
+        response['Content-Type'] = frmt
+        img.save(response, frmt)
+
+        return response
 
 
 class TmsView(View):
@@ -88,7 +144,7 @@ class TmsView(View):
         return IMG_FORMATS[self.kwargs.get('format')]
 
 
-def legend(request, layer_or_legend_name):
+def LegendView(request, layer_or_legend_name):
     """
     Returns the legend for this layer as a json string. The legend is a list of
     legend entries with the attributes "name", "expression" and "color".
