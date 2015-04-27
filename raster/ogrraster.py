@@ -15,7 +15,7 @@ class OGRRaster(object):
 
         if isinstance(data, str):
             self.set_ptr_from_postgis_raster(data)
-        elif isinstance(data, gdal.Dataset):            
+        elif isinstance(data, gdal.Dataset):
             self.ptr = data
 
             # If srid is provided explicitly, override projection
@@ -87,7 +87,7 @@ class OGRRaster(object):
 
             # Convert data to numpy 2d array
             band_data_array = numpy.array(band_data)
-            band_data_array = band_data_array.reshape((header['sizex'], 
+            band_data_array = band_data_array.reshape((header['sizex'],
                                                        header['sizey']))
 
             bands.append({'type': pixeltype_gdal, 'nodata': nodata,
@@ -99,7 +99,7 @@ class OGRRaster(object):
 
         # Create gdal in-memory raster
         driver = gdal.GetDriverByName('MEM')
-        self.ptr = driver.Create('OGRRaster', header['sizex'], header['sizey'], 
+        self.ptr = driver.Create('OGRRaster', header['sizex'], header['sizey'],
                             header['nr_of_bands'], bands[0]['type'])
 
         # Set GeoTransform
@@ -132,9 +132,9 @@ class OGRRaster(object):
         # Get other required header data
         num_bands = self.ptr.RasterCount
 
-        # Setup raster header as array, first two numbers are 
+        # Setup raster header as array, first two numbers are
         # endianness and version, which are fixed by postgis at the moment
-        rasterheader = (1, 0, num_bands, gt[1], gt[5], gt[0], gt[3], 
+        rasterheader = (1, 0, num_bands, gt[1], gt[5], gt[0], gt[3],
                   gt[2], gt[4], self.srid, self.ptr.RasterXSize,
                   self.ptr.RasterYSize)
 
@@ -277,7 +277,15 @@ class OGRRaster(object):
 
         # Replace matched rows with colors
         for key, color in colormap.items():
-            rgba[dat == key] = color
+            try:
+                # Try to use the key as number directly
+                key = float(key)
+                rgba[dat == key] = color
+            except ValueError:
+                # Otherwise use it as numpy expression directly (replacing x with dat)
+                key = key.replace('x', 'dat')
+                selector = eval(key)
+                rgba[selector] = color
 
         # Reshape array to image size
         rgba = rgba.reshape(self.ptr.RasterYSize, self.ptr.RasterXSize, 4)

@@ -29,7 +29,10 @@ class LegendEntry(models.Model):
     One row in a Legend.
     """
     semantics = models.ForeignKey(LegendSemantics)
-    expression = models.CharField(max_length=500)
+    expression = models.CharField(max_length=500,
+            help_text='Use a number or a valid numpy logical expression '\
+                      'where x is the pixel value. For instance: "(-3.0 < x) '\
+                      '& (x <= 1)" or "x <= 1".')
     color = RGBColorField()
 
     def __str__(self):
@@ -130,7 +133,7 @@ class RasterLayer(models.Model):
         """SQL query string for selecting all tiles for this layer"""
         return "SELECT rast FROM raster_rastertile \
                 WHERE rasterlayer_id={0} AND is_base".format(self.id)
-    
+
     def _clip_tiles_sql(self, geom):
         """Returns intersection of tiles with geom"""
         return "SELECT ST_Clip(rast, ST_GeomFromText('{geom}')) AS rast \

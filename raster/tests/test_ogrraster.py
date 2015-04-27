@@ -15,7 +15,7 @@ class RasterFieldTest(TestCase):
         # Create gdal in-memory raster
         driver = gdal.GetDriverByName('MEM')
         raster = driver.Create('OGRRaster', 2, 3, 2, gdalconst.GDT_Byte)
-        
+
         srs = osr.SpatialReference()
         srs.ImportFromEPSG(4326)
         raster.SetProjection(srs.ExportToWkt())
@@ -69,12 +69,22 @@ class RasterFieldTest(TestCase):
         self.assertEqual(self.d.rast.nodata_value(2), 22)
 
     def test_img(self):
+        expected = '\xe1\xe1\xe1\xff\xe1\xe1\xe1\xff\x9c\x9c\x9c\xff\x9c\x9c\x9c\xff\xff\xff\xbe\xff\xff\xff\xbe\xff'
+        # Test image creation from simple number association
         categories =  {
             1:  (225, 225, 225, 255),
             2:  (156, 156, 156, 255),
             3:  (255, 255, 190, 255),
         }
         img = self.d.rast.img(categories)
-
         self.assertEqual(img.size, (2, 3))
-        self.assertEqual(img.tostring(), '\xe1\xe1\xe1\xff\xe1\xe1\xe1\xff\x9c\x9c\x9c\xff\x9c\x9c\x9c\xff\xff\xff\xbe\xff\xff\xff\xbe\xff')
+        self.assertEqual(img.tostring(), expected)
+
+        # Test more complex numpy expressions
+        categories =  {
+            '(-3.0 < x) & (x <= 1)':  (225, 225, 225, 255),
+            '(x > 1) & (x < 3)':  (156, 156, 156, 255),
+            '2 < x':  (255, 255, 190, 255),
+        }
+        img = self.d.rast.img(categories)
+        self.assertEqual(img.tostring(), expected)
