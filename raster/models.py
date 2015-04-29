@@ -116,7 +116,7 @@ class RasterLayer(models.Model):
     description = models.TextField(blank=True, null=True)
     datatype = models.CharField(max_length=2, choices=DATATYPES,
                                 default='co')
-    rasterfile = models.FileField(upload_to='rasters')
+    rasterfile = models.FileField(upload_to='rasters', null=True, blank=True)
     srid = models.CharField(max_length=10, default='3086')
     nodata = models.CharField(max_length=100, default='-9999')
     parse_log = models.TextField(blank=True, null=True, default='',

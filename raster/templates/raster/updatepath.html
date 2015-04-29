@@ -1,0 +1,19 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+
+<p>Specify new filepath for this raster:</p>
+
+<form action="" method="post">{% csrf_token %}
+
+    {{ form }}
+
+    <p>The new filepath will be applied to:</p>
+
+    <ul>{{ items|unordered_list }}</ul>
+
+    <input type="hidden" name="action" value="manually_update_filepath" />
+    <input type="submit" name="apply" value="Update path" />
+</form>
+
+{% endblock %}
