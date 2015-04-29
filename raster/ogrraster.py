@@ -1,11 +1,14 @@
-import struct, binascii, numpy
+import binascii
+import struct
+
+import numpy
+from osgeo import gdal, osr
 from PIL import Image
-from osgeo import gdal, osr, gdalconst
 
 from django.core.exceptions import ValidationError
-
-from utils import convert_pixeltype, HEADER_STRUCTURE, HEADER_NAMES,\
-    GDAL_PIXEL_TYPES, GDAL_PIXEL_TYPES_UNISGNED, STRUCT_SIZE
+from utils import (
+    GDAL_PIXEL_TYPES, GDAL_PIXEL_TYPES_UNISGNED, HEADER_NAMES, HEADER_STRUCTURE, STRUCT_SIZE, convert_pixeltype
+)
 
 
 class OGRRaster(object):
@@ -47,7 +50,7 @@ class OGRRaster(object):
         header, data = self.chunk(data, 122)
 
         # Process header
-        header =  self.unpack(HEADER_STRUCTURE, header)
+        header = self.unpack(HEADER_STRUCTURE, header)
         header = dict(zip(HEADER_NAMES, header))
 
         # Process bands
@@ -134,9 +137,10 @@ class OGRRaster(object):
 
         # Setup raster header as array, first two numbers are
         # endianness and version, which are fixed by postgis at the moment
-        rasterheader = (1, 0, num_bands, gt[1], gt[5], gt[0], gt[3],
-                  gt[2], gt[4], self.srid, self.ptr.RasterXSize,
-                  self.ptr.RasterYSize)
+        rasterheader = (
+            1, 0, num_bands, gt[1], gt[5], gt[0], gt[3], gt[2], gt[4],
+            self.srid, self.ptr.RasterXSize, self.ptr.RasterYSize
+        )
 
         # Pack header into binary data
         result = self.pack(HEADER_STRUCTURE, rasterheader)
@@ -270,7 +274,7 @@ class OGRRaster(object):
         """
         # Get data as 1D array
         dat = self.array()
-        dat = dat.reshape(dat.shape[0]*dat.shape[1],)
+        dat = dat.reshape(dat.shape[0] * dat.shape[1],)
 
         # Create zeros array
         rgba = numpy.zeros((self.nr_of_pixels, 4), dtype='uint8')

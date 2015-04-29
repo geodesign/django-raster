@@ -1,6 +1,6 @@
 from django.db import models
-
 from raster.ogrraster import OGRRaster
+
 
 class RasterField(models.Field):
     """
@@ -8,7 +8,7 @@ class RasterField(models.Field):
     """
 
     description = "PostGIS Raster Field"
-     
+
     __metaclass__ = models.SubfieldBase
 
     def __init__(self, srid=4326, **kwargs):

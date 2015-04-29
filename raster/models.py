@@ -1,13 +1,12 @@
 import json
 
-from django.conf import settings
-from django.db import models, connection
-from django.dispatch import receiver
-from django.db.models.signals import pre_save, post_save, m2m_changed
-from django.contrib.gis.geos import GEOSGeometry, Polygon
-
 from colorful.fields import RGBColorField
 
+from django.conf import settings
+from django.contrib.gis.geos import GEOSGeometry, Polygon
+from django.db import connection, models
+from django.db.models.signals import m2m_changed, post_save
+from django.dispatch import receiver
 from raster.fields import RasterField
 from raster.utils import hex_to_rgba
 
@@ -30,8 +29,8 @@ class LegendEntry(models.Model):
     """
     semantics = models.ForeignKey(LegendSemantics)
     expression = models.CharField(max_length=500,
-            help_text='Use a number or a valid numpy logical expression '\
-                      'where x is the pixel value. For instance: "(-3.0 < x) '\
+            help_text='Use a number or a valid numpy logical expression '
+                      'where x is the pixel value. For instance: "(-3.0 < x) '
                       '& (x <= 1)" or "x <= 1".')
     color = RGBColorField()
 
@@ -158,8 +157,8 @@ class RasterLayer(models.Model):
     def value_count(self, geom=None):
         """Get a count by distinct pixel value within the given geometry"""
         # Check that raster is categorical or mask
-        if not self.datatype in ['ca', 'ma']:
-            raise TypeError('Wrong rastertype, value counts can only be '\
+        if self.datatype not in ['ca', 'ma']:
+            raise TypeError('Wrong rastertype, value counts can only be '
                             'calculated for categorical or mask raster tpyes')
 
         # Make sure geometry is GEOS Geom
@@ -223,6 +222,7 @@ class RasterLayer(models.Model):
 
         return self._bbox
 
+
 @receiver(models.signals.pre_save, sender=RasterLayer)
 def reset_parse_log_if_data_changed(sender, instance, **kwargs):
     try:
@@ -233,17 +233,18 @@ def reset_parse_log_if_data_changed(sender, instance, **kwargs):
         if obj.rasterfile.name != instance.rasterfile.name:
             instance.parse_log = ''
 
+
 @receiver(models.signals.post_save, sender=RasterLayer)
 def parse_raster_layer_if_log_is_empty(sender, instance, **kwargs):
     if instance.rasterfile.name and instance.parse_log == '':
-        if hasattr(settings, 'RASTER_USE_CELERY') and\
-                                settings.RASTER_USE_CELERY:
+        if hasattr(settings, 'RASTER_USE_CELERY') and settings.RASTER_USE_CELERY:
             from raster.tasks import parse_raster_layer_with_celery
             parse_raster_layer_with_celery.delay(instance)
         else:
             from raster.parser import RasterLayerParser
             parser = RasterLayerParser(instance)
             parser.parse_raster_layer()
+
 
 class RasterLayerMetadata(models.Model):
     """Stores meta data for a raster layer"""
@@ -257,15 +258,17 @@ class RasterLayerMetadata(models.Model):
     skewx = models.FloatField(null=True, blank=True)
     skewy = models.FloatField(null=True, blank=True)
     numbands = models.IntegerField(null=True, blank=True)
+
     def __str__(self):
         return self.rasterlayer.name
+
 
 class RasterTile(models.Model):
     """Model to store individual tiles of a raster data source layer"""
     ZOOMLEVELS = (
-        (1,1), (2,2), (3,3), (4,4), (5,5), (6,6), (7,7),
-        (8,8), (9,9), (10,10), (11,11), (12,12), (13,13),
-        (14,14), (15,15), (16,16), (17,17), (18,18)
+        (1, 1), (2, 2), (3, 3), (4, 4), (5, 5), (6, 6), (7, 7),
+        (8, 8), (9, 9), (10, 10), (11, 11), (12, 12), (13, 13),
+        (14, 14), (15, 15), (16, 16), (17, 17), (18, 18)
     )
     rid = models.AutoField(primary_key=True)
     rast = RasterField(null=True, blank=True, srid=3857)
@@ -275,5 +278,6 @@ class RasterTile(models.Model):
     tilex = models.IntegerField(db_index=True, null=True)
     tiley = models.IntegerField(db_index=True, null=True)
     tilez = models.IntegerField(db_index=True, null=True, choices=ZOOMLEVELS)
+
     def __str__(self):
         return '{0} {1}'.format(self.rid, self.filename)

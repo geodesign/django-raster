@@ -1,11 +1,8 @@
-import inspect, os, shutil, json
+import json
 
-from django.conf import settings
 from django.test import TestCase
-from django.test.utils import override_settings
-from django.core.files import File
+from raster.models import Legend, LegendEntry, LegendSemantics
 
-from raster.models import LegendEntry, LegendSemantics, Legend
 
 class RasterLegendTests(TestCase):
 
@@ -23,10 +20,10 @@ class RasterLegendTests(TestCase):
 
         ent1.color = '#000000'
         ent1.save()
-        leg = Legend.objects.get(id=leg.id) # Reload from db
+        leg = Legend.objects.get(id=leg.id)  # Reload from db
         self.assertTrue({"color": "#000000", "expression": "1", "name": "Earth"} in json.loads(leg.json))
 
         sem1.name = 'Fire'
         sem1.save()
-        leg = Legend.objects.get(id=leg.id) # Reload from db
+        leg = Legend.objects.get(id=leg.id)  # Reload from db
         self.assertTrue({"color": "#000000", "expression": "1", "name": "Fire"} in json.loads(leg.json))

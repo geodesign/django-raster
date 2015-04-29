@@ -1,20 +1,24 @@
-import os, tempfile, zipfile, shutil, datetime, struct, binascii, glob,\
-    traceback
+import datetime
+import glob
+import os
+import shutil
+import tempfile
+import traceback
+import zipfile
 from math import pi
+
 from osgeo import gdal, osr
-from osgeo.gdalconst import GA_ReadOnly, GDT_Byte, GDT_Int16, GDT_UInt16, GDT_Int32,\
-    GDT_UInt32, GDT_Float32, GDT_Float64
+from osgeo.gdalconst import GA_ReadOnly
 
-from django.db import connection
 from django.conf import settings
-from django.contrib.gis.geos import Polygon
-
-from raster.models import RasterTile, RasterLayerMetadata
+from django.db import connection
+from raster.models import RasterLayerMetadata, RasterTile
 from raster.ogrraster import OGRRaster
+
 
 class RasterLayerParser:
     """Class to parse raster layers using gdal python bindings"""
-    
+
     def __init__(self, rasterlayer):
         self.rasterlayer = rasterlayer
 
@@ -37,7 +41,7 @@ class RasterLayerParser:
         """Writes a message to the parse log of the rasterlayer instance"""
         # Prepare datetime stamp for log
         now = '[{0}] '.format(datetime.datetime.now().strftime('%Y-%m-%d %T'))
-        
+
         # Write log, reset if requested
         if reset:
             self.rasterlayer.parse_log = now + msg
@@ -50,7 +54,7 @@ class RasterLayerParser:
         """Make local copy of rasterfile (necessary if stored on CDN)"""
 
         self.log('Getting raster file from storage')
-        
+
         self.tmpdir = tempfile.mkdtemp()
 
         # Access rasterfile and store locally
@@ -76,8 +80,8 @@ class RasterLayerParser:
 
             # Check if only one file is found in zipfile
             if len(raster_list) > 1:
-                self.log('WARNING: Found more than one file in zipfile '\
-                         'using only first file found. This might lead '\
+                self.log('WARNING: Found more than one file in zipfile '
+                         'using only first file found. This might lead '
                          'to problems if its not a raster file.')
 
             # Return first one as raster file
@@ -128,18 +132,18 @@ class RasterLayerParser:
         dest_geo = (bounds[0], tilescalex, 0.0, bounds[3], 0.0, tilescaley)
 
         # Create destination raster file
-        sizex = (indexrange[2]-indexrange[0] + 1)*self.tilesize
-        sizey = (indexrange[3]-indexrange[1] + 1)*self.tilesize
+        sizex = (indexrange[2] - indexrange[0] + 1) * self.tilesize
+        sizey = (indexrange[3] - indexrange[1] + 1) * self.tilesize
         dest_file = os.path.join(self.tmpdir, 'djangowarpedraster' + str(zoom) + '.tif')
-        driver=gdal.GetDriverByName('GTiff')
+        driver = gdal.GetDriverByName('GTiff')
         dest = driver.Create(dest_file, sizex, sizey, self.dataset.RasterCount, self.band.DataType)
         dest.SetGeoTransform(dest_geo)
         dest.SetProjection(dest_wkt)
 
         # Set nodata values
         for i in range(self.dataset.RasterCount):
-            nodata = self.dataset.GetRasterBand(i+1).GetNoDataValue()
-            dest.GetRasterBand(i+1).SetNoDataValue(nodata)
+            nodata = self.dataset.GetRasterBand(i + 1).GetNoDataValue()
+            dest.GetRasterBand(i + 1).SetNoDataValue(nodata)
 
         # Warp image using nearest neighbor resampling
         gdal.ReprojectImage(
@@ -172,38 +176,28 @@ class RasterLayerParser:
         """
         lyrmeta = RasterLayerMetadata.objects.get_or_create(
             rasterlayer=self.rasterlayer)[0]
-        lyrmeta.uperleftx=self.geotransform[0]
-        lyrmeta.uperlefty=self.geotransform[3]
-        lyrmeta.width=self.dataset.RasterXSize
-        lyrmeta.height=self.dataset.RasterYSize
-        lyrmeta.scalex=self.geotransform[1]
-        lyrmeta.scaley=self.geotransform[5]
-        lyrmeta.skewx=self.geotransform[2]
-        lyrmeta.skewy=self.geotransform[4]
-        lyrmeta.numbands=self.dataset.RasterCount
+        lyrmeta.uperleftx = self.geotransform[0]
+        lyrmeta.uperlefty = self.geotransform[3]
+        lyrmeta.width = self.dataset.RasterXSize
+        lyrmeta.height = self.dataset.RasterYSize
+        lyrmeta.scalex = self.geotransform[1]
+        lyrmeta.scaley = self.geotransform[5]
+        lyrmeta.skewx = self.geotransform[2]
+        lyrmeta.skewy = self.geotransform[4]
+        lyrmeta.numbands = self.dataset.RasterCount
         lyrmeta.save()
 
     def crop(self, zoom=None):
         if zoom is None:
             self.log('Creating tiles in original projection')
         else:
-            self.log('Creating tiles for zoom ' + str(zoom))            
+            self.log('Creating tiles for zoom ' + str(zoom))
 
         for yblock in range(0, self.rows, self.tilesize):
-            if yblock + self.tilesize < self.rows:
-                numRows = self.tilesize
-            else:
-                numRows = self.rows - yblock
-
             for xblock in range(0, self.cols, self.tilesize):
-                if xblock + self.tilesize < self.cols:
-                    numCols = self.tilesize
-                else:
-                    numCols = self.cols - xblock
-                
                 # Calculate raster tile origin
-                xorigin = self.originX + self.pixelWidth*xblock
-                yorigin = self.originY + self.pixelHeight*yblock
+                xorigin = self.originX + self.pixelWidth * xblock
+                yorigin = self.originY + self.pixelHeight * yblock
 
                 dest_geo = list(self.geotransform)
                 dest_geo[0] = xorigin
@@ -217,8 +211,8 @@ class RasterLayerParser:
                 dest = driver.Create('', self.tilesize, self.tilesize, 1, self.band.DataType)
                 dest.SetGeoTransform(dest_geo)
                 for i in range(self.dataset.RasterCount):
-                    nodata = self.dataset.GetRasterBand(i+1).GetNoDataValue()
-                    dest.GetRasterBand(i+1).SetNoDataValue(nodata)
+                    nodata = self.dataset.GetRasterBand(i + 1).GetNoDataValue()
+                    dest.GetRasterBand(i + 1).SetNoDataValue(nodata)
 
                 # Crop parent raster to tile
                 gdal.ReprojectImage(
@@ -239,9 +233,10 @@ class RasterLayerParser:
 
                 # Create tile
                 tile = RasterTile(
-                        rast=rast,
-                        rasterlayer=self.rasterlayer,
-                        filename=self.rastername)
+                    rast=rast,
+                    rasterlayer=self.rasterlayer,
+                    filename=self.rastername
+                )
 
                 # Set is_base flag or xyz tile indices
                 if zoom is None:
@@ -249,8 +244,8 @@ class RasterLayerParser:
                 else:
                     bbox = self.rasterlayer.extent()
                     indexrange = self.get_tile_index_range(bbox, zoom)
-                    tile.tilex = indexrange[0] + xblock/self.tilesize
-                    tile.tiley = indexrange[1] + yblock/self.tilesize
+                    tile.tilex = indexrange[0] + xblock / self.tilesize
+                    tile.tiley = indexrange[1] + yblock / self.tilesize
                     tile.tilez = zoom
 
                 # Save tile
@@ -270,7 +265,7 @@ class RasterLayerParser:
         sql = var.format(self.rasterlayer.id)
 
         # Calculate tile in DB
-        cursor=connection.cursor()
+        cursor = connection.cursor()
         cursor.execute(sql)
 
     def get_max_zoom(self):
@@ -287,13 +282,13 @@ class RasterLayerParser:
         pixelsize = self.rasterlayer.rasterlayermetadata.scalex
 
         # Calculate all pixelsizes for the TMS zoom levels
-        tms_pixelsizes = [self.worldsize/(2.0**i*self.tilesize) for i in range(1,19)]
+        tms_pixelsizes = [self.worldsize / (2.0 ** i * self.tilesize) for i in range(1, 19)]
 
         # If the pixelsize is smaller than all tms sizes, default to max level
         zoomlevel = 18
 
         # Find zoomlevel (next-upper) for the input pixel size
-        for i in range(0,18):
+        for i in range(0, 18):
             if pixelsize - tms_pixelsizes[i] >= 0:
                 zoomlevel = i
                 break
@@ -310,25 +305,25 @@ class RasterLayerParser:
         with the input bbox at zoomlevel z.
         """
         # Calculate tile size for given zoom level
-        zscale = self.worldsize / 2**z
+        zscale = self.worldsize / 2 ** z
 
         # Calculate overlaying tile indices
         return [
-            int((bbox[0] + self.tileshift)/zscale),
-            int((self.tileshift - bbox[3])/zscale),
-            int((bbox[2] + self.tileshift)/zscale),
-            int((self.tileshift - bbox[1])/zscale)
+            int((bbox[0] + self.tileshift) / zscale),
+            int((self.tileshift - bbox[3]) / zscale),
+            int((bbox[2] + self.tileshift) / zscale),
+            int((self.tileshift - bbox[1]) / zscale)
         ]
 
     def get_tile_bounds(self, x, y, z):
         """
         Calculates bounding box from Tile Map Service XYZ indices.
         """
-        zscale = self.worldsize / 2**z
+        zscale = self.worldsize / 2 ** z
 
         xmin = x * zscale - self.tileshift
-        xmax = (x+1) * zscale - self.tileshift
-        ymin = self.tileshift - (y+1) * zscale
+        xmax = (x + 1) * zscale - self.tileshift
+        ymin = self.tileshift - (y + 1) * zscale
         ymax = self.tileshift - y * zscale
 
         return [xmin, ymin, xmax, ymax]
@@ -336,7 +331,7 @@ class RasterLayerParser:
     def get_tile_scale(self, z):
         """Calculates pixel size scale for given zoom level"""
 
-        zscale = self.worldsize / 2.0**z / self.tilesize
+        zscale = self.worldsize / 2.0 ** z / self.tilesize
         return zscale, -zscale
 
     def parse_raster_layer(self):
@@ -366,7 +361,7 @@ class RasterLayerParser:
             for iz in range(zoom, -1, -1):
                 self.reproject_raster(iz)
                 self.crop(iz)
-            
+
             self.drop_empty_rasters()
 
             # Log success of parsing

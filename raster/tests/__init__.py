@@ -1,5 +1,6 @@
 try:
-    import os, sys
+    import os
+    import sys
 
     from celery import Celery
 

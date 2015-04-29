@@ -1,15 +1,15 @@
 import json
-import numpy
 import re
 import string
+
+import numpy
 from PIL import Image
 
-from django.core.exceptions import ObjectDoesNotExist
-from django.http import HttpResponse, JsonResponse, Http404
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.views.generic import View
 
-from .models import RasterLayer, RasterTile, Legend
+from .models import Legend, RasterLayer, RasterTile
 from .utils import IMG_FORMATS
 
 
@@ -87,7 +87,7 @@ class TmsView(View):
         )
 
         # Get tile
-        tile =  RasterTile.objects.filter(
+        tile = RasterTile.objects.filter(
             tilex=self.kwargs.get('x'),
             tiley=self.kwargs.get('y'),
             tilez=self.kwargs.get('z'),
@@ -112,7 +112,6 @@ class TmsView(View):
 
         return response
 
-
     def get_colormap(self, lyr):
         """
         Returns colormap from request and layer, looking for a colormap in
@@ -122,7 +121,7 @@ class TmsView(View):
         clmp = self.request.GET.get('colormap', None)
         if clmp:
             colormap = json.loads(clmp)
-            colormap = {int(k):v for k,v in colormap.items()}
+            colormap = {int(k): v for k, v in colormap.items()}
         else:
             # Get Legend, check if custom legend has been requested
             query_legend = self.request.GET.get('legend', None)
@@ -138,12 +137,11 @@ class TmsView(View):
                 entries = self.request.GET.get('entries', None)
                 if entries:
                     entries = entries.split(',')
-                    colormap = {k:v for (k,v) in colormap.items() if str(k) in entries}
+                    colormap = {k: v for (k, v) in colormap.items() if str(k) in entries}
             else:
                 colormap = None
 
         return colormap
-
 
     def get_format(self):
         """

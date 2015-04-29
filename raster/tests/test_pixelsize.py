@@ -1,11 +1,11 @@
-import inspect, os, shutil
+import inspect
+import os
+import shutil
 
-from django.conf import settings
-from django.test import TestCase
-from django.test.utils import override_settings
 from django.core.files import File
-
+from django.test import TestCase
 from raster.models import RasterLayer
+
 
 class RasterLayerPixelsizeTests(TestCase):
 
@@ -32,4 +32,4 @@ class RasterLayerPixelsizeTests(TestCase):
 
     def test_pixel_size_level1(self):
         result = self.rasterlayer.pixelsize()
-        self.assertEqual((100,100), result)
+        self.assertEqual((100, 100), result)

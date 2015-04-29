@@ -1,11 +1,13 @@
-import inspect, os, shutil
+import inspect
+import os
+import shutil
 
-from django.test import TestCase, Client
 from django.core.files import File
 from django.core.urlresolvers import reverse
-
-from raster.models import RasterLayer, LegendSemantics, LegendEntry, Legend
+from django.test import Client, TestCase
 from django.test.utils import override_settings
+from raster.models import RasterLayer
+
 
 @override_settings(RASTER_TILE_CACHE_TIMEOUT=0)
 class RasterTmsTests(TestCase):
@@ -27,7 +29,7 @@ class RasterTmsTests(TestCase):
             rasterfile=sourcefile)
 
         self.tile = self.rasterlayer.rastertile_set.filter(is_base=False).first()
-        self.tile_url = url = reverse('algebra', kwargs={'z': self.tile.tilez, 'y': self.tile.tiley, 'x': self.tile.tilex, 'format': '.png'})
+        self.tile_url = reverse('algebra', kwargs={'z': self.tile.tilez, 'y': self.tile.tiley, 'x': self.tile.tilex, 'format': '.png'})
 
         self.client = Client()
 

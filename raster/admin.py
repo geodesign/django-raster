@@ -3,10 +3,7 @@ from django.contrib import admin, messages
 from django.http import HttpResponseRedirect
 from django.shortcuts import render
 
-from .models import (
-    RasterLayer, RasterLayerMetadata, RasterTile,
-    LegendSemantics, LegendEntry, Legend
-)
+from .models import Legend, LegendEntry, LegendSemantics, RasterLayer, RasterLayerMetadata, RasterTile
 
 
 class FilenameActionForm(forms.Form):
@@ -48,9 +45,9 @@ class RasterLayerModelAdmin(admin.ModelAdmin):
         # Check if layer already has a file specified
         if layer.rasterfile:
             self.message_user(
-                    request,
-                    "This layer already has a file specified. Remove file from layer before specifying new path.",
-                    level=messages.ERROR
+                request,
+                "This layer already has a file specified. Remove file from layer before specifying new path.",
+                level=messages.ERROR
             )
             return
 
@@ -61,14 +58,14 @@ class RasterLayerModelAdmin(admin.ModelAdmin):
                 path = form.cleaned_data['path']
                 layer.rasterfile.name = path
                 layer.save()
-                self.message_user(request, "Successfully updated path." )
+                self.message_user(request, "Successfully updated path.")
                 return HttpResponseRedirect(request.get_full_path())
 
         # Before posting, prepare empty action form
         if not form:
             form = FilenameActionForm(initial={'_selected_action': request.POST.getlist(admin.ACTION_CHECKBOX_NAME)})
 
-        return render(request, 'raster/updatepath.html', {'items': queryset,'form': form, 'title':u'Update Path'})
+        return render(request, 'raster/updatepath.html', {'items': queryset, 'form': form, 'title': u'Update Path'})
 
 
 class RasterLayerMetadataModelAdmin(admin.ModelAdmin):

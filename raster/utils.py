@@ -27,7 +27,7 @@ Pixel data types
 
 http://www.gdal.org/gdal_8h.html#a22e22ce0a55036a96f652765793fb7a4
 
-GDT_Unknown  - Unknown or unspecified type 
+GDT_Unknown  - Unknown or unspecified type
 GDT_Byte     - Eight bit unsigned integer
 GDT_UInt16   - Sixteen bit unsigned integer
 GDT_Int16    - Sixteen bit signed integer
@@ -42,16 +42,16 @@ GDT_CFloat64 - Complex Float64
 """
 
 GDAL_PIXEL_TYPES = {
-    0:  'GDT_Unknown',
-    1:  'GDT_Byte',
-    2:  'GDT_UInt16',
-    3:  'GDT_Int16',
-    4:  'GDT_UInt32',
-    5:  'GDT_Int32',
-    6:  'GDT_Float32',
-    7:  'GDT_Float64',
-    8:  'GDT_CInt16',
-    9:  'GDT_CInt32',
+    0: 'GDT_Unknown',
+    1: 'GDT_Byte',
+    2: 'GDT_UInt16',
+    3: 'GDT_Int16',
+    4: 'GDT_UInt32',
+    5: 'GDT_Int32',
+    6: 'GDT_Float32',
+    7: 'GDT_Float64',
+    8: 'GDT_CInt16',
+    9: 'GDT_CInt32',
     10: 'GDT_CFloat32',
     11: 'GDT_CFloat64'
 }
@@ -82,48 +82,48 @@ http://svn.osgeo.org/postgis/spike/wktraster/doc/RFC2-WellKnownBinaryFormat
 """
 
 POSTGIS_PIXEL_TYPES = {
-    0:  '1BB',
-    1:  '2BUI',
-    2:  '4BUI',
-    3:  '8BSI',
-    4:  '8BUI',
-    5:  '16BSI',
-    6:  '16BUI',
-    7:  '32BSI',
-    8:  '32BUI',
-    9:  '32BF',
+    0: '1BB',
+    1: '2BUI',
+    2: '4BUI',
+    3: '8BSI',
+    4: '8BUI',
+    5: '16BSI',
+    6: '16BUI',
+    7: '32BSI',
+    8: '32BUI',
+    9: '32BF',
     10: '64BF'
 }
 
 POSTGIS_PIXEL_TYPES_INV = {v: k for k, v in POSTGIS_PIXEL_TYPES.items()}
 
 GDAL_TO_POSTGIS = {
-    'GDT_Unknown':  None,
-    'GDT_Byte':     '8BUI',
-    'GDT_UInt16':   '16BUI',
-    'GDT_Int16':    '16BSI',
-    'GDT_UInt32':   '32BUI',
-    'GDT_Int32':    '32BSI',
-    'GDT_Float32':  '32BF',
-    'GDT_Float64':  '64BF',
-    'GDT_CInt16':   None,
-    'GDT_CInt32':   None,
+    'GDT_Unknown': None,
+    'GDT_Byte': '8BUI',
+    'GDT_UInt16': '16BUI',
+    'GDT_Int16': '16BSI',
+    'GDT_UInt32': '32BUI',
+    'GDT_Int32': '32BSI',
+    'GDT_Float32': '32BF',
+    'GDT_Float64': '64BF',
+    'GDT_CInt16': None,
+    'GDT_CInt32': None,
     'GDT_CFloat32': None,
     'GDT_CFloat64': None
 }
 
 POSTGIS_TO_GDAL = {
-    '1BB':   None,
-    '2BUI':  None,
-    '4BUI':  None,
-    '8BSI':  None,
-    '8BUI':  'GDT_Byte',
+    '1BB': None,
+    '2BUI': None,
+    '4BUI': None,
+    '8BSI': None,
+    '8BUI': 'GDT_Byte',
     '16BSI': 'GDT_Int16',
     '16BUI': 'GDT_UInt16',
     '32BSI': 'GDT_Int32',
     '32BUI': 'GDT_UInt32',
-    '32BF':  'GDT_Float32',
-    '64BF':  'GDT_CFloat64'
+    '32BF': 'GDT_Float32',
+    '64BF': 'GDT_CFloat64'
 }
 
 """
@@ -164,32 +164,32 @@ STRUCT_SIZE = {
 }
 
 GDAL_TO_STRUCT = {
-    'GDT_Unknown':  None,
-    'GDT_Byte':     'B',
-    'GDT_UInt16':   'H',
-    'GDT_Int16':    'h',
-    'GDT_UInt32':   'L',
-    'GDT_Int32':    'l',
-    'GDT_Float32':  'f',
-    'GDT_Float64':  'd',
-    'GDT_CInt16':   None,
-    'GDT_CInt32':   None,
+    'GDT_Unknown': None,
+    'GDT_Byte': 'B',
+    'GDT_UInt16': 'H',
+    'GDT_Int16': 'h',
+    'GDT_UInt32': 'L',
+    'GDT_Int32': 'l',
+    'GDT_Float32': 'f',
+    'GDT_Float64': 'd',
+    'GDT_CInt16': None,
+    'GDT_CInt32': None,
     'GDT_CFloat32': None,
     'GDT_CFloat64': None
 }
 
 POSTGIS_TO_STRUCT = {
-    '1BB':   '?',
-    '2BUI':  None,
-    '4BUI':  None,
-    '8BSI':  'b',
-    '8BUI':  'B',
+    '1BB': '?',
+    '2BUI': None,
+    '4BUI': None,
+    '8BSI': 'b',
+    '8BUI': 'B',
     '16BSI': 'h',
     '16BUI': 'H',
     '32BSI': 'l',
     '32BUI': 'L',
-    '32BF':  'f',
-    '64BF':  'd'
+    '32BF': 'f',
+    '64BF': 'd'
 }
 
 
@@ -212,6 +212,7 @@ def convert_pixeltype(data, source, target):
             return POSTGIS_TO_STRUCT[data]
 
 IMG_FORMATS = {'.png': 'PNG', '.jpg': 'JPEG'}
+
 
 def hex_to_rgba(value, alpha=255):
     value = value.lstrip('#')

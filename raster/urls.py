@@ -1,13 +1,12 @@
 from django.conf import settings
 from django.conf.urls import patterns, url
 from django.views.decorators.cache import cache_page
-
-from raster.views import AlgebraView, TmsView, LegendView
+from raster.views import AlgebraView, LegendView, TmsView
 
 if hasattr(settings, 'RASTER_TILE_CACHE_TIMEOUT'):
     cache_timeout = settings.RASTER_TILE_CACHE_TIMEOUT
 else:
-    cache_timeout = 60*60*24
+    cache_timeout = 60 * 60 * 24
 
 urlpatterns = patterns('',
 

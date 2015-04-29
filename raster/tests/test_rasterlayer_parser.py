@@ -1,11 +1,13 @@
-import inspect, os, shutil
+import inspect
+import os
+import shutil
 
-from django.conf import settings
+from django.core.files import File
 from django.test import TestCase
 from django.test.utils import override_settings
-from django.core.files import File
-
 from raster.models import RasterLayer
+
+
 @override_settings(RASTER_TILESIZE=100)
 class RasterLayerParserWithoutCeleryTests(TestCase):
 
@@ -55,10 +57,11 @@ class RasterLayerParserWithoutCeleryTests(TestCase):
         self.rasterlayer.save()
 
         self.assertEqual(self.rasterlayer.rastertile_set.filter(is_base=True).count(), 4)
-        self.assertEqual(self.rasterlayer.rastertile_set.filter(is_base=False).count(), 12+4+11)
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(is_base=False).count(), 12 + 4 + 11)
 
     def test_layermeta_creation(self):
         self.assertEqual(self.rasterlayer.rasterlayermetadata.width, 163)
+
 
 @override_settings(CELERY_ALWAYS_EAGER=True,
                    CELERY_EAGER_PROPAGATES_EXCEPTIONS=True,
