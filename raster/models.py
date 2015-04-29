@@ -68,7 +68,7 @@ class Legend(models.Model):
         legend = json.loads(self.json)
         cmap = {}
         for leg in legend:
-            cmap[int(leg['expression'])] = hex_to_rgba(leg['color'])
+            cmap[leg['expression']] = hex_to_rgba(leg['color'])
         return cmap
 
 

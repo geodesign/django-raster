@@ -37,5 +37,9 @@ class RasterTmsTests(TestCase):
         self.rasterlayer.rastertile_set.all().delete()
 
     def test_basic_algebra_request(self):
-        response = self.client.get(self.tile_url + '?layers={0}&formula=a'.format(self.rasterlayer.id))
+        response = self.client.get(self.tile_url + '?layers={0}&formula=y=a'.format(self.rasterlayer.id))
         self.assertEqual(response.status_code, 200)
+
+    def test_wrong_formula_error(self):
+        response = self.client.get(self.tile_url + '?layers={0}&formula=y=aa'.format(self.rasterlayer.id))
+        self.assertEqual(response.status_code, 404)

@@ -1,5 +1,6 @@
 import json
 import numpy
+import re
 import string
 from PIL import Image
 
@@ -43,8 +44,15 @@ class AlgebraView(View):
         # Get formula
         formula = request.GET.get('formula')
 
+        # Check formula validity (all vars need to be just one character long)
+        if(len(re.findall('[a-z]{2}', formula))):
+            raise Http404('Invalid formula, more than one character in variable name.')
+
         # Evaluate expression
-        result = eval(formula, data)
+        exec(formula, data)
+
+        # Get result from data dict
+        result = data['y']
 
         # Scale to grayscale rgb (can be colorscheme later on)
         result = result.astype('float')
