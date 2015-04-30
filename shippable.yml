@@ -28,7 +28,7 @@ before_install:
   - rm /root/ve/lib/python2.7/no-global-site-packages.txt
 
 install:
-  - pip install Django==1.7.7 psycopg2==2.5.3 celery==3.1.15 numpy==1.9.1 Pillow==2.7.0 django-colorful==1.0.1 flake8==2.4.0
+  - pip install Django==1.7.7 psycopg2==2.5.3 celery==3.1.15 numpy==1.9.1 Pillow==2.7.0 django-colorful==1.0.1 flake8==2.4.0 isort==3.9.6
 
 script: django-admin.py test raster
 

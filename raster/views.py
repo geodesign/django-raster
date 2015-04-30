@@ -1,6 +1,5 @@
 import json
 import re
-import string
 
 import numpy
 from PIL import Image
@@ -18,38 +17,58 @@ class AlgebraView(View):
     A view to calculate map algebra on raster layers.
     """
     def get(self, request, *args, **kwargs):
-        # Get layer ids
-        ids = request.GET.get('layers').split(',')
-
         # Get tile indexes
         x, y, z = self.kwargs.get('x'), self.kwargs.get('y'), self.kwargs.get('z')
 
-        # Get tiles
-        tiles = [
-            RasterTile.objects.get(
-                tilex=x,
-                tiley=y,
-                tilez=z,
-                rasterlayer_id=id
-            ) for id in ids
-        ]
+        # Get layer ids
+        ids = request.GET.get('layers').split(',')
+
+        # Parse layer ids into dictionary with variable names
+        ids = {idx.split('=')[0]: idx.split('=')[1] for idx in ids}
 
         # Get raster data as 1D arrays and store in dict that can be used
         # for formula evaluation.
         data = {}
-        for index, tile in enumerate(tiles):
-            # Add tile to dict in order uising alphabetic keys
-            data[string.lowercase[index]] = tile.rast.array().ravel()
+        for name, layerid in ids.items():
+            tile = RasterTile.objects.filter(
+                tilex=x,
+                tiley=y,
+                tilez=z,
+                rasterlayer_id=layerid
+            ).first()
+            if tile:
+                data[name] = tile.rast.array().ravel()
+            else:
+                return self.write_rgba_to_response()
 
-        # Get formula
-        formula = request.GET.get('formula')
+        # Get formula (allowing several parts to the formula)
+        formulas = request.GET.get('formula').split(',')
 
         # Check formula validity (all vars need to be just one character long)
-        if(len(re.findall('[a-z]{2}', formula))):
+        checklist = [len(re.findall('[a-z]{2}', formula)) for formula in formulas]
+        if(any(checklist)):
             raise Http404('Invalid formula, more than one character in variable name.')
 
-        # Evaluate expression
-        exec(formula, data)
+        # Assure exactly one formula defines y
+        checklist = ['y' in formula for formula in formulas]
+        if(sum(checklist) > 1):
+            raise Http404('Invalid formula, variable y found more than once.')
+        elif(sum(checklist) == 0):
+            raise Http404('Invalid formula, variable y not found in any formula.')
+
+        # After formula validation, combine formulas to one expression
+        formula = ';'.join(formulas)
+
+        # Evaluate formulas, saving the formula defining y for the end
+        formula_with_y = None
+        for formula in formulas:
+            if 'y' not in formula:
+                exec(formula, data)
+            else:
+                formula_with_y = formula
+
+        # Run expression with y as last formula
+        exec(formula_with_y, data)
 
         # Get result from data dict
         result = data['y']
@@ -62,12 +81,28 @@ class AlgebraView(View):
         result = numpy.array((result, result, result, numpy.repeat(255, len(result)))).T
         rgba = result.reshape(256, 256, 4).astype('uint8')
 
-        # Create image from array
-        img = Image.fromarray(rgba)
+        return self.write_rgba_to_response(rgba)
 
-        # Create response, add image and return
+    def get_format(self):
+        """
+        Returns image format requested.
+        """
+        return IMG_FORMATS[self.kwargs.get('format')]
+
+    def write_rgba_to_response(self, rgba=None):
+        """
+        Writes rgba numpy array to http response.
+        """
+        if rgba is None:
+            # Create empty image if no data was provided
+            img = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
+        else:
+            # Create image from array
+            img = Image.fromarray(rgba)
+
+        # Create response, and add image
         response = HttpResponse()
-        frmt = IMG_FORMATS[self.kwargs.get('format')]
+        frmt = self.get_format()
         response['Content-Type'] = frmt
         img.save(response, frmt)
 
