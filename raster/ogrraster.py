@@ -6,7 +6,8 @@ from osgeo import gdal, osr
 from PIL import Image
 
 from django.core.exceptions import ValidationError
-from utils import (
+
+from .utils import (
     GDAL_PIXEL_TYPES, GDAL_PIXEL_TYPES_UNISGNED, HEADER_NAMES, HEADER_STRUCTURE, STRUCT_SIZE, convert_pixeltype
 )
 
@@ -85,7 +86,7 @@ class OGRRaster(object):
 
             # Chunnk and unpack band data
             nr_of_pixels = header['sizex'] * header['sizey']
-            band_data, data = self.chunk(data, 2 * nr_of_pixels)
+            band_data, data = self.chunk(data, 2 * pixeltype_len * nr_of_pixels)
             band_data = self.unpack(pack_type * nr_of_pixels, band_data)
 
             # Convert data to numpy 2d array
