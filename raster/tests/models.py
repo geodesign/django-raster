@@ -1,12 +1,11 @@
 """
 Model for testing raster field.
 """
-from django.db import models
-from raster.fields import RasterField
+from django.contrib.gis.db import models
 
 
 class RasterFieldModel(models.Model):
-    rast = RasterField()
+    rast = models.RasterField()
 
     def __str__(self):
         return str(self.id)

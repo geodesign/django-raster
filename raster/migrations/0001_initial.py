@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-import raster.fields
-from django.db import migrations, models
+from django.contrib.gis.db import models
+from django.db import migrations
 
 
 class Migration(migrations.Migration):
@@ -31,7 +31,7 @@ class Migration(migrations.Migration):
             name='RasterTile',
             fields=[
                 ('rid', models.AutoField(serialize=False, primary_key=True)),
-                ('rast', raster.fields.RasterField(null=True, blank=True)),
+                ('rast', models.RasterField(null=True, blank=True)),
                 ('filename', models.TextField(null=True, blank=True)),
                 ('rasterlayer', models.ForeignKey(blank=True, to='raster.RasterLayer', null=True)),
             ],

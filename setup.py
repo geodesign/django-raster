@@ -21,7 +21,7 @@ setup(
     install_requires=[
         'psycopg2>=2.5.3',
         'GDAL>=1.10.0',
-        'Django>=1.8',
+        'Django>=1.9',
         'numpy>=1.9.1',
         'Pillow>=2.7.0',
         'django-colorful>=1.0.1'

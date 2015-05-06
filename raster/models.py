@@ -3,11 +3,11 @@ import json
 from colorful.fields import RGBColorField
 
 from django.conf import settings
+from django.contrib.gis.db import models
 from django.contrib.gis.geos import GEOSGeometry, Polygon
-from django.db import connection, models
+from django.db import connection
 from django.db.models.signals import m2m_changed, post_save
 from django.dispatch import receiver
-from raster.fields import RasterField
 from raster.utils import hex_to_rgba
 
 
@@ -271,7 +271,7 @@ class RasterTile(models.Model):
         (14, 14), (15, 15), (16, 16), (17, 17), (18, 18)
     )
     rid = models.AutoField(primary_key=True)
-    rast = RasterField(null=True, blank=True, srid=3857)
+    rast = models.RasterField(null=True, blank=True, srid=3857)
     rasterlayer = models.ForeignKey(RasterLayer, null=True, blank=True, db_index=True)
     filename = models.TextField(null=True, blank=True, db_index=True)
     is_base = models.BooleanField(default=False)

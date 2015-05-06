@@ -7,13 +7,10 @@ import traceback
 import zipfile
 from math import pi
 
-from osgeo import gdal, osr
-from osgeo.gdalconst import GA_ReadOnly
-
 from django.conf import settings
+from django.contrib.gis.gdal.raster.source import GDALRaster
 from django.db import connection
 from raster.models import RasterLayerMetadata, RasterTile
-from raster.ogrraster import OGRRaster
 
 
 class RasterLayerParser:
@@ -93,19 +90,19 @@ class RasterLayerParser:
         self.log('Opening raster file with gdal')
 
         # Open raster file
-        self.dataset = gdal.Open(os.path.join(self.tmpdir, self.rastername), GA_ReadOnly)
+        self.dataset = GDALRaster(os.path.join(self.tmpdir, self.rastername))
 
         # Get data for first band
-        self.band = self.dataset.GetRasterBand(1)
-        self.geotransform = self.dataset.GetGeoTransform()
+        self.band = self.dataset.bands[0]
+        self.geotransform = self.dataset.geotransform
 
         # Store original metadata for this raster
         self.store_original_metadata()
 
         # Get raster meta info
-        self.cols = self.dataset.RasterXSize
-        self.rows = self.dataset.RasterYSize
-        self.bands = self.dataset.RasterCount
+        self.cols = self.dataset.width
+        self.rows = self.dataset.height
+        self.bands = len(self.dataset.bands)
         self.originX = self.geotransform[0]
         self.originY = self.geotransform[3]
         self.pixelWidth = self.geotransform[1]
@@ -178,13 +175,13 @@ class RasterLayerParser:
             rasterlayer=self.rasterlayer)[0]
         lyrmeta.uperleftx = self.geotransform[0]
         lyrmeta.uperlefty = self.geotransform[3]
-        lyrmeta.width = self.dataset.RasterXSize
-        lyrmeta.height = self.dataset.RasterYSize
+        lyrmeta.width = self.dataset.width
+        lyrmeta.height = self.dataset.height
         lyrmeta.scalex = self.geotransform[1]
         lyrmeta.scaley = self.geotransform[5]
         lyrmeta.skewx = self.geotransform[2]
         lyrmeta.skewy = self.geotransform[4]
-        lyrmeta.numbands = self.dataset.RasterCount
+        lyrmeta.numbands = len(self.dataset.bands)
         lyrmeta.save()
 
     def crop(self, zoom=None):
@@ -204,7 +201,7 @@ class RasterLayerParser:
                 dest_geo[3] = yorigin
 
                 # Get projections for source and destination
-                dest_wkt = source_wkt = self.dataset.GetProjection()
+                dest_wkt = source_wkt = self.dataset.srs.wkt
 
                 # Create gdal in-memory raster
                 driver = gdal.GetDriverByName('MEM')
@@ -228,8 +225,8 @@ class RasterLayerParser:
                 else:
                     srid = self.global_srid
 
-                # Setup OGRRaster
-                rast = OGRRaster(dest, srid)
+                # Setup GDALRaster
+                rast = GDALRaster(dest, srid)
 
                 # Create tile
                 tile = RasterTile(
