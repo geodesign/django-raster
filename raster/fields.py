@@ -19,7 +19,7 @@ class RasterField(models.Field):
     def db_type(self, connection):
         return 'raster'
 
-    def from_db_value(self, value, connection):
+    def from_db_value(self, value, expression, connection, context):
         # Convert PostGIS Raster string to OGR Rasters
         if value:
             value = OGRRaster(value)
