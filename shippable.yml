@@ -1,5 +1,3 @@
-build_image: shippableimages/ubuntu1404_python
-
 language: python
 
 python:
@@ -13,21 +11,12 @@ env:
   - DB_NAME=raster_test DJANGO_SETTINGS_MODULE=settings PYTHONPATH=$HOME/workspace/src/github.com/geodesign/django-raster
 
 before_install:
-  - sudo echo "deb http://ppa.launchpad.net/ubuntugis/ubuntugis-unstable/ubuntu trusty main " >> /etc/apt/sources.list
-  - sudo echo "deb-src http://ppa.launchpad.net/ubuntugis/ubuntugis-unstable/ubuntu trusty main"  >> /etc/apt/sources.list
-  - shippable_retry sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 314DF160
-  - shippable_retry sudo apt-get update
-  - shippable_retry sudo apt-get install -y python-dev python-gdal
-  - shippable_retry sudo apt-get install -y postgresql-9.3 postgresql-contrib-9.3 postgresql-server-dev-9.3 postgis postgresql-9.3-postgis-scripts
-  - sudo echo "host all all localhost trust" > /etc/postgresql/9.3/main/pg_hba.conf
-  - sudo echo "local all all trust" >> /etc/postgresql/9.3/main/pg_hba.conf
-  - sudo service postgresql start
   - psql -c 'create database raster_test;' -U postgres
   - psql -d raster_test -c 'create extension postgis;' -U postgres
-  - rm /root/ve/lib/python2.7/no-global-site-packages.txt
 
 install:
-  - pip install Django==1.8 psycopg2==2.5.3 celery==3.1.15 numpy==1.9.1 Pillow==2.7.0 django-colorful==1.0.1 flake8==2.4.0 isort==3.9.6
+  - pip install psycopg2==2.5.3 celery==3.1.15 numpy==1.9.1 Pillow==2.7.0 django-colorful==1.0.1 flake8==2.4.0 isort==3.9.6
+  - pip install git+https://github.com/geodesign/django.git@geodesign
 
 script: django-admin.py test raster
 

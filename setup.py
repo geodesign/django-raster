@@ -8,7 +8,7 @@ os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
 
 setup(
     name='django-raster',
-    version='0.1.6',
+    version='0.1.7',
     packages=['raster', 'raster.migrations'],
     include_package_data=True,
     license='BSD',
@@ -20,8 +20,7 @@ setup(
     author_email='daniel@urbmet.com',
     install_requires=[
         'psycopg2>=2.5.3',
-        'GDAL>=1.10.0',
-        'Django>=1.9',
+        'Django>=1.8',
         'numpy>=1.9.1',
         'Pillow>=2.7.0',
         'django-colorful>=1.0.1'
