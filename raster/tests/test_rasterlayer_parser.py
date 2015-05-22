@@ -25,7 +25,8 @@ class RasterLayerParserWithoutCeleryTests(TestCase):
             datatype='ca',
             srid='3086',
             nodata='0',
-            rasterfile=sourcefile)
+            rasterfile=sourcefile
+        )
 
     def tearDown(self):
         shutil.rmtree(os.path.dirname(os.path.join(

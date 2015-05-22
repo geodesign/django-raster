@@ -114,58 +114,41 @@ class RasterLayerParser:
         """
         self.log('Starting raster warp for zoom ' + str(zoom))
 
-        # Get projections for source and destination
-        srs = osr.SpatialReference()
-        srs.ImportFromEPSG(self.global_srid)
-        dest_wkt = srs.ExportToWkt()
-        source_wkt = self.dataset.GetProjection()
-
         # Calculate warp geotransform
         bbox = self.rasterlayer.extent()
         indexrange = self.get_tile_index_range(bbox, zoom)
         bounds = self.get_tile_bounds(indexrange[0], indexrange[1], zoom)
         tilescalex, tilescaley = self.get_tile_scale(zoom)
 
-        dest_geo = (bounds[0], tilescalex, 0.0, bounds[3], 0.0, tilescaley)
-
         # Create destination raster file
         sizex = (indexrange[2] - indexrange[0] + 1) * self.tilesize
         sizey = (indexrange[3] - indexrange[1] + 1) * self.tilesize
         dest_file = os.path.join(self.tmpdir, 'djangowarpedraster' + str(zoom) + '.tif')
-        driver = gdal.GetDriverByName('GTiff')
-        dest = driver.Create(dest_file, sizex, sizey, self.dataset.RasterCount, self.band.DataType)
-        dest.SetGeoTransform(dest_geo)
-        dest.SetProjection(dest_wkt)
 
-        # Set nodata values
-        for i in range(self.dataset.RasterCount):
-            nodata = self.dataset.GetRasterBand(i + 1).GetNoDataValue()
-            dest.GetRasterBand(i + 1).SetNoDataValue(nodata)
-
-        # Warp image using nearest neighbor resampling
-        gdal.ReprojectImage(
-            self.dataset,
-            dest,
-            source_wkt,
-            dest_wkt,
-            gdal.GRA_NearestNeighbour
-        )
+        dest = self.dataset.warp({
+            'origin': [bounds[0], bounds[3]],
+            'scale': [tilescalex, tilescaley],
+            'width': sizex,
+            'height': sizey,
+            'name': dest_file,
+            'srid': self.global_srid
+        })
 
         # Replace original dataset with warped version
         self.dataset = dest
 
         # Get data for first band
-        self.band = self.dataset.GetRasterBand(1)
-        self.geotransform = self.dataset.GetGeoTransform()
+        self.band = self.dataset.bands[0]
+        self.geotransform = self.dataset.geotransform
 
         # Get raster meta info
-        self.cols = self.dataset.RasterXSize
-        self.rows = self.dataset.RasterYSize
-        self.bands = self.dataset.RasterCount
-        self.originX = self.geotransform[0]
-        self.originY = self.geotransform[3]
-        self.pixelWidth = self.geotransform[1]
-        self.pixelHeight = self.geotransform[5]
+        self.cols = self.dataset.width
+        self.rows = self.dataset.height
+        self.bands = len(self.dataset.bands)
+        self.originX = self.dataset.origin.x
+        self.originY = self.dataset.origin.y
+        self.pixelWidth = self.dataset.scale.x
+        self.pixelHeight = self.dataset.scale.y
 
     def store_original_metadata(self):
         """
@@ -196,41 +179,22 @@ class RasterLayerParser:
                 xorigin = self.originX + self.pixelWidth * xblock
                 yorigin = self.originY + self.pixelHeight * yblock
 
-                dest_geo = list(self.geotransform)
-                dest_geo[0] = xorigin
-                dest_geo[3] = yorigin
-
-                # Get projections for source and destination
-                dest_wkt = source_wkt = self.dataset.srs.wkt
-
-                # Create gdal in-memory raster
-                driver = gdal.GetDriverByName('MEM')
-                dest = driver.Create('', self.tilesize, self.tilesize, 1, self.band.DataType)
-                dest.SetGeoTransform(dest_geo)
-                for i in range(self.dataset.RasterCount):
-                    nodata = self.dataset.GetRasterBand(i + 1).GetNoDataValue()
-                    dest.GetRasterBand(i + 1).SetNoDataValue(nodata)
-
-                # Crop parent raster to tile
-                gdal.ReprojectImage(
-                    self.dataset,
-                    dest,
-                    source_wkt,
-                    dest_wkt
-                )
-
-                # Select srid for this zoomlevel
+                # select srid for this zoomlevel
                 if zoom is None:
                     srid = int(self.rasterlayer.srid)
                 else:
                     srid = self.global_srid
 
-                # Setup GDALRaster
-                rast = GDALRaster(dest, srid)
+                # Create gdal in-memory raster
+                dest = self.dataset.warp({
+                    'driver': 'MEM', 'srid': srid,
+                    'width': self.tilesize, 'height': self.tilesize,
+                    'origin': [xorigin, yorigin]
+                })
 
                 # Create tile
                 tile = RasterTile(
-                    rast=rast,
+                    rast=dest,
                     rasterlayer=self.rasterlayer,
                     filename=self.rastername
                 )
