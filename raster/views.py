@@ -9,7 +9,7 @@ from django.shortcuts import get_object_or_404
 from django.views.generic import View
 
 from .models import Legend, RasterLayer, RasterTile
-from .utils import IMG_FORMATS
+from .utils import IMG_FORMATS, raster_to_image
 
 
 class AlgebraView(View):
@@ -37,7 +37,7 @@ class AlgebraView(View):
                 rasterlayer_id=layerid
             ).first()
             if tile:
-                data[name] = tile.rast.array().ravel()
+                data[name] = tile.rast.bands[0].data().ravel()
             else:
                 return self.write_rgba_to_response()
 
@@ -135,7 +135,7 @@ class TmsView(View):
         # Render tile
         if tile.exists() and colormap:
             # Render tile using the legend data
-            img = tile[0].rast.img(colormap)
+            img = raster_to_image(tile[0].rast, colormap)
         else:
             # Create empty image if tile cant be found
             img = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
