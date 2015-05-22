@@ -33,7 +33,8 @@ class RasterTmsTests(TestCase):
             srid='3086',
             nodata='0',
             rasterfile=sourcefile,
-            legend=leg)
+            legend=leg
+        )
 
         self.tile = self.rasterlayer.rastertile_set.filter(is_base=False).first()
         self.tile_url = reverse('tms', kwargs={'z': self.tile.tilez, 'y': self.tile.tiley, 'x': self.tile.tilex, 'layer': 'raster.tif', 'format': '.png'})
