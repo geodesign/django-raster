@@ -9,7 +9,7 @@ from django.shortcuts import get_object_or_404
 from django.views.generic import View
 
 from .models import Legend, RasterLayer, RasterTile
-from .utils import IMG_FORMATS, raster_to_image
+from .utils import IMG_FORMATS, band_data_to_image
 
 
 class AlgebraView(View):
@@ -39,7 +39,9 @@ class AlgebraView(View):
             if tile:
                 data[name] = tile.rast.bands[0].data().ravel()
             else:
-                return self.write_rgba_to_response()
+                # Create empty image if no data was provided
+                img = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
+                return self.write_img_to_response(img)
 
         # Get formula (allowing several parts to the formula)
         formulas = request.GET.get('formula').split(',')
@@ -73,15 +75,26 @@ class AlgebraView(View):
         # Get result from data dict
         result = data['y']
 
-        # Scale to grayscale rgb (can be colorscheme later on)
-        result = result.astype('float')
-        result = 255 * (result - numpy.min(result)) / (numpy.max(result) - numpy.min(result))
+        colormap = self.get_colormap()
+        if colormap:
+            # Reshape data to original size
+            result = result.reshape(tile.rast.width, tile.rast.height)
+            # Render tile using the legend data
+            img = band_data_to_image(result, colormap)
+        else:
+            # Scale to grayscale rgb (can be colorscheme later on)
+            result = result.astype('float')
+            result = 255 * (result - numpy.min(result)) / (numpy.max(result) - numpy.min(result))
 
-        # Create rgba matrix from grayscale array
-        result = numpy.array((result, result, result, numpy.repeat(255, len(result)))).T
-        rgba = result.reshape(256, 256, 4).astype('uint8')
+            # Create rgba matrix from grayscale array
+            result = numpy.array((result, result, result, numpy.repeat(255, len(result)))).T
+            rgba = result.reshape(256, 256, 4).astype('uint8')
 
-        return self.write_rgba_to_response(rgba)
+            # Create image from array
+            img = Image.fromarray(rgba)
+
+        # Return rendered image
+        return self.write_img_to_response(img)
 
     def get_format(self):
         """
@@ -89,17 +102,10 @@ class AlgebraView(View):
         """
         return IMG_FORMATS[self.kwargs.get('format')]
 
-    def write_rgba_to_response(self, rgba=None):
+    def write_img_to_response(self, img):
         """
         Writes rgba numpy array to http response.
         """
-        if rgba is None:
-            # Create empty image if no data was provided
-            img = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
-        else:
-            # Create image from array
-            img = Image.fromarray(rgba)
-
         # Create response, and add image
         response = HttpResponse()
         frmt = self.get_format()
@@ -107,6 +113,25 @@ class AlgebraView(View):
         img.save(response, frmt)
 
         return response
+
+    def get_colormap(self):
+        # Skip if legend was not specified
+        if 'legend' not in self.request.GET:
+            return
+
+        # Get legend from request
+        query_legend = self.request.GET.get('legend')
+
+        # Try to get legend object from id, otherwise use as name
+        colormap = None
+        try:
+            colormap = Legend.objects.get(id=int(query_legend)).colormap
+        except:
+            legend = Legend.objects.filter(title__iexact=query_legend).first()
+            if legend:
+                colormap = legend.colormap
+
+        return colormap
 
 
 class TmsView(View):
@@ -135,7 +160,7 @@ class TmsView(View):
         # Render tile
         if tile.exists() and colormap:
             # Render tile using the legend data
-            img = raster_to_image(tile[0].rast, colormap)
+            img = band_data_to_image(tile[0].rast.bands[0].data(), colormap)
         else:
             # Create empty image if tile cant be found
             img = Image.new("RGBA", (256, 256), (0, 0, 0, 0))

@@ -224,13 +224,13 @@ def hex_to_rgba(value, alpha=255):
     return rgb + (alpha, )
 
 
-def raster_to_image(raster, colormap, band=0):
+def band_data_to_image(band_data, colormap, band=0):
     """
     Creates an python image from pixel values of a GDALRaster.
     The input is a dictionary that maps pixel values to RGBA UInt8 colors.
     """
     # Get data as 1D array
-    dat = raster.bands[band].data().ravel()
+    dat = band_data.ravel()
 
     # Create zeros array
     rgba = numpy.zeros((dat.shape[0], 4), dtype='uint8')
@@ -248,7 +248,7 @@ def raster_to_image(raster, colormap, band=0):
             rgba[selector] = color
 
     # Reshape array to image size
-    rgba = rgba.reshape(raster.height, raster.width, 4)
+    rgba = rgba.reshape(band_data.shape[0], band_data.shape[1], 4)
 
     # Create image from array
     return Image.fromarray(rgba)
