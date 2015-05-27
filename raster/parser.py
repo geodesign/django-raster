@@ -86,7 +86,6 @@ class RasterLayerParser:
 
     def open_raster_file(self):
         """Opens the raster file through gdal and extracts data values"""
-
         self.log('Opening raster file with gdal')
 
         # Open raster file
@@ -189,7 +188,8 @@ class RasterLayerParser:
                 dest = self.dataset.warp({
                     'driver': 'MEM', 'srid': srid,
                     'width': self.tilesize, 'height': self.tilesize,
-                    'origin': [xorigin, yorigin]
+                    'origin': [xorigin, yorigin],
+                    'nodata_value': float(self.rasterlayer.nodata)
                 })
 
                 # Create tile
