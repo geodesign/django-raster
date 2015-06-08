@@ -129,39 +129,55 @@ class RasterLayer(models.Model):
                                                 self.srid)
 
     def _collect_tiles_sql(self):
-        """SQL query string for selecting all tiles for this layer"""
-        return "SELECT rast FROM raster_rastertile \
-                WHERE rasterlayer_id={0} AND is_base".format(self.id)
+        """
+        SQL query string for selecting all tiles for this layer.
+        """
+        return (
+            "SELECT rast FROM raster_rastertile "
+            "WHERE rasterlayer_id={0} AND is_base"
+        ).format(self.id)
 
     def _clip_tiles_sql(self, geom):
-        """Returns intersection of tiles with geom"""
-        return "SELECT ST_Clip(rast, ST_GeomFromText('{geom}')) AS rast \
-                FROM ({base}) AS cliptiles \
-                WHERE ST_Intersects(rast, ST_GeomFromText('{geom}'))\
-                ".format(geom=geom.ewkt, base=self._collect_tiles_sql())
+        """
+        Returns intersection of tiles with geom.
+        """
+        var = (
+            "SELECT ST_Clip(rast, ST_GeomFromText('{geom}')) AS rast "
+            "FROM ({base}) AS cliptiles "
+            "WHERE ST_Intersects(rast, ST_GeomFromText('{geom}'))"
+        ).format(geom=geom.ewkt, base=self._collect_tiles_sql())
+        print var
+        return var
 
     def _value_count_sql(self, geom):
-        """SQL query string for counting pixels per distinct value"""
+        """
+        SQL query string for counting pixels per distinct value.
+        """
         if geom:
             tile_sql = self._clip_tiles_sql(geom)
         else:
             tile_sql = self._collect_tiles_sql()
 
-        count_sql = "SELECT ST_ValueCount(rast) AS pvc\
-                     FROM ({0}) AS cliprast WHERE ST_Count(rast) != 0\
-                     ".format(tile_sql)
+        count_sql = (
+            "SELECT ST_ValueCount(rast) AS pvc "
+            "FROM ({0}) AS cliprast WHERE ST_Count(rast) != 0 "
+        ).format(tile_sql)
 
-        return "SELECT (pvc).value, SUM((pvc).count) AS count FROM \
-                ({0}) AS pvctable GROUP BY (pvc).value".format(count_sql)
+        return (
+            "SELECT (pvc).value, SUM((pvc).count) AS count FROM"
+            "({0}) AS pvctable GROUP BY (pvc).value"
+        ).format(count_sql)
 
     def value_count(self, geom=None):
-        """Get a count by distinct pixel value within the given geometry"""
+        """
+        Get a count by distinct pixel value within the given geometry.
+        """
         # Check that raster is categorical or mask
         if self.datatype not in ['ca', 'ma']:
             raise TypeError('Wrong rastertype, value counts can only be '
                             'calculated for categorical or mask raster tpyes')
 
-        # Make sure geometry is GEOS Geom
+        # Make sure geometry is GEOS Geom and in right projection
         if geom:
             geom = GEOSGeometry(geom)
             geom.transform(self.srid)

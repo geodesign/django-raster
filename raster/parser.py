@@ -14,8 +14,9 @@ from raster.models import RasterLayerMetadata, RasterTile
 
 
 class RasterLayerParser:
-    """Class to parse raster layers using gdal python bindings"""
-
+    """
+    Class to parse raster layers using gdal python bindings.
+    """
     def __init__(self, rasterlayer):
         self.rasterlayer = rasterlayer
 
@@ -35,7 +36,9 @@ class RasterLayerParser:
         self.tileshift = self.worldsize / 2.0
 
     def log(self, msg, reset=False):
-        """Writes a message to the parse log of the rasterlayer instance"""
+        """
+        Write a message to the parse log of the rasterlayer instance.
+        """
         # Prepare datetime stamp for log
         now = '[{0}] '.format(datetime.datetime.now().strftime('%Y-%m-%d %T'))
 
@@ -48,8 +51,9 @@ class RasterLayerParser:
         self.rasterlayer.save()
 
     def get_raster_file(self):
-        """Make local copy of rasterfile (necessary if stored on CDN)"""
-
+        """
+        Make local copy of rasterfile (necessary if files are stored on CDN).
+        """
         self.log('Getting raster file from storage')
 
         self.tmpdir = tempfile.mkdtemp()
@@ -85,31 +89,37 @@ class RasterLayerParser:
             self.rastername = os.path.basename(raster_list[0])
 
     def open_raster_file(self):
-        """Opens the raster file through gdal and extracts data values"""
+        """
+        Opens the raster file through gdal and extracts data values.
+        """
         self.log('Opening raster file with gdal')
 
         # Open raster file
         self.dataset = GDALRaster(os.path.join(self.tmpdir, self.rastername))
 
-        # Get data for first band
-        self.band = self.dataset.bands[0]
-        self.geotransform = self.dataset.geotransform
-
         # Store original metadata for this raster
         self.store_original_metadata()
 
-        # Get raster meta info
-        self.cols = self.dataset.width
-        self.rows = self.dataset.height
-        self.bands = len(self.dataset.bands)
-        self.originX = self.geotransform[0]
-        self.originY = self.geotransform[3]
-        self.pixelWidth = self.geotransform[1]
-        self.pixelHeight = self.geotransform[5]
-
-    def reproject_raster(self, zoom):
+    def store_original_metadata(self):
         """
-        Reprojects the gdal raster to the global srid setting.
+        Exports the input raster meta data to a RasterLayerMetadata object.
+        """
+        lyrmeta = RasterLayerMetadata.objects.get_or_create(
+            rasterlayer=self.rasterlayer)[0]
+        lyrmeta.uperleftx = self.dataset.origin.x
+        lyrmeta.uperlefty = self.dataset.origin.y
+        lyrmeta.width = self.dataset.width
+        lyrmeta.height = self.dataset.height
+        lyrmeta.scalex = self.dataset.scale.x
+        lyrmeta.scaley = self.dataset.scale.y
+        lyrmeta.skewx = self.dataset.skew.x
+        lyrmeta.skewy = self.dataset.skew.y
+        lyrmeta.numbands = len(self.dataset.bands)
+        lyrmeta.save()
+
+    def snap_raster_to_zoomlevel(self, zoom):
+        """
+        Snaps the raster to the grid of the given zoom level.
         """
         self.log('Starting raster warp for zoom ' + str(zoom))
 
@@ -129,42 +139,11 @@ class RasterLayerParser:
             'scale': [tilescalex, tilescaley],
             'width': sizex,
             'height': sizey,
-            'name': dest_file,
-            'srid': self.global_srid
+            'name': dest_file
         })
 
         # Replace original dataset with warped version
         self.dataset = dest
-
-        # Get data for first band
-        self.band = self.dataset.bands[0]
-        self.geotransform = self.dataset.geotransform
-
-        # Get raster meta info
-        self.cols = self.dataset.width
-        self.rows = self.dataset.height
-        self.bands = len(self.dataset.bands)
-        self.originX = self.dataset.origin.x
-        self.originY = self.dataset.origin.y
-        self.pixelWidth = self.dataset.scale.x
-        self.pixelHeight = self.dataset.scale.y
-
-    def store_original_metadata(self):
-        """
-        Exports the input raster meta data to a RasterLayerMetadata object
-        """
-        lyrmeta = RasterLayerMetadata.objects.get_or_create(
-            rasterlayer=self.rasterlayer)[0]
-        lyrmeta.uperleftx = self.geotransform[0]
-        lyrmeta.uperlefty = self.geotransform[3]
-        lyrmeta.width = self.dataset.width
-        lyrmeta.height = self.dataset.height
-        lyrmeta.scalex = self.geotransform[1]
-        lyrmeta.scaley = self.geotransform[5]
-        lyrmeta.skewx = self.geotransform[2]
-        lyrmeta.skewy = self.geotransform[4]
-        lyrmeta.numbands = len(self.dataset.bands)
-        lyrmeta.save()
 
     def crop(self, zoom=None):
         if zoom is None:
@@ -172,11 +151,11 @@ class RasterLayerParser:
         else:
             self.log('Creating tiles for zoom ' + str(zoom))
 
-        for yblock in range(0, self.rows, self.tilesize):
-            for xblock in range(0, self.cols, self.tilesize):
+        for yblock in range(0, self.dataset.height, self.tilesize):
+            for xblock in range(0, self.dataset.width, self.tilesize):
                 # Calculate raster tile origin
-                xorigin = self.originX + self.pixelWidth * xblock
-                yorigin = self.originY + self.pixelHeight * yblock
+                xorigin = self.dataset.origin.x + self.dataset.scale.x * xblock
+                yorigin = self.dataset.origin.y + self.dataset.scale.y * yblock
 
                 # select srid for this zoomlevel
                 if zoom is None:
@@ -216,16 +195,14 @@ class RasterLayerParser:
         """
         Remove rasters that are only no-data from the current rasterlayer.
         """
+        # Setup SQL command
+        sql = (
+            "DELETE FROM raster_rastertile "
+            "WHERE ST_Count(rast)=0 "
+            "AND rasterlayer_id={0}"
+        ).format(self.rasterlayer.id)
 
-        var = """
-        DELETE FROM raster_rastertile
-        WHERE ST_Count(rast)=0
-        AND rasterlayer_id={0}
-        """
-
-        sql = var.format(self.rasterlayer.id)
-
-        # Calculate tile in DB
+        # Run SQL to drop empty tiles
         cursor = connection.cursor()
         cursor.execute(sql)
 
@@ -240,7 +217,7 @@ class RasterLayerParser:
             return self.rasterlayer.max_zoom
 
         # Get scale of raster
-        pixelsize = self.rasterlayer.rasterlayermetadata.scalex
+        pixelsize = self.dataset.scale.x
 
         # Calculate all pixelsizes for the TMS zoom levels
         tms_pixelsizes = [self.worldsize / (2.0 ** i * self.tilesize) for i in range(1, 19)]
@@ -253,6 +230,7 @@ class RasterLayerParser:
             if pixelsize - tms_pixelsizes[i] >= 0:
                 zoomlevel = i
                 break
+
         # If nextdown setting is true, adjust level
         if self.zoomdown:
             zoomlevel += 1
@@ -290,15 +268,16 @@ class RasterLayerParser:
         return [xmin, ymin, xmax, ymax]
 
     def get_tile_scale(self, z):
-        """Calculates pixel size scale for given zoom level"""
-
+        """
+        Calculates pixel size scale for given zoom level.
+        """
         zscale = self.worldsize / 2.0 ** z / self.tilesize
         return zscale, -zscale
 
     def parse_raster_layer(self):
         """
         This function pushes the raster data from the Raster Layer into the
-        RasterTile table, in tiles of 100x100 pixels.
+        RasterTile table.
         """
         try:
             # Clean previous parse log
@@ -311,16 +290,15 @@ class RasterLayerParser:
             # Remove existing tiles for this layer before loading new ones
             self.rasterlayer.rastertile_set.all().delete()
 
-            # Create tiles in original projection and resolution
-            self.crop()
-            self.drop_empty_rasters()
+            # Transform raster to global srid
+            self.dataset = self.dataset.transform(self.global_srid)
 
             # Setup TMS aligned tiles in world mercator
             zoom = self.get_max_zoom()
 
             # Loop through all lower zoom levels and create tiles
             for iz in range(zoom, -1, -1):
-                self.reproject_raster(iz)
+                self.snap_raster_to_zoomlevel(iz)
                 self.crop(iz)
 
             self.drop_empty_rasters()
