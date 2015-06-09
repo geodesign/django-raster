@@ -1,14 +1,12 @@
 """
-Settings for django-raster tests
+Settings for django-raster tests.
 """
-
 import os
 
 SECRET_KEY = 'testkey'
 
 INSTALLED_APPS = (
     'raster',
-    'raster.tests'
 )
 
 DATABASES = {

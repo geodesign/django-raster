@@ -291,6 +291,7 @@ class RasterLayerParser:
             self.rasterlayer.rastertile_set.all().delete()
 
             # Transform raster to global srid
+            self.log('Transforming raster to SRID {0}'.format(self.global_srid))
             self.dataset = self.dataset.transform(self.global_srid)
 
             # Setup TMS aligned tiles in world mercator

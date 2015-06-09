@@ -43,7 +43,7 @@ class RasterTmsTests(TestCase):
 
     def tearDown(self):
         shutil.rmtree(os.path.dirname(os.path.join(
-            self.pwd, '../..', self.rasterlayer.rasterfile.name)))
+            self.pwd, '..', self.rasterlayer.rasterfile.name)))
         self.rasterlayer.rastertile_set.all().delete()
 
     def test_tms_nonexisting_layer(self):
