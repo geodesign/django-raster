@@ -104,8 +104,9 @@ def update_dependent_legends_on_semantics_change(sender, instance, **kwargs):
 
 
 class RasterLayer(models.Model):
-    """Source data model for raster layers"""
-
+    """
+    Source data model for raster layers
+    """
     DATATYPES = (('co', 'Continuous'),
                  ('ca', 'Categorical'),
                  ('ma', 'Mask'),
@@ -130,11 +131,13 @@ class RasterLayer(models.Model):
 
     def _collect_tiles_sql(self):
         """
-        SQL query string for selecting all tiles for this layer.
+        SQL query string for selecting all tiles at the maximum zoom level
+        for this layer.
         """
         return (
             "SELECT rast FROM raster_rastertile "
-            "WHERE rasterlayer_id={0} AND is_base"
+            "WHERE rasterlayer_id={0} "
+            "AND tilez=(SELECT MAX(tilez) FROM raster_rastertile WHERE rasterlayer_id={0})"
         ).format(self.id)
 
     def _clip_tiles_sql(self, geom):
@@ -146,7 +149,6 @@ class RasterLayer(models.Model):
             "FROM ({base}) AS cliptiles "
             "WHERE ST_Intersects(rast, ST_GeomFromText('{geom}'))"
         ).format(geom=geom.ewkt, base=self._collect_tiles_sql())
-        print var
         return var
 
     def _value_count_sql(self, geom):
@@ -160,11 +162,11 @@ class RasterLayer(models.Model):
 
         count_sql = (
             "SELECT ST_ValueCount(rast) AS pvc "
-            "FROM ({0}) AS cliprast WHERE ST_Count(rast) != 0 "
+            "FROM ({0}) AS cliprast WHERE ST_Count(rast) != 0"
         ).format(tile_sql)
 
         return (
-            "SELECT (pvc).value, SUM((pvc).count) AS count FROM"
+            "SELECT (pvc).value, SUM((pvc).count) AS count FROM "
             "({0}) AS pvctable GROUP BY (pvc).value"
         ).format(count_sql)
 
@@ -180,18 +182,15 @@ class RasterLayer(models.Model):
         # Make sure geometry is GEOS Geom and in right projection
         if geom:
             geom = GEOSGeometry(geom)
-            geom.transform(self.srid)
+            if geom.srid != 3857:
+                geom.transform(3857)
 
         # Query data and return results
         cursor = connection.cursor()
         cursor.execute(self._value_count_sql(geom))
 
-        # Retruns all rows as dict
-        desc = cursor.description
-        return [
-            dict(zip([col[0] for col in desc], row))
-            for row in cursor.fetchall()
-        ]
+        # Return dict from count data
+        return {int(row[0]): int(row[1]) for row in cursor.fetchall()}
 
     _pixelsize = None
 
