@@ -5,11 +5,11 @@ import shutil
 import tempfile
 import traceback
 import zipfile
-from math import pi
 
 from django.conf import settings
 from django.contrib.gis.gdal.raster.source import GDALRaster
 from django.db import connection
+from raster.const import WEB_MERCATOR_SRID, WEB_MERCATOR_TILESHIFT, WEB_MERCATOR_WORLDSIZE
 from raster.models import RasterLayerMetadata, RasterTile
 
 
@@ -22,18 +22,9 @@ class RasterLayerParser:
 
         self.rastername = os.path.basename(rasterlayer.rasterfile.name)
 
-        self.tmpdir = ''
-
         # Set raster tilesize
         self.tilesize = int(getattr(settings, 'RASTER_TILESIZE', 256))
-
-        # Next up vs next down
         self.zoomdown = getattr(settings, 'RASTER_ZOOM_NEXT_HIGHER', True)
-
-        # Set tile srid and basic tile geometry parameters
-        self.global_srid = 3857
-        self.worldsize = 2 * pi * 6378137
-        self.tileshift = self.worldsize / 2.0
 
     def log(self, msg, reset=False):
         """
@@ -161,7 +152,7 @@ class RasterLayerParser:
                 if zoom is None:
                     srid = int(self.rasterlayer.srid)
                 else:
-                    srid = self.global_srid
+                    srid = WEB_MERCATOR_SRID
 
                 # Create gdal in-memory raster
                 dest = self.dataset.warp({
@@ -220,7 +211,7 @@ class RasterLayerParser:
         pixelsize = self.dataset.scale.x
 
         # Calculate all pixelsizes for the TMS zoom levels
-        tms_pixelsizes = [self.worldsize / (2.0 ** i * self.tilesize) for i in range(1, 19)]
+        tms_pixelsizes = [WEB_MERCATOR_WORLDSIZE / (2.0 ** i * self.tilesize) for i in range(1, 19)]
 
         # If the pixelsize is smaller than all tms sizes, default to max level
         zoomlevel = 18
@@ -244,26 +235,26 @@ class RasterLayerParser:
         with the input bbox at zoomlevel z.
         """
         # Calculate tile size for given zoom level
-        zscale = self.worldsize / 2 ** z
+        zscale = WEB_MERCATOR_WORLDSIZE / 2 ** z
 
         # Calculate overlaying tile indices
         return [
-            int((bbox[0] + self.tileshift) / zscale),
-            int((self.tileshift - bbox[3]) / zscale),
-            int((bbox[2] + self.tileshift) / zscale),
-            int((self.tileshift - bbox[1]) / zscale)
+            int((bbox[0] + WEB_MERCATOR_TILESHIFT) / zscale),
+            int((WEB_MERCATOR_TILESHIFT - bbox[3]) / zscale),
+            int((bbox[2] + WEB_MERCATOR_TILESHIFT) / zscale),
+            int((WEB_MERCATOR_TILESHIFT - bbox[1]) / zscale)
         ]
 
     def get_tile_bounds(self, x, y, z):
         """
         Calculates bounding box from Tile Map Service XYZ indices.
         """
-        zscale = self.worldsize / 2 ** z
+        zscale = WEB_MERCATOR_WORLDSIZE / 2 ** z
 
-        xmin = x * zscale - self.tileshift
-        xmax = (x + 1) * zscale - self.tileshift
-        ymin = self.tileshift - (y + 1) * zscale
-        ymax = self.tileshift - y * zscale
+        xmin = x * zscale - WEB_MERCATOR_TILESHIFT
+        xmax = (x + 1) * zscale - WEB_MERCATOR_TILESHIFT
+        ymin = WEB_MERCATOR_TILESHIFT - (y + 1) * zscale
+        ymax = WEB_MERCATOR_TILESHIFT - y * zscale
 
         return [xmin, ymin, xmax, ymax]
 
@@ -271,7 +262,7 @@ class RasterLayerParser:
         """
         Calculates pixel size scale for given zoom level.
         """
-        zscale = self.worldsize / 2.0 ** z / self.tilesize
+        zscale = WEB_MERCATOR_WORLDSIZE / 2.0 ** z / self.tilesize
         return zscale, -zscale
 
     def parse_raster_layer(self):
@@ -291,8 +282,8 @@ class RasterLayerParser:
             self.rasterlayer.rastertile_set.all().delete()
 
             # Transform raster to global srid
-            self.log('Transforming raster to SRID {0}'.format(self.global_srid))
-            self.dataset = self.dataset.transform(self.global_srid)
+            self.log('Transforming raster to SRID {0}'.format(WEB_MERCATOR_SRID))
+            self.dataset = self.dataset.transform(WEB_MERCATOR_SRID)
 
             # Setup TMS aligned tiles in world mercator
             zoom = self.get_max_zoom()

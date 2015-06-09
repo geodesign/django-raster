@@ -23,3 +23,5 @@ DATABASES = {
 DEBUG = True
 
 ROOT_URLCONF = 'raster.urls'
+
+RASTER_TILESIZE = 256

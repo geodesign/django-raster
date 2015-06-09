@@ -68,3 +68,33 @@ class RasterLayerParserWithoutCeleryTests(TestCase):
                    RASTER_TILESIZE=100)
 class RasterLayerParserWithCeleryTests(RasterLayerParserWithoutCeleryTests):
     pass
+
+
+@override_settings(RASTER_TILESIZE=100, RASTER_ZOOM_NEXT_HIGHER=False)
+class RasterLayerParserWithoutCeleryTests(TestCase):
+
+    def setUp(self):
+        # Instantiate Django file instances with nodes and links
+        self.pwd = os.path.dirname(os.path.abspath(
+            inspect.getfile(inspect.currentframe())))
+
+        sourcefile = File(open(os.path.join(self.pwd, 'raster.tif.zip'), 'rb'))
+
+        # Create network with csv data attached
+        self.rasterlayer = RasterLayer.objects.create(
+            name='Raster data',
+            description='Small raster for testing',
+            datatype='ca',
+            srid='3086',
+            nodata='0',
+            rasterfile=sourcefile
+        )
+
+    def tearDown(self):
+        shutil.rmtree(os.path.dirname(os.path.join(
+            self.pwd, '..', self.rasterlayer.rasterfile.name)))
+        self.rasterlayer.rastertile_set.all().delete()
+
+    def test_raster_layer_parsing(self):
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(tilez=12).count(), 0)
+        self.assertEqual(self.rasterlayer.rastertile_set.filter(tilez=11).count(), 4)
