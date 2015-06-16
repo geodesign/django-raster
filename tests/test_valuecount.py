@@ -1,37 +1,17 @@
-import inspect
-import os
-import shutil
-
 import numpy
 
 from django.contrib.gis.geos import Polygon
-from django.core.files import File
-from django.test import TestCase
 from django.test.utils import override_settings
 from raster.const import WEB_MERCATOR_SRID
-from raster.models import RasterLayer
+
+from .raster_testcase import RasterTestCase
 
 
 @override_settings(RASTER_TILE_CACHE_TIMEOUT=0)
-class RasterValueCountTests(TestCase):
+class RasterValueCountTests(RasterTestCase):
 
     def setUp(self):
-        # Instantiate Django file instances with nodes and links
-        self.pwd = os.path.dirname(os.path.abspath(
-            inspect.getfile(inspect.currentframe())))
-
-        sourcefile = File(open(os.path.join(self.pwd, 'raster.tif.zip')))
-
-        # Create raster layer
-        self.rasterlayer = RasterLayer.objects.create(
-            name='Raster data',
-            description='Small raster for testing',
-            datatype='ca',
-            srid='3086',
-            nodata='0',
-            rasterfile=sourcefile
-        )
-
+        super(RasterValueCountTests, self).setUp()
         # Precompute expected totals from value count
         expected = {}
         for tile in self.rasterlayer.rastertile_set.filter(tilez=11):
@@ -43,11 +23,6 @@ class RasterValueCountTests(TestCase):
                     expected[pair[0]] = pair[1]
 
         self.expected_totals = expected
-
-    def tearDown(self):
-        shutil.rmtree(os.path.dirname(os.path.join(
-            self.pwd, '..', self.rasterlayer.rasterfile.name)))
-        self.rasterlayer.rastertile_set.all().delete()
 
     def test_value_count_no_geom(self):
         self.assertEqual(
