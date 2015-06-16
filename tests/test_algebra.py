@@ -28,10 +28,22 @@ class RasterTmsTests(TestCase):
             datatype='ca',
             srid='3086',
             nodata='0',
-            rasterfile=sourcefile)
+            rasterfile=sourcefile
+        )
 
         self.tile = self.rasterlayer.rastertile_set.filter(is_base=False).first()
         self.tile_url = reverse('algebra', kwargs={'z': self.tile.tilez, 'y': self.tile.tiley, 'x': self.tile.tilex, 'format': '.png'})
+
+        # Create raster layer and empty it
+        self.empty_rasterlayer = RasterLayer.objects.create(
+            name='Raster data',
+            description='Small raster for testing',
+            datatype='ca',
+            srid='3086',
+            nodata='0',
+            rasterfile=sourcefile
+        )
+        self.empty_rasterlayer.rastertile_set.all().delete()
 
         # Create raster legend
         sem1 = LegendSemantics.objects.create(name='Earth')
@@ -76,4 +88,8 @@ class RasterTmsTests(TestCase):
 
     def test_legend_title_specified(self):
         response = self.client.get(self.tile_url + '?layers=a={0}&formula=y=a&legend={1}'.format(self.rasterlayer.id, self.legend.title))
+        self.assertEqual(response.status_code, 200)
+
+    def test_algebra_with_empty_tile(self):
+        response = self.client.get(self.tile_url + '?layers=a={0},b={1}&formula=y=a*b&legend={2}'.format(self.rasterlayer.id, self.empty_rasterlayer.id, self.legend.title))
         self.assertEqual(response.status_code, 200)

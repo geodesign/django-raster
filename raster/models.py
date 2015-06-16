@@ -8,6 +8,7 @@ from django.contrib.gis.geos import GEOSGeometry, Polygon
 from django.db import connection
 from django.db.models.signals import m2m_changed, post_save
 from django.dispatch import receiver
+from raster.const import WEB_MERCATOR_SRID
 from raster.utils import hex_to_rgba
 
 
@@ -117,8 +118,8 @@ class RasterLayer(models.Model):
     datatype = models.CharField(max_length=2, choices=DATATYPES,
                                 default='co')
     rasterfile = models.FileField(upload_to='rasters', null=True, blank=True)
-    srid = models.CharField(max_length=10, default='3086')
-    nodata = models.CharField(max_length=100, default='-9999')
+    srid = models.CharField(max_length=10)
+    nodata = models.CharField(max_length=100)
     parse_log = models.TextField(blank=True, null=True, default='',
                                  editable=False)
     legend = models.ForeignKey(Legend, blank=True, null=True)
@@ -129,26 +130,37 @@ class RasterLayer(models.Model):
                                                 self.datatype,
                                                 self.srid)
 
-    def _collect_tiles_sql(self):
+    def _collect_tiles_sql(self, srid=None):
         """
         SQL query string for selecting all tiles at the maximum zoom level
         for this layer.
         """
+        if srid:
+            sql_head = "SELECT ST_Transform(rast, {srid}) AS rast FROM raster_rastertile "
+        else:
+            sql_head = "SELECT rast FROM raster_rastertile "
+
         return (
-            "SELECT rast FROM raster_rastertile "
-            "WHERE rasterlayer_id={0} "
-            "AND tilez=(SELECT MAX(tilez) FROM raster_rastertile WHERE rasterlayer_id={0})"
-        ).format(self.id)
+            sql_head +
+            "WHERE rasterlayer_id={layer_id} "
+            "AND tilez=(SELECT MAX(tilez) FROM raster_rastertile WHERE rasterlayer_id={layer_id})"
+        ).format(srid=srid, layer_id=self.id)
 
     def _clip_tiles_sql(self, geom):
         """
         Returns intersection of tiles with geom.
         """
+        # Make intersection on raw tiles to leverage index, clip in the geom's srid
         var = (
-            "SELECT ST_Clip(rast, ST_GeomFromText('{geom}')) AS rast "
+            "SELECT ST_Clip(ST_Transform(rast, {srid}), ST_GeomFromText('{geom}')) AS rast "
             "FROM ({base}) AS cliptiles "
-            "WHERE ST_Intersects(rast, ST_GeomFromText('{geom}'))"
-        ).format(geom=geom.ewkt, base=self._collect_tiles_sql())
+            "WHERE ST_Intersects(rast, ST_Transform(ST_GeomFromText('{geom}'), {wmerc}))"
+        ).format(
+            srid=geom.srid,
+            geom=geom.ewkt,
+            base=self._collect_tiles_sql(),
+            wmerc=WEB_MERCATOR_SRID
+        )
         return var
 
     def _value_count_sql(self, geom):
@@ -170,7 +182,7 @@ class RasterLayer(models.Model):
             "({0}) AS pvctable GROUP BY (pvc).value"
         ).format(count_sql)
 
-    def value_count(self, geom=None):
+    def value_count(self, geom=None, area=False):
         """
         Get a count by distinct pixel value within the given geometry.
         """
@@ -179,41 +191,39 @@ class RasterLayer(models.Model):
             raise TypeError('Wrong rastertype, value counts can only be '
                             'calculated for categorical or mask raster tpyes')
 
-        # Make sure geometry is GEOS Geom and in right projection
         if geom:
+            # Make sure geometry is GEOS Geom
             geom = GEOSGeometry(geom)
-            if geom.srid != 3857:
-                geom.transform(3857)
 
         # Query data and return results
         cursor = connection.cursor()
         cursor.execute(self._value_count_sql(geom))
 
-        # Return dict from count data
-        return {int(row[0]): int(row[1]) for row in cursor.fetchall()}
+        # Convert value count to areas if requested
+        if area:
+            scalex, scaley = self._min_pixelsize(geom.srid)
+            return {int(row[0]): int(row[1]) * scalex * scaley for row in cursor.fetchall()}
+        else:
+            return {int(row[0]): int(row[1]) for row in cursor.fetchall()}
 
-    _pixelsize = None
+    def _min_pixelsize(self, srid=WEB_MERCATOR_SRID):
+        sql = (
+            "SELECT ST_ScaleX(rast) AS scalex, ST_ScaleY(rast) AS scaley "
+            "FROM ({0}) AS cliprast "
+            "LIMIT 1"
+        ).format(self._collect_tiles_sql(srid))
 
-    def _pixelsize_sql(self):
-        """SQL query string to get pixel size in the units of the layer"""
-        return "SELECT ST_ScaleX(rast) AS scalex, ST_ScaleY(rast) AS scaley\
-                FROM ({0}) AS tiles LIMIT 1"\
-                .format(self._collect_tiles_sql())
-
-    def pixelsize(self):
-        """Returns pixel area in units of raster layer"""
-        if not self._pixelsize:
-            cursor = connection.cursor()
-            cursor.execute(self._pixelsize_sql())
-            res = cursor.fetchone()
-            self._pixelsize = (abs(res[0]), abs(res[1]))
-
-        return self._pixelsize
+        cursor = connection.cursor()
+        cursor.execute(sql)
+        res = cursor.fetchone()
+        return (abs(res[0]), abs(res[1]))
 
     _bbox = None
 
-    def extent(self, srid=3857):
-        """Returns bbox for layer"""
+    def extent(self, srid=WEB_MERCATOR_SRID):
+        """
+        Returns bbox for layer.
+        """
         if not self._bbox:
             # Get bbox for raster in original coordinates
             meta = self.rasterlayermetadata
@@ -286,7 +296,7 @@ class RasterTile(models.Model):
         (14, 14), (15, 15), (16, 16), (17, 17), (18, 18)
     )
     rid = models.AutoField(primary_key=True)
-    rast = models.RasterField(null=True, blank=True, srid=3857)
+    rast = models.RasterField(null=True, blank=True, srid=WEB_MERCATOR_SRID)
     rasterlayer = models.ForeignKey(RasterLayer, null=True, blank=True, db_index=True)
     filename = models.TextField(null=True, blank=True, db_index=True)
     is_base = models.BooleanField(default=False)

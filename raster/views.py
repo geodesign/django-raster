@@ -42,7 +42,7 @@ class AlgebraView(View):
                     tile.rast.bands[0].nodata_value
                 )
             else:
-                # Create empty image if no data was provided
+                # Create empty image if any layer misses the required tile
                 img = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
                 return self.write_img_to_response(img)
 
