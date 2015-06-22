@@ -23,6 +23,8 @@ class RasterLayerModelAdmin(admin.ModelAdmin):
     """
     readonly_fields = ('parse_log',)
     actions = ['reparse_rasters', 'manually_update_filepath']
+    list_filter = ('datatype', )
+    search_fields = ('name', 'rasterfile')
 
     def reparse_rasters(self, request, queryset):
         """
