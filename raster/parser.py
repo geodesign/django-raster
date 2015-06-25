@@ -7,7 +7,7 @@ import traceback
 import zipfile
 
 from django.conf import settings
-from django.contrib.gis.gdal.raster.source import GDALRaster
+from django.contrib.gis.gdal import GDALRaster
 from django.db import connection
 from raster.const import WEB_MERCATOR_SRID, WEB_MERCATOR_TILESHIFT, WEB_MERCATOR_WORLDSIZE
 from raster.models import RasterLayerMetadata, RasterTile
@@ -15,7 +15,7 @@ from raster.models import RasterLayerMetadata, RasterTile
 
 class RasterLayerParser:
     """
-    Class to parse raster layers using gdal python bindings.
+    Class to parse raster layers.
     """
     def __init__(self, rasterlayer):
         self.rasterlayer = rasterlayer

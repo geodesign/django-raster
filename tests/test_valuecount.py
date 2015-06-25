@@ -34,7 +34,7 @@ class RasterValueCountTests(RasterTestCase):
         # Set extent covering all tiles
         extent = (
             -10036039.001754418, 1028700.0747658457,
-            -3016471.122513413, 5548267.9540068507
+            -3016471.122513413, 5548267.9540068507,
         )
 
         # Create polygon from extent
@@ -72,13 +72,13 @@ class RasterValueCountTests(RasterTestCase):
         self.assertEqual(
             self.rasterlayer.value_count(bbox),
             {
-                0: expected[0] - 10,
+                0: expected[0] - 7,
                 1: expected[1],
                 2: expected[2],
-                3: expected[3] + 1,
-                4: expected[4] + 2,
+                3: expected[3],
+                4: expected[4] + 1,
                 8: expected[8] + 1,
-                9: expected[9] + 2
+                9: expected[9] + 1,
             }
         )
 
@@ -97,13 +97,13 @@ class RasterValueCountTests(RasterTestCase):
         self.assertEqual(
             self.rasterlayer.value_count(bbox, area=True),
             {
-                0: 332135378.95307404,
-                1: 660215.9801167584,
+                0: 332182119.9074186,
+                1: 712799.5537543764,
                 2: 157750.7209128538,
-                3: 6245760.024290396,
-                4: 42949094.42334771,
-                8: 934819.0868909854,
-                9: 2816142.4992590933
+                3: 6076324.064791405,
+                4: 42878982.99183089,
+                8: 940661.706184054,
+                9: 2950522.7429996724,
             }
         )
 
@@ -116,12 +116,12 @@ class RasterValueCountTests(RasterTestCase):
         self.assertEqual(
             self.rasterlayer.value_count(bbox, area=True),
             {
-                0: 256775731.89892957,
-                1: 509006.76057840907,
+                0: 256848447.15044078,
+                1: 527185.5734562094,
                 2: 122706.98692515219,
-                3: 4808296.006178186,
-                4: 32794578.431551784,
-                8: 722607.8118925629,
-                9: 2090563.4809470372
+                3: 4676499.612814133,
+                4: 32735497.289698936,
+                8: 731697.218331463,
+                9: 2181457.545336039,
             }
         )

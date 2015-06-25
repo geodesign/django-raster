@@ -6,7 +6,7 @@ from raster.models import Legend, LegendEntry, LegendSemantics
 
 class RasterLegendTests(TestCase):
 
-    def test_pixel_size_level1(self):
+    def test_raster_legend_creation_and_signals(self):
         sem1 = LegendSemantics.objects.create(name='Earth')
         sem2 = LegendSemantics.objects.create(name='Wind')
 

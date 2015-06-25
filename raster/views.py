@@ -144,21 +144,34 @@ class TmsView(View):
         Returns an image rendered from a raster tile.
         """
         # Get layer
-        lyr = get_object_or_404(
-            RasterLayer,
-            rasterfile__contains='rasters/' + self.kwargs.get('layer')
-        )
+        layer = self.kwargs.get('layer')
+
+        try:
+            layer = int(layer)
+        except:
+            pass
+
+        if isinstance(layer, int):
+            layer = get_object_or_404(
+                RasterLayer,
+                id=layer
+            )
+        else:
+            layer = get_object_or_404(
+                RasterLayer,
+                rasterfile__contains='rasters/' + self.kwargs.get('layer')
+            )
 
         # Get tile
         tile = RasterTile.objects.filter(
             tilex=self.kwargs.get('x'),
             tiley=self.kwargs.get('y'),
             tilez=self.kwargs.get('z'),
-            rasterlayer_id=lyr.id
+            rasterlayer_id=layer.id
         )
 
         # Override color map if arg provided
-        colormap = self.get_colormap(lyr)
+        colormap = self.get_colormap(layer)
 
         # Render tile
         if tile.exists() and colormap:

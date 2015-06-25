@@ -30,7 +30,8 @@ class RasterLayerParserWithoutCeleryTests(RasterTestCase):
         sourcefile = File(open(os.path.join(self.pwd, 'raster.tif.zip')),
                           'raster_new.tif.zip')
         self.rasterlayer.rasterfile = sourcefile
-        self.rasterlayer.save()
+        with self.settings(MEDIA_ROOT=self.media_root):
+            self.rasterlayer.save()
 
         self.assertEqual(self.rasterlayer.rastertile_set.filter(is_base=False).count(), 12 + 4 + 11)
 
