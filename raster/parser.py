@@ -108,9 +108,12 @@ class RasterLayerParser:
         lyrmeta.numbands = len(self.dataset.bands)
         lyrmeta.save()
 
-    def snap_raster_to_zoomlevel(self, zoom):
+    def create_tiles(self, zoom):
         """
-        Snaps the raster to the grid of the given zoom level.
+        Create tiles for this raster at the given zoomlevel.
+
+        This routine first snaps the raster to the grid of the zoomlevel,
+        then creates  the tiles from the snapped raster.
         """
         self.log('Starting raster warp for zoom ' + str(zoom))
 
@@ -125,7 +128,7 @@ class RasterLayerParser:
         sizey = (indexrange[3] - indexrange[1] + 1) * self.tilesize
         dest_file = os.path.join(self.tmpdir, 'djangowarpedraster' + str(zoom) + '.tif')
 
-        dest = self.dataset.warp({
+        snapped_dataset = self.dataset.warp({
             'origin': [bounds[0], bounds[3]],
             'scale': [tilescalex, tilescaley],
             'width': sizex,
@@ -133,54 +136,32 @@ class RasterLayerParser:
             'name': dest_file
         })
 
-        # Replace original dataset with warped version
-        self.dataset = dest
+        self.log('Creating tiles for zoom ' + str(zoom))
 
-    def crop(self, zoom=None):
-        if zoom is None:
-            self.log('Creating tiles in original projection')
-        else:
-            self.log('Creating tiles for zoom ' + str(zoom))
-
-        for yblock in range(0, self.dataset.height, self.tilesize):
-            for xblock in range(0, self.dataset.width, self.tilesize):
+        for yblock in range(0, snapped_dataset.height, self.tilesize):
+            for xblock in range(0, snapped_dataset.width, self.tilesize):
                 # Calculate raster tile origin
-                xorigin = self.dataset.origin.x + self.dataset.scale.x * xblock
-                yorigin = self.dataset.origin.y + self.dataset.scale.y * yblock
-
-                # select srid for this zoomlevel
-                if zoom is None:
-                    srid = int(self.rasterlayer.srid)
-                else:
-                    srid = WEB_MERCATOR_SRID
-
+                xorigin = snapped_dataset.origin.x + snapped_dataset.scale.x * xblock
+                yorigin = snapped_dataset.origin.y + snapped_dataset.scale.y * yblock
                 # Create gdal in-memory raster
-                dest = self.dataset.warp({
-                    'driver': 'MEM', 'srid': srid,
+                dest = snapped_dataset.warp({
+                    'driver': 'MEM', 'srid': WEB_MERCATOR_SRID,
                     'width': self.tilesize, 'height': self.tilesize,
                     'origin': [xorigin, yorigin],
                     'nodata_value': float(self.rasterlayer.nodata)
                 })
 
                 # Create tile
-                tile = RasterTile(
+                RasterTile.objects.create(
                     rast=dest,
                     rasterlayer=self.rasterlayer,
-                    filename=self.rastername
+                    filename=self.rastername,
+                    tilex=indexrange[0] + xblock / self.tilesize,
+                    tiley=indexrange[1] + yblock / self.tilesize,
+                    tilez=zoom
                 )
 
-                # Set is_base flag or xyz tile indices
-                if zoom is None:
-                    tile.is_base = True
-                else:
-                    bbox = self.rasterlayer.extent()
-                    indexrange = self.get_tile_index_range(bbox, zoom)
-                    tile.tilex = indexrange[0] + xblock / self.tilesize
-                    tile.tiley = indexrange[1] + yblock / self.tilesize
-                    tile.tilez = zoom
-
-                # Save tile
-                tile.save()
+        os.remove(dest_file)
 
     def drop_empty_rasters(self):
         """
@@ -289,9 +270,8 @@ class RasterLayerParser:
             zoom = self.get_max_zoom()
 
             # Loop through all lower zoom levels and create tiles
-            for iz in range(zoom, -1, -1):
-                self.snap_raster_to_zoomlevel(iz)
-                self.crop(iz)
+            for iz in range(zoom + 1):
+                self.create_tiles(iz)
 
             self.drop_empty_rasters()
 
