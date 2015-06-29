@@ -1,6 +1,11 @@
+from collections import Counter
+
+import numpy
+
 from django.contrib.gis.geos import GEOSGeometry
 from django.db import connection
 from raster.const import WEB_MERCATOR_SRID
+from raster.rasterize import rasterize
 
 
 CLIPPED_VALUE_COUNT_SQL = """
@@ -50,7 +55,7 @@ class ValueCountMixin(object):
     Value count methods for Raster Layers.
     """
 
-    def value_count(self, geom=None, area=False):
+    def db_value_count(self, geom=None, area=False):
         """
         Get a count by distinct pixel value within the given geometry.
         """
@@ -90,7 +95,7 @@ class ValueCountMixin(object):
 
     _maxz = None
 
-    @ property
+    @property
     def _max_zoom(self):
         """
         Get max zoom for this layer.
@@ -122,3 +127,35 @@ class ValueCountMixin(object):
             self._minsize_srid = srid
 
         return self._minsize
+
+    def value_count(self, geom=None, area=False):
+        if geom:
+            if geom.srid != WEB_MERCATOR_SRID:
+                geom.transform(WEB_MERCATOR_SRID)
+
+            tiles = self.rastertile_set.raw(
+                "SELECT * FROM raster_rastertile "
+                "WHERE ST_Intersects(rast, ST_GeomFromEWKT('{geom_ewkt}')) "
+                "AND tilez={max_zoom} "
+                "AND rasterlayer_id={rstid}"
+                .format(geom_ewkt=geom.ewkt, max_zoom=self._max_zoom, rstid=self.id)
+            )
+        else:
+            tiles = self.rastertile_set.filter(tilez=self._max_zoom)
+
+        results = Counter({})
+        for tile in tiles:
+            if geom:
+                rastgeom = rasterize(geom, tile.rast)
+                data = numpy.unique(tile.rast.bands[0].data()[rastgeom.bands[0].data() == 1], return_counts=True)
+            else:
+                data = numpy.unique(tile.rast.bands[0].data(), return_counts=True)
+
+            results += Counter(dict(zip(data[0], data[1])))
+
+        if area:
+            scalex, scaley = self._min_pixelsize(geom.srid)
+            for key, val in results.items():
+                results[key] = val * scalex * scaley
+
+        return dict(results)

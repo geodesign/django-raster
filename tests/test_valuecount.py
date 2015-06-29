@@ -46,6 +46,10 @@ class RasterValueCountTests(RasterTestCase):
             self.rasterlayer.value_count(bbox),
             self.expected_totals
         )
+        self.assertEqual(
+            self.rasterlayer.db_value_count(bbox),
+            self.expected_totals
+        )
 
     def test_value_count_with_geom_covering_single_tile(self):
         # Get extent from single tile
@@ -72,13 +76,26 @@ class RasterValueCountTests(RasterTestCase):
         self.assertEqual(
             self.rasterlayer.value_count(bbox),
             {
-                0: expected[0] - 7,
+                0: expected[0],
                 1: expected[1],
                 2: expected[2],
                 3: expected[3],
-                4: expected[4] + 1,
-                8: expected[8] + 1,
-                9: expected[9] + 1,
+                4: expected[4],
+                8: expected[8],
+                9: expected[9],
+            }
+        )
+
+        self.assertEqual(
+            self.rasterlayer.db_value_count(bbox),
+            {
+                0: expected[0] + 132,
+                1: expected[1],
+                2: expected[2],
+                3: expected[3] + 5,
+                4: expected[4] + 96,
+                8: expected[8],
+                9: expected[9] + 23,
             }
         )
 
@@ -90,38 +107,17 @@ class RasterValueCountTests(RasterTestCase):
         # Create polygon from extent in default projection
         bbox = Polygon.from_bbox(extent)
         bbox.srid = WEB_MERCATOR_SRID
-
+        expected = {}
+        val, counts = numpy.unique(tile.rast.bands[0].data(), return_counts=True)
+        for pair in zip(val, counts):
+            if pair[0] in expected:
+                expected[pair[0]] += pair[1]
+            else:
+                expected[pair[0]] = pair[1]
         # Confirm clipped count
         # The clip operation with the geom results in a small error when
         # compared to the exact count for a tile.
-        self.assertEqual(
-            self.rasterlayer.value_count(bbox, area=True),
-            {
-                0: 332182119.9074186,
-                1: 712799.5537543764,
-                2: 157750.7209128538,
-                3: 6076324.064791405,
-                4: 42878982.99183089,
-                8: 940661.706184054,
-                9: 2950522.7429996724,
-            }
-        )
-
-        # Transform bbox to different coord system
-        bbox.transform(3086)
-
-        # Confirm clipped count
-        # The clip operation with the geom results in a small error when
-        # compared to the exact count for a tile.
-        self.assertEqual(
-            self.rasterlayer.value_count(bbox, area=True),
-            {
-                0: 256848447.15044078,
-                1: 527185.5734562094,
-                2: 122706.98692515219,
-                3: 4676499.612814133,
-                4: 32735497.289698936,
-                8: 731697.218331463,
-                9: 2181457.545336039,
-            }
-        )
+        area_per_pixel = 76.437028285175102837456506676971912384033 ** 2
+        result = self.rasterlayer.value_count(bbox, area=True)
+        for key, val in result.items():
+            self.assertAlmostEqual(expected[key] * area_per_pixel, val, 5)
