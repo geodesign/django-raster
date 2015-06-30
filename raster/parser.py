@@ -86,7 +86,11 @@ class RasterLayerParser:
         self.log('Opening raster file with gdal')
 
         # Open raster file
-        self.dataset = GDALRaster(os.path.join(self.tmpdir, self.rastername))
+        self.dataset = GDALRaster(os.path.join(self.tmpdir, self.rastername), write=True)
+
+        # Make sure nodata value is set from input
+        for band in self.dataset.bands:
+            band.nodata_value = float(self.rasterlayer.nodata)
 
         # Store original metadata for this raster
         self.store_original_metadata()
@@ -148,7 +152,6 @@ class RasterLayerParser:
                     'driver': 'MEM', 'srid': WEB_MERCATOR_SRID,
                     'width': self.tilesize, 'height': self.tilesize,
                     'origin': [xorigin, yorigin],
-                    'nodata_value': float(self.rasterlayer.nodata)
                 })
 
                 # Create tile

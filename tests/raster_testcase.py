@@ -46,7 +46,7 @@ class RasterTestCase(TestCase):
                 description='Small raster for testing',
                 datatype='ca',
                 srid='3086',
-                nodata='0',
+                nodata='255',
                 rasterfile=rasterfile,
                 legend=leg
             )
