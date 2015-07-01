@@ -7,9 +7,11 @@ class FormulaParser(object):
     Deconstructs a raster algebra expression and converts it into a callable.
     http://pyparsing.wikispaces.com/file/view/fourFn.py
     """
-    epsilon = 1e-12
 
-    # Map operator symbols to corresponding arithmetic operations in numpy
+    exprStack = []
+    tiles = {}
+
+    # Map operator symbols to arithmetic operations in numpy
     opn = {
         "+": numpy.add,
         "-": numpy.subtract,
@@ -26,31 +28,18 @@ class FormulaParser(object):
         "!": numpy.logical_not,
     }
 
-    exprStack = []
-    tiles = {}
+    # Map function names to python functions
+    fn = {
+        "sin": numpy.sin,
+        "cos": numpy.cos,
+        "tan": numpy.tan,
+        "abs": abs,
+        "trunc": lambda a: int(a),
+        "round": round,
+        "sgn": lambda a: abs(a) > 1e-12 and cmp(a, 0) or 0,
+    }
 
     def __init__(self):
-        self.fn = {
-            "sin": numpy.sin,
-            "cos": numpy.cos,
-            "tan": numpy.tan,
-            "abs": abs,
-            "trunc": lambda a: int(a),
-            "round": round,
-            "sgn": lambda a: abs(a) > self.epsilon and cmp(a, 0) or 0,
-        }
-
-    def pushFirst(self, strg, loc, toks):
-        self.exprStack.append(toks[0])
-
-    def pushUMinus(self, strg, loc, toks):
-        if toks and toks[0] == '-':
-            self.exprStack.append('unary -')
-
-    _bnf = None
-
-    @property
-    def bnf(self):
         """
         expop   :: '^'
         multop  :: '*' | '/'
@@ -61,53 +50,74 @@ class FormulaParser(object):
         term    :: factor [ multop factor ]*
         expr    :: term [ addop term ]*
         """
-        if not self._bnf:
-            point = Literal(".")
-            e = CaselessLiteral("E")
-            fnumber = Combine(
-                Word("+-" + nums, nums) +
-                Optional(point + Optional(Word(nums))) +
-                Optional(e + Word("+-" + nums, nums))
-            )
-            ident = Word(alphas, alphas + nums + "_$")
+        point = Literal(".")
 
-            plus = Literal("+")
-            minus = Literal("-")
-            mult = Literal("*")
-            div = Literal("/")
-            eq = Literal("==")
-            lt = Literal("<")
-            le = Literal("<=")
-            gt = Literal(">")
-            ge = Literal(">=")
-            ior = Literal("|")
-            iand = Literal("&")
-            inot = Literal("!")
-            lpar = Literal("(").suppress()
-            rpar = Literal(")").suppress()
-            addop = plus | minus | eq
-            multop = mult | div | ge | le | gt | lt | ior | iand | inot  # Order matters here due to <= being caught by <
-            expop = Literal("^")
-            pi = CaselessLiteral("PI")
+        e = CaselessLiteral("E")
 
-            # Letters
-            xx = CaselessLiteral("x")
-            yy = CaselessLiteral("y")
-            zz = CaselessLiteral("z")
+        fnumber = Combine(
+            Word("+-" + nums, nums) +
+            Optional(point + Optional(Word(nums))) +
+            Optional(e + Word("+-" + nums, nums))
+        )
 
-            expr = Forward()
-            atom = (Optional("-") + (xx | yy | zz | pi | e | fnumber | ident + lpar + expr + rpar).setParseAction(self.pushFirst) | (lpar + expr.suppress() + rpar)).setParseAction(self.pushUMinus)
+        ident = Word(alphas, alphas + nums + "_$")
 
-            # by defining exponentiation as "atom [ ^ factor ]..." instead of "atom [ ^ atom ]...", we get right-to-left exponents, instead of left-to-righ
-            # that is, 2^3^2 = 2^(3^2), not (2^3)^2.
-            factor = Forward()
-            factor << atom + ZeroOrMore((expop + factor).setParseAction(self.pushFirst))
+        # Operators
+        plus = Literal("+")
+        minus = Literal("-")
+        mult = Literal("*")
+        div = Literal("/")
+        eq = Literal("==")
+        lt = Literal("<")
+        le = Literal("<=")
+        gt = Literal(">")
+        ge = Literal(">=")
+        ior = Literal("|")
+        iand = Literal("&")
+        inot = Literal("!")
+        lpar = Literal("(").suppress()
+        rpar = Literal(")").suppress()
+        addop = plus | minus | eq
+        multop = mult | div | ge | le | gt | lt | ior | iand | inot  # Order matters here due to <= being caught by <
+        expop = Literal("^")
+        pi = CaselessLiteral("PI")
 
-            term = factor + ZeroOrMore((multop + factor).setParseAction(self.pushFirst))
-            expr << term + ZeroOrMore((addop + term).setParseAction(self.pushFirst))
-            self._bnf = expr
+        # Letters for variables
+        aa = CaselessLiteral("a")
+        bb = CaselessLiteral("b")
+        cc = CaselessLiteral("c")
+        uu = CaselessLiteral("u")
+        vv = CaselessLiteral("v")
+        ww = CaselessLiteral("w")
+        xx = CaselessLiteral("x")
+        yy = CaselessLiteral("y")
+        zz = CaselessLiteral("z")
 
-        return self._bnf
+        expr = Forward()
+        atom = (
+            Optional("-") + (
+                aa | bb | cc | uu | vv | ww | xx | yy | zz |
+                pi | e | fnumber | ident + lpar + expr + rpar
+            ).setParseAction(self.pushFirst) | (lpar + expr.suppress() + rpar)
+        ).setParseAction(self.pushUMinus)
+
+        # By defining exponentiation as "atom [ ^ factor ]..." instead of "atom [ ^ atom ]...",
+        # we get right-to-left exponents, instead of left-to-righ
+        # that is, 2^3^2 = 2^(3^2), not (2^3)^2.
+        factor = Forward()
+        factor << atom + ZeroOrMore((expop + factor).setParseAction(self.pushFirst))
+
+        term = factor + ZeroOrMore((multop + factor).setParseAction(self.pushFirst))
+        expr << term + ZeroOrMore((addop + term).setParseAction(self.pushFirst))
+
+        self.bnf = expr
+
+    def pushFirst(self, strg, loc, toks):
+        self.exprStack.append(toks[0])
+
+    def pushUMinus(self, strg, loc, toks):
+        if toks and toks[0] == '-':
+            self.exprStack.append('unary -')
 
     def evaluateStack(self, stack):
         op = stack.pop()
