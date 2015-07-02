@@ -170,6 +170,8 @@ class RasterLayerParser:
         """
         Remove rasters that are only no-data from the current rasterlayer.
         """
+        self.log('Dropping empty raster tiles.')
+
         # Setup SQL command
         sql = (
             "DELETE FROM raster_rastertile "
