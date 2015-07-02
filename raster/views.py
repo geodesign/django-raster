@@ -1,5 +1,4 @@
 import json
-import re
 
 import numpy
 from PIL import Image
@@ -8,6 +7,7 @@ from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.views.generic import View
 
+from .formulas import RasterAlgebraParser
 from .models import Legend, RasterLayer, RasterTile
 from .utils import IMG_FORMATS, band_data_to_image
 
@@ -16,7 +16,12 @@ class AlgebraView(View):
     """
     A view to calculate map algebra on raster layers.
     """
-    def get(self, request, *args, **kwargs):
+
+    def __init__(self, *args, **kwargs):
+        super(AlgebraView, self).__init__(*args, **kwargs)
+        self.parser = RasterAlgebraParser()
+
+    def get(self, request, masked=False, *args, **kwargs):
         # Get tile indexes
         x, y, z = self.kwargs.get('x'), self.kwargs.get('y'), self.kwargs.get('z')
 
@@ -37,56 +42,33 @@ class AlgebraView(View):
                 rasterlayer_id=layerid
             ).first()
             if tile:
-                data[name] = numpy.ma.masked_values(
-                    tile.rast.bands[0].data().ravel(),
-                    tile.rast.bands[0].nodata_value
-                )
+                data[name] = tile.rast
             else:
                 # Create empty image if any layer misses the required tile
                 img = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
                 return self.write_img_to_response(img)
 
-        # Get formula (allowing several parts to the formula)
-        formulas = request.GET.get('formula').split(',')
+        # Get formula from request
+        formula = request.GET.get('formula')
 
-        # Check formula validity (all vars need to be just one character long)
-        checklist = [len(re.findall('[a-z]{2}', formula)) for formula in formulas]
-        if(any(checklist)):
-            raise Http404('Invalid formula, more than one character in variable name.')
+        # Evaluate raster algebra expression, return 404 if not successfull
+        try:
+            # Evaluate raster algebra expression
+            result = self.parser.evaluate_raster_algebra(data, formula)
+        except:
+            raise Http404('Failed to evaluate raster algebra.')
 
-        # Assure exactly one formula defines y
-        checklist = ['y' in formula for formula in formulas]
-        if(sum(checklist) > 1):
-            raise Http404('Invalid formula, variable y found more than once.')
-        elif(sum(checklist) == 0):
-            raise Http404('Invalid formula, variable y not found in any formula.')
+        # Get array from algebra result
+        result = result.bands[0].data()
 
-        # After formula validation, combine formulas to one expression
-        formula = ';'.join(formulas)
-
-        # Evaluate formulas, saving the formula defining y for the end
-        formula_with_y = None
-        for formula in formulas:
-            if 'y' not in formula:
-                exec(formula, data)
-            else:
-                formula_with_y = formula
-
-        # Run expression with y as last formula
-        exec(formula_with_y, data)
-
-        # Get result from data dict
-        result = data['y']
-
+        # Render tile
         colormap = self.get_colormap()
         if colormap:
-            # Reshape data to original size
-            result = result.reshape(tile.rast.width, tile.rast.height)
             # Render tile using the legend data
             img = band_data_to_image(result, colormap)
         else:
             # Scale to grayscale rgb (can be colorscheme later on)
-            result = result.astype('float')
+            result = result.astype('float').ravel()
             result = 255 * (result - numpy.min(result)) / (numpy.max(result) - numpy.min(result))
 
             # Create rgba matrix from grayscale array
@@ -175,11 +157,14 @@ class TmsView(View):
 
         # Render tile
         if tile.exists() and colormap:
-            # Mask values
-            data = numpy.ma.masked_values(
-                tile[0].rast.bands[0].data(),
-                tile[0].rast.bands[0].nodata_value
-            )
+            if kwargs.get('masked', ''):
+                # Mask values
+                data = numpy.ma.masked_values(
+                    tile[0].rast.bands[0].data(),
+                    tile[0].rast.bands[0].nodata_value
+                )
+            else:
+                data = tile[0].rast.bands[0].data()
 
             # Render tile using the legend data
             img = band_data_to_image(data, colormap)

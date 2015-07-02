@@ -1,10 +1,15 @@
 import numpy
 from PIL import Image
 
+from .formulas import FormulaParser
+
 IMG_FORMATS = {'.png': 'PNG', '.jpg': 'JPEG'}
 
 
 def hex_to_rgba(value, alpha=255):
+    """
+    Converts a HEX color string to a RGBA 4-tuple.
+    """
     value = value.lstrip('#')
     lv = len(value)
     rgb = tuple(int(value[i:i + lv // 3], 16) for i in range(0, lv, lv // 3))
@@ -16,6 +21,8 @@ def band_data_to_image(band_data, colormap, band=0):
     Creates an python image from pixel values of a GDALRaster.
     The input is a dictionary that maps pixel values to RGBA UInt8 colors.
     """
+    parser = FormulaParser()
+
     # Get data as 1D array
     dat = band_data.ravel()
 
@@ -30,8 +37,7 @@ def band_data_to_image(band_data, colormap, band=0):
             rgba[dat == key] = color
         except ValueError:
             # Otherwise use it as numpy expression directly (replacing x with dat)
-            key = key.replace('x', 'dat')
-            selector = eval(key)
+            selector = parser.evaluate_formula(key, {'x': dat})
             rgba[selector] = color
 
     # Reshape array to image size

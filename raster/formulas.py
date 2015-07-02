@@ -4,12 +4,15 @@ from pyparsing import CaselessLiteral, Combine, Forward, Literal, Optional, Word
 
 class FormulaParser(object):
     """
-    Deconstructs a raster algebra expression and converts it into a callable.
-    http://pyparsing.wikispaces.com/file/view/fourFn.py
-    """
+    Deconstruct mathematical algebra expressions and convert those into
+    callable funcitons.
 
-    exprStack = []
-    tiles = {}
+    Adopted from: http://pyparsing.wikispaces.com/file/view/fourFn.py
+    """
+    expr_stack = []
+
+    # The data dictionary holds the values on which to evaluate the formula
+    data = {}
 
     # Map operator symbols to arithmetic operations in numpy
     opn = {
@@ -41,14 +44,7 @@ class FormulaParser(object):
 
     def __init__(self):
         """
-        expop   :: '^'
-        multop  :: '*' | '/'
-        addop   :: '+' | '-'
-        integer :: ['+' | '-'] '0'..'9'+
-        atom    :: PI | E | real | fn '(' expr ')' | '(' expr ')'
-        factor  :: atom [ expop factor ]*
-        term    :: factor [ multop factor ]*
-        expr    :: term [ addop term ]*
+        Setup the Backus Normal Form (BNF) parser logic.
         """
         point = Literal(".")
 
@@ -78,7 +74,7 @@ class FormulaParser(object):
         lpar = Literal("(").suppress()
         rpar = Literal(")").suppress()
         addop = plus | minus | eq
-        multop = mult | div | ge | le | gt | lt | ior | iand | inot  # Order matters here due to <= being caught by <
+        multop = mult | div | ge | le | gt | lt | ior | iand | inot  # Order matters here due to "<=" being caught by "<"
         expop = Literal("^")
         pi = CaselessLiteral("PI")
 
@@ -93,56 +89,133 @@ class FormulaParser(object):
         yy = CaselessLiteral("y")
         zz = CaselessLiteral("z")
 
-        expr = Forward()
+        bnf = Forward()
         atom = (
             Optional("-") + (
                 aa | bb | cc | uu | vv | ww | xx | yy | zz |
-                pi | e | fnumber | ident + lpar + expr + rpar
-            ).setParseAction(self.pushFirst) | (lpar + expr.suppress() + rpar)
-        ).setParseAction(self.pushUMinus)
+                pi | e | fnumber | ident + lpar + bnf + rpar
+            ).setParseAction(self.push_first) | (lpar + bnf.suppress() + rpar)
+        ).setParseAction(self.push_unary_minus)
 
         # By defining exponentiation as "atom [ ^ factor ]..." instead of "atom [ ^ atom ]...",
         # we get right-to-left exponents, instead of left-to-righ
         # that is, 2^3^2 = 2^(3^2), not (2^3)^2.
         factor = Forward()
-        factor << atom + ZeroOrMore((expop + factor).setParseAction(self.pushFirst))
+        factor << atom + ZeroOrMore((expop + factor).setParseAction(self.push_first))
 
-        term = factor + ZeroOrMore((multop + factor).setParseAction(self.pushFirst))
-        expr << term + ZeroOrMore((addop + term).setParseAction(self.pushFirst))
+        term = factor + ZeroOrMore((multop + factor).setParseAction(self.push_first))
+        bnf << term + ZeroOrMore((addop + term).setParseAction(self.push_first))
 
-        self.bnf = expr
+        self.bnf = bnf
 
-    def pushFirst(self, strg, loc, toks):
-        self.exprStack.append(toks[0])
+    def push_first(self, strg, loc, toks):
+        self.expr_stack.append(toks[0])
 
-    def pushUMinus(self, strg, loc, toks):
+    def push_unary_minus(self, strg, loc, toks):
         if toks and toks[0] == '-':
-            self.exprStack.append('unary -')
+            self.expr_stack.append('unary -')
 
-    def evaluateStack(self, stack):
+    def evaluate_stack(self, stack):
+        """
+        Evaluate a stack element.
+        """
         op = stack.pop()
         if op == 'unary -':
-            return -self.evaluateStack(stack)
+            return -self.evaluate_stack(stack)
         if op in ["+", "-", "*", "/", "^", ">", "<", "==", "<=", ">=", "|", "&", "!"]:
-            op2 = self.evaluateStack(stack)
-            op1 = self.evaluateStack(stack)
+            op2 = self.evaluate_stack(stack)
+            op1 = self.evaluate_stack(stack)
             return self.opn[op](op1, op2)
         elif op == "PI":
             return numpy.pi  # 3.1415926535
         elif op == "E":
             return numpy.e  # 2.718281828
         elif op in self.fn:
-            return self.fn[op](self.evaluateStack(stack))
-        elif op[0].isalpha() and len(op[0]) == 1 and op[0] in self.tiles:
-            return self.tiles[op[0]]
-        elif op[0].isalpha():
-            return 0
+            return self.fn[op](self.evaluate_stack(stack))
+        elif op[0].isalpha() and len(op[0]) == 1 and op[0] in self.data:
+            return self.data[op[0]]
+        elif op[0].isalpha() and len(op[0]) == 1:
+            raise Exception('Found an undeclared variable in formula.')
         else:
             return numpy.array(float(op))
 
-    def eval_formula(self, formula, tiles={}):
-        self.tiles = tiles
-        self.exprStack = []
+    def parse_formula(self, formula):
+        """
+        Parse a string formula into a BNF expression.
+        """
+        # Reset expression stack
+        self.expr_stack = []
+
+        # Use bnf to parse the string
         self.bnf.parseString(formula)
-        val = self.evaluateStack(self.exprStack)
-        return val
+
+    def evaluate(self, data=None):
+        """
+        Evaluate the input data using the current formula expression stack.
+        """
+        # Make sure a formula has been parsed before evaluating
+        if self.expr_stack == []:
+            raise Exception('Please specify a formula to evaluate.')
+
+        # Update dataset
+        if data:
+            self.data = data
+
+        # Evaluate stack on data
+        self.result = self.evaluate_stack(self.expr_stack)
+
+        return self.result
+
+    def evaluate_formula(self, formula, data={}):
+        """
+        Helper function to set formula and evaluate in one call.
+        """
+        self.parse_formula(formula)
+        return self.evaluate(data)
+
+
+class RasterAlgebraParser(FormulaParser):
+    """
+    Compute raster algebra expressions using the FormulaParser class.
+    """
+
+    def evaluate_raster_algebra(self, data, formula, check_aligned=False):
+        """
+        Evaluate a raster algebra expression on a set of rasters. All input
+        rasters need to be strictly aligned (same size, geotransform and srid).
+
+        The input raster list will be zipped into a dictionary using the input
+        names. The resulting dictionary will be used as input data for formula
+        evaluation. If the check_aligned flag is set, the input rasters are
+        compared to make sure they are aligned.
+        """
+        # Check that all input rasters are aligned
+        if check_aligned:
+            self.check_aligned(data.values())
+
+        # Construct list of numpy arrays holding raster pixel data
+        data_arrays = {name: rast.bands[0].data().ravel() for name, rast in data.items()}
+
+        # Evaluate formula on raster data
+        algebra_result = self.evaluate_formula(formula, data_arrays)
+
+        # Copy one raster to hold results
+        result = data.values()[0].warp({'name': 'algebra_result'})
+
+        # Make sure algebra result has the correct data type
+        algebra_result = algebra_result.astype(data_arrays.values()[0].dtype)
+
+        # Write result to a target raster
+        result.bands[0].data(algebra_result)
+
+        return result
+
+    def check_aligned(self, rasters):
+        """
+        Assert that all input rasters are properly aligned.
+        """
+        if not len(set([x.srs.srid for x in rasters])) == 1:
+            raise Exception('Raster aligment check failed: SRIDs not all the same')
+
+        if not len(set([x.origin.x for x in rasters])) == 1:
+            raise Exception('Raster aligment check failed: Origins are not all the same')
