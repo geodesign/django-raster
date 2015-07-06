@@ -16,7 +16,7 @@ def hex_to_rgba(value, alpha=255):
     return rgb + (alpha, )
 
 
-def band_data_to_image(band_data, colormap, band=0):
+def band_data_to_image(band_data, colormap):
     """
     Creates an python image from pixel values of a GDALRaster.
     The input is a dictionary that maps pixel values to RGBA UInt8 colors.
@@ -30,18 +30,24 @@ def band_data_to_image(band_data, colormap, band=0):
     rgba = numpy.zeros((dat.shape[0], 4), dtype='uint8')
 
     # Replace matched rows with colors
+    stats = {}
     for key, color in colormap.items():
+        orig_key = key
         try:
             # Try to use the key as number directly
             key = float(key)
-            rgba[dat == key] = color
+            selector = dat == key
+            rgba[selector] = color
         except ValueError:
-            # Otherwise use it as numpy expression directly (replacing x with dat)
+            # Otherwise use it as numpy expression directly
             selector = parser.evaluate_formula(key, {'x': dat})
             rgba[selector] = color
+        stats[orig_key] = numpy.sum(selector)
 
     # Reshape array to image size
     rgba = rgba.reshape(band_data.shape[0], band_data.shape[1], 4)
 
     # Create image from array
-    return Image.fromarray(rgba)
+    img = Image.fromarray(rgba)
+
+    return img, stats

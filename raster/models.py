@@ -126,9 +126,8 @@ class RasterLayer(models.Model, ValueCountMixin):
     max_zoom = models.IntegerField(blank=True, null=True)
 
     def __str__(self):
-        return '{} (type: {}, srid: {})'.format(self.name,
-                                                self.datatype,
-                                                self.srid)
+        return '{} {} (type: {}, srid: {})'.format(self.id, self.name, self.datatype, self.srid)
+
     _bbox = None
 
     def extent(self, srid=WEB_MERCATOR_SRID):

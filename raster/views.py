@@ -46,7 +46,7 @@ class AlgebraView(View):
             else:
                 # Create empty image if any layer misses the required tile
                 img = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
-                return self.write_img_to_response(img)
+                return self.write_img_to_response(img, {})
 
         # Get formula from request
         formula = request.GET.get('formula')
@@ -65,7 +65,7 @@ class AlgebraView(View):
         colormap = self.get_colormap()
         if colormap:
             # Render tile using the legend data
-            img = band_data_to_image(result, colormap)
+            img, stats = band_data_to_image(result, colormap)
         else:
             # Scale to grayscale rgb (can be colorscheme later on)
             result = result.astype('float').ravel()
@@ -77,9 +77,10 @@ class AlgebraView(View):
 
             # Create image from array
             img = Image.fromarray(rgba)
+            stats = {}
 
         # Return rendered image
-        return self.write_img_to_response(img)
+        return self.write_img_to_response(img, stats)
 
     def get_format(self):
         """
@@ -87,7 +88,7 @@ class AlgebraView(View):
         """
         return IMG_FORMATS[self.kwargs.get('format')]
 
-    def write_img_to_response(self, img):
+    def write_img_to_response(self, img, stats):
         """
         Writes rgba numpy array to http response.
         """
@@ -95,6 +96,7 @@ class AlgebraView(View):
         response = HttpResponse()
         frmt = self.get_format()
         response['Content-Type'] = frmt
+        response['aggregation'] = json.dumps(stats)
         img.save(response, frmt)
 
         return response
@@ -167,14 +169,16 @@ class TmsView(View):
                 data = tile[0].rast.bands[0].data()
 
             # Render tile using the legend data
-            img = band_data_to_image(data, colormap)
+            img, stats = band_data_to_image(data, colormap)
         else:
             # Create empty image if tile cant be found
             img = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
+            stats = {}
 
         # Create response, add image and return
         response = HttpResponse()
         response['Content-Type'] = self.get_format()
+        response['aggregation'] = json.dumps(stats)
         img.save(response, self.get_format())
 
         return response

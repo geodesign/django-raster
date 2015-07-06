@@ -71,32 +71,14 @@ class RasterValueCountTests(RasterTestCase):
                 expected[pair[0]] = pair[1]
 
         # Confirm clipped count
-        # The clip operation with the geom results in a small error when
-        # compared to the exact count for a tile.
         self.assertEqual(
             self.rasterlayer.value_count(bbox),
-            {
-                0: expected[0],
-                1: expected[1],
-                2: expected[2],
-                3: expected[3],
-                4: expected[4],
-                8: expected[8],
-                9: expected[9],
-            }
+            expected
         )
 
         self.assertEqual(
             self.rasterlayer.db_value_count(bbox),
-            {
-                0: expected[0] + 132,
-                1: expected[1],
-                2: expected[2],
-                3: expected[3] + 5,
-                4: expected[4] + 96,
-                8: expected[8],
-                9: expected[9] + 23,
-            }
+            expected
         )
 
     def test_area_calculation_with_geom_covering_single_tile(self):

@@ -119,52 +119,41 @@ class RasterLayerParser:
         This routine first snaps the raster to the grid of the zoomlevel,
         then creates  the tiles from the snapped raster.
         """
-        self.log('Starting raster warp for zoom ' + str(zoom))
-
-        # Calculate warp geotransform
+        # Compute the tile x-y-z index range for the rasterlayer for this zoomlevel
         bbox = self.rasterlayer.extent()
         indexrange = self.get_tile_index_range(bbox, zoom)
-        bounds = self.get_tile_bounds(indexrange[0], indexrange[1], zoom)
-        tilescalex, tilescaley = self.get_tile_scale(zoom)
 
-        # Create destination raster file
-        sizex = (indexrange[2] - indexrange[0] + 1) * self.tilesize
-        sizey = (indexrange[3] - indexrange[1] + 1) * self.tilesize
-        dest_file = os.path.join(self.tmpdir, 'djangowarpedraster' + str(zoom) + '.tif')
+        # Compute scale of tiles for this zoomlevel
+        tilescale = self.get_tile_scale(zoom)
 
-        snapped_dataset = self.dataset.warp({
-            'origin': [bounds[0], bounds[3]],
-            'scale': [tilescalex, tilescaley],
-            'width': sizex,
-            'height': sizey,
-            'name': dest_file
-        })
+        # Count the number of tiles that are required to cover the raster at this zoomlevel
+        nr_of_tiles = (indexrange[2] - indexrange[0] + 1) * (indexrange[3] - indexrange[1] + 1)
 
-        self.log('Creating tiles for zoom ' + str(zoom))
+        self.log('Creating {0} tiles for zoom {1}.'.format(nr_of_tiles, zoom))
 
-        for yblock in range(0, snapped_dataset.height, self.tilesize):
-            for xblock in range(0, snapped_dataset.width, self.tilesize):
+        for tilex in range(indexrange[0], indexrange[2] + 1):
+            for tiley in range(indexrange[1], indexrange[3] + 1):
                 # Calculate raster tile origin
-                xorigin = snapped_dataset.origin.x + snapped_dataset.scale.x * xblock
-                yorigin = snapped_dataset.origin.y + snapped_dataset.scale.y * yblock
-                # Create gdal in-memory raster
-                dest = snapped_dataset.warp({
-                    'driver': 'MEM', 'srid': WEB_MERCATOR_SRID,
-                    'width': self.tilesize, 'height': self.tilesize,
-                    'origin': [xorigin, yorigin],
+                bounds = self.get_tile_bounds(tilex, tiley, zoom)
+
+                # Warp source raster into this tile (in memory)
+                dest = self.dataset.warp({
+                    'driver': 'MEM',
+                    'width': self.tilesize,
+                    'height': self.tilesize,
+                    'scale': [tilescale, -tilescale],
+                    'origin': [bounds[0], bounds[3]],
                 })
 
-                # Create tile
+                # Store tile
                 RasterTile.objects.create(
                     rast=dest,
                     rasterlayer=self.rasterlayer,
                     filename=self.rastername,
-                    tilex=indexrange[0] + xblock / self.tilesize,
-                    tiley=indexrange[1] + yblock / self.tilesize,
+                    tilex=tilex,
+                    tiley=tiley,
                     tilez=zoom
                 )
-
-        os.remove(dest_file)
 
     def drop_empty_rasters(self):
         """
@@ -248,8 +237,7 @@ class RasterLayerParser:
         """
         Calculates pixel size scale for given zoom level.
         """
-        zscale = WEB_MERCATOR_WORLDSIZE / 2.0 ** z / self.tilesize
-        return zscale, -zscale
+        return WEB_MERCATOR_WORLDSIZE / 2.0 ** z / self.tilesize
 
     def parse_raster_layer(self):
         """
