@@ -12,7 +12,60 @@ from .models import Legend, RasterLayer, RasterTile
 from .utils import IMG_FORMATS, band_data_to_image
 
 
-class AlgebraView(View):
+class RasterView(View):
+
+    def get_colormap(self, lyr=None):
+        """
+        Returns colormap from request and layer, looking for a colormap in
+        the request, a custom legend name to construct the legend or the
+        default colormap from the layer legend.
+        """
+        clmp = self.request.GET.get('colormap', None)
+        if clmp:
+            colormap = json.loads(clmp)
+            colormap = {int(k): v for k, v in colormap.items()}
+        else:
+            # Get Legend, check if custom legend has been requested
+            legend = self.request.GET.get('legend', None)
+            if legend:
+                legend = Legend.objects.filter(title__iexact=legend).first()
+            elif lyr:
+                legend = lyr.legend
+
+            # Get colormap
+            if legend:
+                colormap = legend.colormap
+                # Check if custom legend entries have been requested
+                entries = self.request.GET.get('entries', None)
+                if entries:
+                    entries = entries.split(',')
+                    colormap = {k: v for (k, v) in colormap.items() if str(k) in entries}
+            else:
+                colormap = None
+
+        return colormap
+
+    def get_format(self):
+        """
+        Returns image format requested.
+        """
+        return IMG_FORMATS[self.kwargs.get('format')]
+
+    def write_img_to_response(self, img, stats):
+        """
+        Writes rgba numpy array to http response.
+        """
+        # Create response, and add image
+        response = HttpResponse()
+        frmt = self.get_format()
+        response['Content-Type'] = frmt
+        response['aggregation'] = json.dumps(stats)
+        img.save(response, frmt)
+
+        return response
+
+
+class AlgebraView(RasterView):
     """
     A view to calculate map algebra on raster layers.
     """
@@ -82,48 +135,10 @@ class AlgebraView(View):
         # Return rendered image
         return self.write_img_to_response(img, stats)
 
-    def get_format(self):
-        """
-        Returns image format requested.
-        """
-        return IMG_FORMATS[self.kwargs.get('format')]
 
-    def write_img_to_response(self, img, stats):
-        """
-        Writes rgba numpy array to http response.
-        """
-        # Create response, and add image
-        response = HttpResponse()
-        frmt = self.get_format()
-        response['Content-Type'] = frmt
-        response['aggregation'] = json.dumps(stats)
-        img.save(response, frmt)
+class TmsView(RasterView):
 
-        return response
-
-    def get_colormap(self):
-        # Skip if legend was not specified
-        if 'legend' not in self.request.GET:
-            return
-
-        # Get legend from request
-        query_legend = self.request.GET.get('legend')
-
-        # Try to get legend object from id, otherwise use as name
-        colormap = None
-        try:
-            colormap = Legend.objects.get(id=int(query_legend)).colormap
-        except:
-            legend = Legend.objects.filter(title__iexact=query_legend).first()
-            if legend:
-                colormap = legend.colormap
-
-        return colormap
-
-
-class TmsView(View):
-
-    def get(self, request, *args, **kwargs):
+    def get(self, *args, **kwargs):
         """
         Returns an image rendered from a raster tile.
         """
@@ -175,65 +190,24 @@ class TmsView(View):
             img = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
             stats = {}
 
-        # Create response, add image and return
-        response = HttpResponse()
-        response['Content-Type'] = self.get_format()
-        response['aggregation'] = json.dumps(stats)
-        img.save(response, self.get_format())
+        return self.write_img_to_response(img, stats)
 
-        return response
 
-    def get_colormap(self, lyr):
+class LegendView(View):
+
+    def get(self, request, layer_or_legend_name):
         """
-        Returns colormap from request and layer, looking for a colormap in
-        the request, a custom legend name to construct the legend or the
-        default colormap from the layer legend.
+        Returns the legend for this layer as a json string. The legend is a list of
+        legend entries with the attributes "name", "expression" and "color".
         """
-        clmp = self.request.GET.get('colormap', None)
-        if clmp:
-            colormap = json.loads(clmp)
-            colormap = {int(k): v for k, v in colormap.items()}
-        else:
-            # Get Legend, check if custom legend has been requested
-            query_legend = self.request.GET.get('legend', None)
-            if query_legend:
-                legend = Legend.objects.filter(title__iexact=query_legend).first()
-            else:
-                legend = lyr.legend
-
-            # Get colormap
-            if legend:
-                colormap = legend.colormap
-                # Check if custom legend entries have been requested
-                entries = self.request.GET.get('entries', None)
-                if entries:
-                    entries = entries.split(',')
-                    colormap = {k: v for (k, v) in colormap.items() if str(k) in entries}
-            else:
-                colormap = None
-
-        return colormap
-
-    def get_format(self):
-        """
-        Returns image format requested.
-        """
-        return IMG_FORMATS[self.kwargs.get('format')]
-
-
-def LegendView(request, layer_or_legend_name):
-    """
-    Returns the legend for this layer as a json string. The legend is a list of
-    legend entries with the attributes "name", "expression" and "color".
-    """
-    try:
-        lyr = RasterLayer.objects.get(rasterfile__contains='rasters/' + layer_or_legend_name)
-        if lyr.legend:
-            legend = lyr.legend
-    except RasterLayer.DoesNotExist:
         try:
-            legend = Legend.objects.get(title__iexact=layer_or_legend_name)
-        except Legend.DoesNotExist:
-            raise Http404()
+            lyr = RasterLayer.objects.get(rasterfile__contains='rasters/' + layer_or_legend_name)
+            if lyr.legend:
+                legend = lyr.legend
+        except RasterLayer.DoesNotExist:
+            try:
+                legend = Legend.objects.get(title__iexact=layer_or_legend_name)
+            except Legend.DoesNotExist:
+                raise Http404()
 
-    return HttpResponse(legend.json, content_type='application/json')
+        return HttpResponse(legend.json, content_type='application/json')
