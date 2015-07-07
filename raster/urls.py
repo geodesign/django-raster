@@ -21,6 +21,6 @@ urlpatterns = patterns('',
 
     # Url to return legend as a json array (list of legend entries)
     url(r'^legend/(?P<layer_or_legend_name>[^/]+)$',
-        cache_page(cache_timeout)(LegendView),
+        cache_page(cache_timeout)(LegendView.as_view()),
         name='legend'),
 )
