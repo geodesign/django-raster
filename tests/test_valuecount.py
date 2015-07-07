@@ -103,3 +103,19 @@ class RasterValueCountTests(RasterTestCase):
         result = self.rasterlayer.value_count(bbox, area=True)
         for key, val in result.items():
             self.assertAlmostEqual(expected[key] * area_per_pixel, val, 5)
+
+    def test_value_count_at_lower_zoom(self):
+        # Precompute expected totals from value count
+        expected = {}
+        for tile in self.rasterlayer.rastertile_set.filter(tilez=9):
+            val, counts = numpy.unique(tile.rast.bands[0].data(), return_counts=True)
+            for pair in zip(val, counts):
+                if pair[0] in expected:
+                    expected[pair[0]] += pair[1]
+                else:
+                    expected[pair[0]] = pair[1]
+
+        self.assertEqual(
+            self.rasterlayer.value_count(zoom=9),
+            expected
+        )
