@@ -155,6 +155,8 @@ class RasterLayerParser:
                     tilez=zoom
                 )
 
+                dest.__del__()
+
     def drop_empty_rasters(self):
         """
         Remove rasters that are only no-data from the current rasterlayer.
