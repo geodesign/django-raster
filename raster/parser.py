@@ -9,11 +9,12 @@ import zipfile
 from django.conf import settings
 from django.contrib.gis.gdal import GDALRaster
 from django.db import connection
-from raster.const import WEB_MERCATOR_SRID, WEB_MERCATOR_TILESHIFT, WEB_MERCATOR_WORLDSIZE
+from raster import tiler
+from raster.const import WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE
 from raster.models import RasterLayerMetadata, RasterTile
 
 
-class RasterLayerParser:
+class RasterLayerParser(object):
     """
     Class to parse raster layers.
     """
@@ -23,7 +24,7 @@ class RasterLayerParser:
         self.rastername = os.path.basename(rasterlayer.rasterfile.name)
 
         # Set raster tilesize
-        self.tilesize = int(getattr(settings, 'RASTER_TILESIZE', 256))
+        self.tilesize = int(getattr(settings, 'RASTER_TILESIZE', WEB_MERCATOR_TILESIZE))
         self.zoomdown = getattr(settings, 'RASTER_ZOOM_NEXT_HIGHER', True)
 
     def log(self, msg, reset=False):
@@ -121,10 +122,10 @@ class RasterLayerParser:
         """
         # Compute the tile x-y-z index range for the rasterlayer for this zoomlevel
         bbox = self.rasterlayer.extent()
-        indexrange = self.get_tile_index_range(bbox, zoom)
+        indexrange = tiler.tile_index_range(bbox, zoom)
 
         # Compute scale of tiles for this zoomlevel
-        tilescale = self.get_tile_scale(zoom)
+        tilescale = tiler.tile_scale(zoom)
 
         # Count the number of tiles that are required to cover the raster at this zoomlevel
         nr_of_tiles = (indexrange[2] - indexrange[0] + 1) * (indexrange[3] - indexrange[1] + 1)
@@ -134,7 +135,7 @@ class RasterLayerParser:
         for tilex in range(indexrange[0], indexrange[2] + 1):
             for tiley in range(indexrange[1], indexrange[3] + 1):
                 # Calculate raster tile origin
-                bounds = self.get_tile_bounds(tilex, tiley, zoom)
+                bounds = tiler.tile_bounds(tilex, tiley, zoom)
 
                 # Warp source raster into this tile (in memory)
                 dest = self.dataset.warp({
@@ -174,73 +175,6 @@ class RasterLayerParser:
         cursor = connection.cursor()
         cursor.execute(sql)
 
-    def get_max_zoom(self):
-        """
-        Calculates the zoom level index z that is closest to the given scale.
-        The input scale needs to be provided in meters per pixel. It is then
-        compared to a list of pixel sizes for all TMS zoom levels.
-        """
-        # Check if max zoom was manually specified
-        if self.rasterlayer.max_zoom is not None:
-            return self.rasterlayer.max_zoom
-
-        # Get scale of raster
-        pixelsize = self.dataset.scale.x
-
-        # Calculate all pixelsizes for the TMS zoom levels
-        tms_pixelsizes = [WEB_MERCATOR_WORLDSIZE / (2.0 ** i * self.tilesize) for i in range(1, 19)]
-
-        # If the pixelsize is smaller than all tms sizes, default to max level
-        zoomlevel = 18
-
-        # Find zoomlevel (next-upper) for the input pixel size
-        for i in range(0, 18):
-            if pixelsize - tms_pixelsizes[i] >= 0:
-                zoomlevel = i
-                break
-
-        # If nextdown setting is true, adjust level
-        if self.zoomdown:
-            zoomlevel += 1
-
-        return zoomlevel
-
-    def get_tile_index_range(self, bbox, z):
-        """
-        Calculates index range for a given bounding box and zoomlevel.
-        It returns maximum and minimum x and y tile indices that overlap
-        with the input bbox at zoomlevel z.
-        """
-        # Calculate tile size for given zoom level
-        zscale = WEB_MERCATOR_WORLDSIZE / 2 ** z
-
-        # Calculate overlaying tile indices
-        return [
-            int((bbox[0] + WEB_MERCATOR_TILESHIFT) / zscale),
-            int((WEB_MERCATOR_TILESHIFT - bbox[3]) / zscale),
-            int((bbox[2] + WEB_MERCATOR_TILESHIFT) / zscale),
-            int((WEB_MERCATOR_TILESHIFT - bbox[1]) / zscale)
-        ]
-
-    def get_tile_bounds(self, x, y, z):
-        """
-        Calculates bounding box from Tile Map Service XYZ indices.
-        """
-        zscale = WEB_MERCATOR_WORLDSIZE / 2 ** z
-
-        xmin = x * zscale - WEB_MERCATOR_TILESHIFT
-        xmax = (x + 1) * zscale - WEB_MERCATOR_TILESHIFT
-        ymin = WEB_MERCATOR_TILESHIFT - (y + 1) * zscale
-        ymax = WEB_MERCATOR_TILESHIFT - y * zscale
-
-        return [xmin, ymin, xmax, ymax]
-
-    def get_tile_scale(self, z):
-        """
-        Calculates pixel size scale for given zoom level.
-        """
-        return WEB_MERCATOR_WORLDSIZE / 2.0 ** z / self.tilesize
-
     def parse_raster_layer(self):
         """
         This function pushes the raster data from the Raster Layer into the
@@ -262,10 +196,18 @@ class RasterLayerParser:
             self.dataset = self.dataset.transform(WEB_MERCATOR_SRID)
 
             # Setup TMS aligned tiles in world mercator
-            zoom = self.get_max_zoom()
+            if self.rasterlayer.max_zoom is not None:
+                # Check if max zoom was manually specified
+                max_zoom = self.rasterlayer.max_zoom
+            else:
+                # Compute max zoom based on scale of input raster
+                max_zoom = tiler.closest_zoomlevel(
+                    abs(self.dataset.scale.x),
+                    self.zoomdown
+                )
 
             # Loop through all lower zoom levels and create tiles
-            for iz in range(zoom + 1):
+            for iz in range(max_zoom + 1):
                 self.create_tiles(iz)
 
             self.drop_empty_rasters()

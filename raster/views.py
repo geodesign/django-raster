@@ -6,10 +6,10 @@ from PIL import Image
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.views.generic import View
-
-from .formulas import RasterAlgebraParser
-from .models import Legend, RasterLayer, RasterTile
-from .utils import IMG_FORMATS, band_data_to_image
+from raster.const import WEB_MERCATOR_TILESIZE
+from raster.formulas import RasterAlgebraParser
+from raster.models import Legend, RasterLayer, RasterTile
+from raster.utils import IMG_FORMATS, band_data_to_image
 
 
 class RasterView(View):
@@ -98,7 +98,7 @@ class AlgebraView(RasterView):
                 data[name] = tile.rast
             else:
                 # Create empty image if any layer misses the required tile
-                img = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
+                img = Image.new("RGBA", (WEB_MERCATOR_TILESIZE, WEB_MERCATOR_TILESIZE), (0, 0, 0, 0))
                 return self.write_img_to_response(img, {})
 
         # Get formula from request
@@ -126,7 +126,7 @@ class AlgebraView(RasterView):
 
             # Create rgba matrix from grayscale array
             result = numpy.array((result, result, result, numpy.repeat(255, len(result)))).T
-            rgba = result.reshape(256, 256, 4).astype('uint8')
+            rgba = result.reshape(WEB_MERCATOR_TILESIZE, WEB_MERCATOR_TILESIZE, 4).astype('uint8')
 
             # Create image from array
             img = Image.fromarray(rgba)
@@ -187,7 +187,7 @@ class TmsView(RasterView):
             img, stats = band_data_to_image(data, colormap)
         else:
             # Create empty image if tile cant be found
-            img = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
+            img = Image.new("RGBA", (WEB_MERCATOR_TILESIZE, WEB_MERCATOR_TILESIZE), (0, 0, 0, 0))
             stats = {}
 
         return self.write_img_to_response(img, stats)
