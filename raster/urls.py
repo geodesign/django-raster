@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.conf.urls import patterns, url
+from django.conf.urls import url
 from django.views.decorators.cache import cache_page
 from raster.views import AlgebraView, LegendView, TmsView
 
@@ -8,7 +8,7 @@ if hasattr(settings, 'RASTER_TILE_CACHE_TIMEOUT'):
 else:
     cache_timeout = 60 * 60 * 24
 
-urlpatterns = patterns('',
+urlpatterns = [
 
     # Url to request raster tiles
     url(r'^tiles/(?P<layer>[^/]+)/(?P<z>[0-9]+)/(?P<x>[0-9]+)/(?P<y>[0-9]+)(?P<format>\.jpg|\.png)$',
@@ -23,4 +23,4 @@ urlpatterns = patterns('',
     url(r'^legend/(?P<layer_or_legend_name>[^/]+)$',
         cache_page(cache_timeout)(LegendView.as_view()),
         name='legend'),
-)
+]
