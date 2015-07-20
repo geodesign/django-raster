@@ -156,8 +156,6 @@ class RasterLayerParser(object):
                     tilez=zoom
                 )
 
-                dest.__del__()
-
     def drop_empty_rasters(self):
         """
         Remove rasters that are only no-data from the current rasterlayer.
@@ -195,18 +193,14 @@ class RasterLayerParser(object):
             self.log('Transforming raster to SRID {0}'.format(WEB_MERCATOR_SRID))
             self.dataset = self.dataset.transform(WEB_MERCATOR_SRID)
 
-            # Setup TMS aligned tiles in world mercator
-            if self.rasterlayer.max_zoom is not None:
-                # Check if max zoom was manually specified
-                max_zoom = self.rasterlayer.max_zoom
-            else:
-                # Compute max zoom based on scale of input raster
-                max_zoom = tiler.closest_zoomlevel(
-                    abs(self.dataset.scale.x),
-                    self.zoomdown
-                )
+            # Compute max zoom based on scale of input raster
+            max_zoom = tiler.closest_zoomlevel(
+                abs(self.dataset.scale.x),
+                self.zoomdown
+            )
 
-            # Loop through all lower zoom levels and create tiles
+            # Loop through all lower zoom levels and create tiles to
+            # setup TMS aligned tiles in world mercator
             for iz in range(max_zoom + 1):
                 self.create_tiles(iz)
 

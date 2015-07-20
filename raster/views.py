@@ -3,12 +3,14 @@ import json
 import numpy
 from PIL import Image
 
+from django.conf import settings
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.views.generic import View
 from raster.const import WEB_MERCATOR_TILESIZE
 from raster.formulas import RasterAlgebraParser
 from raster.models import Legend, RasterLayer, RasterTile
+from raster.tiler import tile_bounds, tile_scale
 from raster.utils import IMG_FORMATS, band_data_to_image
 
 
@@ -64,6 +66,52 @@ class RasterView(View):
 
         return response
 
+    def get_tile(self, layer_id):
+        """
+        Returns a tile for rendering. If the tile does not exists, higher
+        level tiles are searched and warped to lower level if found.
+        """
+        # Get tile indices from request
+        tilex = int(self.kwargs.get('x'))
+        tiley = int(self.kwargs.get('y'))
+        tilez = int(self.kwargs.get('z'))
+
+        # Loop through zoom levels to search for a tile
+        result = None
+        for zoom in range(tilez, -1, -1):
+            # Compute multiplier to find parent raster
+            multiplier = 2 ** (tilez - zoom)
+            # Fetch tile
+            tile = RasterTile.objects.filter(
+                tilex=tilex / multiplier,
+                tiley=tiley / multiplier,
+                tilez=zoom,
+                rasterlayer_id=layer_id
+            )
+
+            if tile.exists():
+                # Extract raster from tile model
+                result = tile[0].rast
+                # If the tile is a parent of the original, warp it to the
+                # original request tile.
+                if zoom < tilez:
+                    # Compute bounds, scale and size of child tile
+                    bounds = tile_bounds(tilex, tiley, tilez)
+                    tilesize = int(getattr(settings, 'RASTER_TILESIZE', WEB_MERCATOR_TILESIZE))
+                    tilescale = tile_scale(tilez)
+
+                    # Warp parent tile to child tile
+                    result = result.warp({
+                        'width': tilesize,
+                        'height': tilesize,
+                        'scale': [tilescale, -tilescale],
+                        'origin': [bounds[0], bounds[3]],
+                    })
+
+                break
+
+        return result
+
 
 class AlgebraView(RasterView):
     """
@@ -75,9 +123,6 @@ class AlgebraView(RasterView):
         self.parser = RasterAlgebraParser()
 
     def get(self, request, masked=False, *args, **kwargs):
-        # Get tile indexes
-        x, y, z = self.kwargs.get('x'), self.kwargs.get('y'), self.kwargs.get('z')
-
         # Get layer ids
         ids = request.GET.get('layers').split(',')
 
@@ -88,14 +133,9 @@ class AlgebraView(RasterView):
         # for formula evaluation.
         data = {}
         for name, layerid in ids.items():
-            tile = RasterTile.objects.filter(
-                tilex=x,
-                tiley=y,
-                tilez=z,
-                rasterlayer_id=layerid
-            ).first()
+            tile = self.get_tile(layerid)
             if tile:
-                data[name] = tile.rast
+                data[name] = tile
             else:
                 # Create empty image if any layer misses the required tile
                 img = Image.new("RGBA", (WEB_MERCATOR_TILESIZE, WEB_MERCATOR_TILESIZE), (0, 0, 0, 0))
@@ -161,27 +201,22 @@ class TmsView(RasterView):
                 rasterfile__contains='rasters/' + self.kwargs.get('layer')
             )
 
-        # Get tile
-        tile = RasterTile.objects.filter(
-            tilex=self.kwargs.get('x'),
-            tiley=self.kwargs.get('y'),
-            tilez=self.kwargs.get('z'),
-            rasterlayer_id=layer.id
-        )
-
         # Override color map if arg provided
         colormap = self.get_colormap(layer)
 
+        # Get tile
+        tile = self.get_tile(layer.id)
+
         # Render tile
-        if tile.exists() and colormap:
+        if tile and colormap:
             if kwargs.get('masked', ''):
                 # Mask values
                 data = numpy.ma.masked_values(
-                    tile[0].rast.bands[0].data(),
-                    tile[0].rast.bands[0].nodata_value
+                    tile.bands[0].data(),
+                    tile.bands[0].nodata_value
                 )
             else:
-                data = tile[0].rast.bands[0].data()
+                data = tile.bands[0].data()
 
             # Render tile using the legend data
             img, stats = band_data_to_image(data, colormap)
