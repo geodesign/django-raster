@@ -22,6 +22,8 @@ def rasterize(geom, rast):
     # Create in memory target raster
     rasterized = rast.warp({'name': 'rasterized.MEM', 'driver': 'MEM'})
     rasterized.bands[0].data(numpy.zeros(rast.width * rast.height))
+    # Set zero as nodata
+    rasterized.bands[0].nodata_value = 0
 
     # Make sure geom is an OGR geometry
     if not isinstance(geom, OGRGeometry):

@@ -179,7 +179,7 @@ class RasterAlgebraParser(FormulaParser):
     Compute raster algebra expressions using the FormulaParser class.
     """
 
-    def evaluate_raster_algebra(self, data, formula, check_aligned=False):
+    def evaluate_raster_algebra(self, data, formula, check_aligned=False, mask=False):
         """
         Evaluate a raster algebra expression on a set of rasters. All input
         rasters need to be strictly aligned (same size, geotransform and srid).
@@ -194,7 +194,13 @@ class RasterAlgebraParser(FormulaParser):
             self.check_aligned(data.values())
 
         # Construct list of numpy arrays holding raster pixel data
-        data_arrays = {name: rast.bands[0].data().ravel() for name, rast in data.items()}
+        if mask:
+            data_arrays = {
+                name: numpy.ma.masked_values(rast.bands[0].data().ravel(), rast.bands[0].nodata_value)
+                for name, rast in data.items()
+            }
+        else:
+            data_arrays = {name: rast.bands[0].data().ravel() for name, rast in data.items()}
 
         # Evaluate formula on raster data
         algebra_result = self.evaluate_formula(formula, data_arrays)
