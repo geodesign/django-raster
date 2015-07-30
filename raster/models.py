@@ -108,10 +108,17 @@ class RasterLayer(models.Model, ValueCountMixin):
     """
     Source data model for raster layers
     """
-    DATATYPES = (('co', 'Continuous'),
-                 ('ca', 'Categorical'),
-                 ('ma', 'Mask'),
-                 ('ro', 'Rank Ordered'))
+    CONTINUOUS = 'co'
+    CATEGORICAL = 'ca'
+    MASK = 'ma'
+    RANK_ORDERED = 'ro'
+
+    DATATYPES = (
+        (CONTINUOUS, 'Continuous'),
+        (CATEGORICAL, 'Categorical'),
+        (MASK, 'Mask'),
+        (RANK_ORDERED, 'Rank Ordered')
+    )
 
     name = models.CharField(max_length=100, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
@@ -126,6 +133,13 @@ class RasterLayer(models.Model, ValueCountMixin):
 
     def __str__(self):
         return '{} {} (type: {}, srid: {})'.format(self.id, self.name, self.datatype, self.srid)
+
+    @property
+    def discrete(self):
+        """
+        Returns true for discrete rasters.
+        """
+        return self.datatype in (self.CATEGORICAL, self.MASK, self.RANK_ORDERED)
 
     _bbox = None
 

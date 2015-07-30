@@ -75,7 +75,6 @@ class RasterValueCountTests(RasterTestCase):
             self.rasterlayer.value_count(bbox),
             expected
         )
-
         self.assertEqual(
             self.rasterlayer.db_value_count(bbox),
             expected
@@ -89,6 +88,8 @@ class RasterValueCountTests(RasterTestCase):
         # Create polygon from extent in default projection
         bbox = Polygon.from_bbox(extent)
         bbox.srid = WEB_MERCATOR_SRID
+        bbox.transform(3086)
+
         expected = {}
         val, counts = numpy.unique(tile.rast.bands[0].data(), return_counts=True)
         for pair in zip(val, counts):
@@ -117,5 +118,9 @@ class RasterValueCountTests(RasterTestCase):
 
         self.assertEqual(
             self.rasterlayer.value_count(zoom=9),
+            expected
+        )
+        self.assertEqual(
+            self.rasterlayer.db_value_count(zoom=9),
             expected
         )

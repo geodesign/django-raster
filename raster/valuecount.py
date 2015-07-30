@@ -1,5 +1,3 @@
-from collections import Counter
-
 import numpy
 
 from django.contrib.gis.geos import GEOSGeometry
@@ -54,10 +52,9 @@ class ValueCountMixin(object):
     """
     Value count methods for Raster Layers.
     """
-
     def db_value_count(self, geom=None, area=False, zoom=None):
         """
-        Get a count by distinct pixel value within the given geometry.
+        Compute value count in database.
         """
         if not zoom:
             zoom = self._max_zoom
@@ -131,13 +128,19 @@ class ValueCountMixin(object):
         return self._minsize
 
     def value_count(self, geom=None, area=False, zoom=None):
+        """
+        Compute value counts or histograms for rasterlayers within a geometry.
+        """
+        # Automatically determine zoom if not provided
         if not zoom:
             zoom = self._max_zoom
 
+        # Get raster tiles
         if geom:
             if geom.srid != WEB_MERCATOR_SRID:
                 geom.transform(WEB_MERCATOR_SRID)
 
+            # Filter tiles by geometry intersection
             tiles = self.rastertile_set.raw(
                 "SELECT * FROM raster_rastertile "
                 "WHERE ST_Intersects(rast, ST_GeomFromEWKT('{geom_ewkt}')) "
@@ -145,22 +148,27 @@ class ValueCountMixin(object):
                 "AND rasterlayer_id={rstid}"
                 .format(geom_ewkt=geom.ewkt, zoom=zoom, rstid=self.id)
             )
+            rastgeom = rasterize(geom, tiles[0].rast)
+            tile_data = [tile.rast.bands[0].data()[rastgeom.bands[0].data() == 1] for tile in tiles]
         else:
             tiles = self.rastertile_set.filter(tilez=zoom)
+            tile_data = [tile.rast.bands[0].data() for tile in tiles]
 
-        results = Counter({})
-        for tile in tiles:
-            if geom:
-                rastgeom = rasterize(geom, tile.rast)
-                data = numpy.unique(tile.rast.bands[0].data()[rastgeom.bands[0].data() == 1], return_counts=True)
-            else:
-                data = numpy.unique(tile.rast.bands[0].data(), return_counts=True)
+        if self.discrete:
+            # Compute unique value counts for discrete rasters
+            values, counts = numpy.unique(tile_data, return_counts=True)
+        else:
+            # Compute histogram for continuous rasters
+            counts, bins = numpy.histogram(tile_data)
+            # Compute bin labels
+            values = []
+            for i in range(len(bins) - 1):
+                values.append((bins[i], bins[i + 1]))
 
-            results += Counter(dict(zip(data[0], data[1])))
-
+        # If requested, convert counts into area
         if area:
+            # Get scale of rasters in the geometry projection
             scalex, scaley = self.pixelsize(geom.srid, zoom)
-            for key, val in results.items():
-                results[key] = val * scalex * scaley
+            counts = counts * scalex * scaley
 
-        return dict(results)
+        return dict(zip(values, counts))
