@@ -36,10 +36,12 @@ class FormulaParser(object):
         "sin": numpy.sin,
         "cos": numpy.cos,
         "tan": numpy.tan,
-        "abs": abs,
-        "trunc": lambda a: int(a),
-        "round": round,
-        "sgn": lambda a: abs(a) > 1e-12 and cmp(a, 0) or 0,
+        "log": numpy.log,
+        "exp": numpy.exp,
+        "abs": numpy.abs,
+        "int": numpy.int,
+        "round": numpy.round,
+        "sign": numpy.sign,
     }
 
     def __init__(self):
@@ -82,6 +84,23 @@ class FormulaParser(object):
         aa = CaselessLiteral("a")
         bb = CaselessLiteral("b")
         cc = CaselessLiteral("c")
+        dd = CaselessLiteral("d")
+        ee = CaselessLiteral("e")
+        ff = CaselessLiteral("f")
+        gg = CaselessLiteral("g")
+        hh = CaselessLiteral("h")
+        ii = CaselessLiteral("i")
+        jj = CaselessLiteral("j")
+        kk = CaselessLiteral("k")
+        ll = CaselessLiteral("l")
+        mm = CaselessLiteral("m")
+        nn = CaselessLiteral("n")
+        oo = CaselessLiteral("o")
+        pp = CaselessLiteral("p")
+        qq = CaselessLiteral("q")
+        rr = CaselessLiteral("r")
+        ss = CaselessLiteral("s")
+        tt = CaselessLiteral("t")
         uu = CaselessLiteral("u")
         vv = CaselessLiteral("v")
         ww = CaselessLiteral("w")
@@ -90,10 +109,12 @@ class FormulaParser(object):
         zz = CaselessLiteral("z")
 
         bnf = Forward()
+
         atom = (
             Optional("-") + (
-                aa | bb | cc | uu | vv | ww | xx | yy | zz |
-                pi | e | fnumber | ident + lpar + bnf + rpar
+                pi | e | fnumber | ident + lpar + bnf + rpar |  # pi needs to be before the letters, for it to be found
+                aa | bb | cc | dd | ee | ff | gg | hh | ii | jj | kk | ll | mm |
+                nn | oo | pp | qq | rr | ss | tt | uu | vv | ww | xx | yy | zz
             ).setParseAction(self.push_first) | (lpar + bnf.suppress() + rpar)
         ).setParseAction(self.push_unary_minus)
 

@@ -11,7 +11,7 @@ from raster.const import WEB_MERCATOR_TILESIZE
 from raster.formulas import RasterAlgebraParser
 from raster.models import Legend, RasterLayer, RasterTile
 from raster.tiler import tile_bounds, tile_scale
-from raster.utils import IMG_FORMATS, band_data_to_image
+from raster.utils import IMG_FORMATS, band_data_to_image, hex_to_rgba
 
 
 class RasterView(View):
@@ -25,7 +25,7 @@ class RasterView(View):
         clmp = self.request.GET.get('colormap', None)
         if clmp:
             colormap = json.loads(clmp)
-            colormap = {int(k): v for k, v in colormap.items()}
+            colormap = {k: hex_to_rgba(v) if isinstance(v, (unicode, str, int)) else v for k, v in colormap.items()}
         else:
             # Get Legend, check if custom legend has been requested
             legend = self.request.GET.get('legend', None)
