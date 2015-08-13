@@ -83,7 +83,7 @@ class RasterLayerMetadataModelAdmin(admin.ModelAdmin):
 
 
 class RasterTileModelAdmin(admin.ModelAdmin):
-    readonly_fields = ('rast', 'rasterlayer', 'filename', 'is_base', 'tilex',
+    readonly_fields = ('rast', 'rasterlayer', 'filename', 'tilex',
                        'tiley', 'tilez')
 
     def has_add_permission(self, request, obj=None):
