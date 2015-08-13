@@ -31,7 +31,8 @@ class RasterAlgebra(object):
 
         # Instantiate formula parser and evaluate
         algebra_result = self.parser.evaluate_formula(formula, data)
-        # TODO: Convert to dtype of raster automatically
+
+        # TODO: Convert to dtype of raster automatically when setting band data in GDALRaster
         algebra_result = algebra_result.astype(self.result.bands[0].data().dtype)
 
         # Write result to target raster

@@ -27,7 +27,7 @@ class RasterValueCountTests(RasterTestCase):
     def test_value_count_no_geom(self):
         self.assertEqual(
             self.rasterlayer.value_count(),
-            self.expected_totals
+            {str(k): v for k, v in self.expected_totals.items()}
         )
 
     def test_value_count_with_geom_covering_all(self):
@@ -44,7 +44,7 @@ class RasterValueCountTests(RasterTestCase):
         # Confirm global count
         self.assertEqual(
             self.rasterlayer.value_count(bbox),
-            self.expected_totals
+            {str(key): val for key, val in self.expected_totals.items()}
         )
         self.assertEqual(
             self.rasterlayer.db_value_count(bbox),
@@ -73,7 +73,7 @@ class RasterValueCountTests(RasterTestCase):
         # Confirm clipped count
         self.assertEqual(
             self.rasterlayer.value_count(bbox),
-            expected
+            {str(k): v for k, v in expected.items()}
         )
         self.assertEqual(
             self.rasterlayer.db_value_count(bbox),
@@ -93,17 +93,15 @@ class RasterValueCountTests(RasterTestCase):
         expected = {}
         val, counts = numpy.unique(tile.rast.bands[0].data(), return_counts=True)
         for pair in zip(val, counts):
+            pair = (str(pair[0]), pair[1])
             if pair[0] in expected:
                 expected[pair[0]] += pair[1]
             else:
                 expected[pair[0]] = pair[1]
+
         # Confirm clipped count
-        # The clip operation with the geom results in a small error when
-        # compared to the exact count for a tile.
-        area_per_pixel = 76.437028285175102837456506676971912384033 ** 2
         result = self.rasterlayer.value_count(bbox, area=True)
-        for key, val in result.items():
-            self.assertAlmostEqual(expected[key] * area_per_pixel, val, 5)
+        self.assertEqual(result, expected)
 
     def test_value_count_at_lower_zoom(self):
         # Precompute expected totals from value count
@@ -118,7 +116,7 @@ class RasterValueCountTests(RasterTestCase):
 
         self.assertEqual(
             self.rasterlayer.value_count(zoom=9),
-            expected
+            {str(k): v for k, v in expected.items()}
         )
         self.assertEqual(
             self.rasterlayer.db_value_count(zoom=9),

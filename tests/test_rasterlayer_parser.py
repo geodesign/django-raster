@@ -33,7 +33,7 @@ class RasterLayerParserWithoutCeleryTests(RasterTestCase):
         with self.settings(MEDIA_ROOT=self.media_root):
             self.rasterlayer.save()
 
-        self.assertEqual(self.rasterlayer.rastertile_set.filter(is_base=False).count(), 12 + 4 + 11)
+        self.assertEqual(self.rasterlayer.rastertile_set.count(), 12 + 4 + 11)
 
     def test_layermeta_creation(self):
         self.assertEqual(self.rasterlayer.rasterlayermetadata.width, 163)
