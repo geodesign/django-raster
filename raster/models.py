@@ -50,6 +50,7 @@ class Legend(models.Model):
     description = models.TextField(null=True, blank=True)
     entries = models.ManyToManyField(LegendEntry)
     json = models.TextField(null=True, blank=True)
+    modified = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.title
@@ -131,6 +132,7 @@ class RasterLayer(models.Model, ValueCountMixin):
     parse_log = models.TextField(blank=True, null=True, default='',
                                  editable=False)
     legend = models.ForeignKey(Legend, blank=True, null=True)
+    modified = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return '{} {} (type: {}, srid: {})'.format(self.id, self.name, self.datatype, self.srid)
