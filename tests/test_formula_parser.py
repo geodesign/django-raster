@@ -45,6 +45,7 @@ class FormulaParserTests(TestCase):
         self.assertFormulaResult("sign(0.1)", 1)
         self.assertFormulaResult("exp(0)", numpy.e)
         self.assertFormulaResult("log(1)", 0)
+        self.assertFormulaResult("99999", 99999)
 
     def test_formula_parser_with_vars(self):
         data = {
@@ -67,3 +68,4 @@ class FormulaParserTests(TestCase):
         self.assertFormulaResult("x - x", [0, 0, 0], data)
         self.assertFormulaResult("x * x", [1.2 * 1.2, 0, -1.2 * -1.2], data)
         self.assertFormulaResult("x / (x + y)", [1, 0, 1], data)
+        self.assertFormulaResult("x * 99999 + 0.5*y)", [1.2 * 99999, 0.5, -1.2 * 99999], data)
