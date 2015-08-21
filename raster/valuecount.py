@@ -114,7 +114,6 @@ def aggregator(layer_dict, zoom, geom=None, formula=None, acres=True):
                 # Evaluate algebra on tiles
                 result = parser.evaluate_raster_algebra(data, formula, mask=False)
                 result_data = numpy.ma.masked_values(result.bands[0].data(), result.bands[0].nodata_value)
-
                 if geom:
                     # Rasterize the aggregation area to the result raster
                     rastgeom = rasterize(geom, result)
@@ -125,9 +124,9 @@ def aggregator(layer_dict, zoom, geom=None, formula=None, acres=True):
                     # Compute unique counts constrained with the rasterized geom
                     result = numpy.unique(result_data[rastgeom_mask], return_counts=True)
                 else:
-                    result = numpy.unique(result.bands[0].data(), return_counts=True)
+                    result = numpy.unique(result_data, return_counts=True)
 
-                # TODO: Handle continuous case
+                # Handle continuous case
                 # if self.discrete:
                     # # Compute unique value counts for discrete rasters
                     # values, counts = numpy.unique(tile_data, return_counts=True)
