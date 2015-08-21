@@ -92,6 +92,7 @@ def aggregator(layer_dict, zoom, geom=None, formula=None, acres=True):
 
     # Loop through tiles and evaluate raster algebra for each tile
     results = Counter({})
+    rastgeom = None
     for tilex in range(tilerange[0], tilerange[2] + 1):
         for tiley in range(tilerange[1], tilerange[3] + 1):
             # Prepare a data dictionary with named tiles for algebra evaluation
@@ -143,7 +144,7 @@ def aggregator(layer_dict, zoom, geom=None, formula=None, acres=True):
 
     # Transform pixel count to acres if requested
     scaling_factor = 1
-    if acres:
+    if acres and rastgeom and len(result):
         scaling_factor = int(round(abs(rastgeom.scale.x * rastgeom.scale.y) * 0.000247105381))
 
     results = {str(k): v * scaling_factor for k, v in results.iteritems()}
