@@ -44,13 +44,14 @@ class RasterLayerParser(object):
 
     def get_raster_file(self):
         """
-        Make local copy of rasterfile (necessary if files are stored on CDN).
+        Make local copy of rasterfile, which is needed if files are stored on
+        remote storage, and unzip it if necessary.
         """
         self.log('Getting raster file from storage')
 
         self.tmpdir = tempfile.mkdtemp()
 
-        # Access rasterfile and store locally
+        # Access rasterfile and store in a temp folder
         rasterfile = open(os.path.join(self.tmpdir, self.rastername), 'wb')
         for chunk in self.rasterlayer.rasterfile.chunks():
             rasterfile.write(chunk)
@@ -73,25 +74,28 @@ class RasterLayerParser(object):
 
             # Check if only one file is found in zipfile
             if len(raster_list) > 1:
-                self.log('WARNING: Found more than one file in zipfile '
-                         'using only first file found. This might lead '
-                         'to problems if its not a raster file.')
+                self.log(
+                    'WARNING: Found more than one file in zipfile '
+                    'using only first file found. This might lead '
+                    'to problems if its not a raster file.'
+                )
 
             # Return first one as raster file
             self.rastername = os.path.basename(raster_list[0])
 
     def open_raster_file(self):
         """
-        Opens the raster file through gdal and extracts data values.
+        Open the raster file as GDALRaster and set nodata-values.
         """
-        self.log('Opening raster file with gdal')
+        self.log('Opening raster file as GDALRaster.')
 
         # Open raster file
         self.dataset = GDALRaster(os.path.join(self.tmpdir, self.rastername), write=True)
 
         # Make sure nodata value is set from input
-        for band in self.dataset.bands:
-            band.nodata_value = float(self.rasterlayer.nodata)
+        if self.rasterlayer.nodata is not None:
+            for band in self.dataset.bands:
+                band.nodata_value = float(self.rasterlayer.nodata)
 
         # Store original metadata for this raster
         self.store_original_metadata()
