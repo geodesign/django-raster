@@ -22,13 +22,13 @@ class FormulaParser(object):
         "/": numpy.divide,
         "^": numpy.power,
         "==": numpy.equal,
+        "!=": numpy.not_equal,
         ">": numpy.greater,
         ">=": numpy.greater_equal,
         "<": numpy.less,
         "<=": numpy.less_equal,
         "|": numpy.logical_or,
-        "&": numpy.logical_and,
-        "!": numpy.logical_not,
+        "&": numpy.logical_and
     }
 
     # Map function names to python functions
@@ -66,17 +66,18 @@ class FormulaParser(object):
         mult = Literal("*")
         div = Literal("/")
         eq = Literal("==")
+        neq = Literal("!=")
         lt = Literal("<")
         le = Literal("<=")
         gt = Literal(">")
         ge = Literal(">=")
         ior = Literal("|")
         iand = Literal("&")
-        inot = Literal("!")
         lpar = Literal("(").suppress()
         rpar = Literal(")").suppress()
         addop = plus | minus | eq
-        multop = mult | div | ge | le | gt | lt | ior | iand | inot  # Order matters here due to "<=" being caught by "<"
+        #multop = mult | div | ge | le | gt | lt | ior | iand | inot  # Order matters here due to "<=" being caught by "<"
+        multop = mult | div | eq | neq | ge | le | gt | lt | ior | iand  # Order matters here due to "<=" being caught by "<"
         expop = Literal("^")
         pi = CaselessLiteral("PI")
 
@@ -111,12 +112,12 @@ class FormulaParser(object):
         bnf = Forward()
 
         atom = (
-            Optional("-") + (
-                pi | e | fnumber | ident + lpar + bnf + rpar |  # pi needs to be before the letters, for it to be found
+            Optional('-') + Optional("!") + (
+                pi | e | fnumber | ident + lpar + bnf + rpar |  # pi needs to be before the letters for it to be found
                 aa | bb | cc | dd | ee | ff | gg | hh | ii | jj | kk | ll | mm |
                 nn | oo | pp | qq | rr | ss | tt | uu | vv | ww | xx | yy | zz
             ).setParseAction(self.push_first) | (lpar + bnf.suppress() + rpar)
-        ).setParseAction(self.push_unary_minus)
+        ).setParseAction(self.push_unary_operator)
 
         # By defining exponentiation as "atom [ ^ factor ]..." instead of "atom [ ^ atom ]...",
         # we get right-to-left exponents, instead of left-to-righ
@@ -132,25 +133,38 @@ class FormulaParser(object):
     def push_first(self, strg, loc, toks):
         self.expr_stack.append(toks[0])
 
-    def push_unary_minus(self, strg, loc, toks):
-        if toks and toks[0] == '-':
-            self.expr_stack.append('unary -')
+    def push_unary_operator(self, strg, loc, toks):
+        """
+        Sets custom flag for unary operators.
+        """
+        if toks:
+            if toks[0] == '-':
+                self.expr_stack.append('unary -')
+            elif toks[0] == '!':
+                self.expr_stack.append('unary !')
 
     def evaluate_stack(self, stack):
         """
         Evaluate a stack element.
         """
+        # Get operator element
         op = stack.pop()
+
+        # Evaluate unary operators
         if op == 'unary -':
             return -self.evaluate_stack(stack)
-        if op in ["+", "-", "*", "/", "^", ">", "<", "==", "<=", ">=", "|", "&", "!"]:
+        if op == 'unary !':
+            return numpy.logical_not(self.evaluate_stack(stack))
+
+        # Evaluate binary operators
+        if op in ["+", "-", "*", "/", "^", ">", "<", "==", "!=", "<=", ">=", "|", "&", "!"]:
             op2 = self.evaluate_stack(stack)
             op1 = self.evaluate_stack(stack)
             return self.opn[op](op1, op2)
         elif op == "PI":
-            return numpy.pi  # 3.1415926535
+            return numpy.pi
         elif op == "E":
-            return numpy.e  # 2.718281828
+            return numpy.e
         elif op in self.fn:
             return self.fn[op](self.evaluate_stack(stack))
         elif op[0].isalpha() and len(op[0]) == 1 and op[0] in self.data:
@@ -158,6 +172,7 @@ class FormulaParser(object):
         elif op[0].isalpha() and len(op[0]) == 1:
             raise Exception('Found an undeclared variable in formula.')
         else:
+            # If numeric, convert to numpy float
             return numpy.array(float(op))
 
     def parse_formula(self, formula):
