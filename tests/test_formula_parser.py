@@ -106,3 +106,7 @@ class FormulaParserTests(TestCase):
         self.assertFormulaResult("b & c", [True, False, False], data)
         self.assertFormulaResult("b | c", [True, False, True], data)
         self.assertFormulaResult("b | !c", [True, True, True], data)
+
+        # This is not desired behavior, should be changed in formula parser
+        # to raise error or accept multi character words.
+        self.assertFormulaResult("aaa", data['a'], data)

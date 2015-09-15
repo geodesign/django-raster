@@ -1,11 +1,17 @@
 from math import pi
 
 IMG_FORMATS = {'.png': 'PNG', '.jpg': 'JPEG'}
+
 WEB_MERCATOR_SRID = 3857
+
 WEB_MERCATOR_WORLDSIZE = 2 * pi * 6378137
+
 WEB_MERCATOR_TILESHIFT = WEB_MERCATOR_WORLDSIZE / 2.0
+
 WEB_MERCATOR_TILESIZE = 256
+
 GLOBAL_MAX_ZOOM_LEVEL = 18
+
 GDAL_TO_NUMPY_PIXEL_TYPES = {
     1: 'UInt8',  # Eight bit unsigned integer
     2: 'UInt16',  # Sixteen bit unsigned integer
