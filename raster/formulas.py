@@ -1,6 +1,10 @@
 import numpy
 from pyparsing import CaselessLiteral, Combine, Forward, Literal, Optional, Word, ZeroOrMore, alphas, nums
 
+from django.contrib.gis.gdal import GDALRaster
+
+from .const import GDAL_TO_NUMPY_PIXEL_TYPES
+
 
 class FormulaParser(object):
     """
@@ -76,7 +80,6 @@ class FormulaParser(object):
         lpar = Literal("(").suppress()
         rpar = Literal(")").suppress()
         addop = plus | minus | eq
-        #multop = mult | div | ge | le | gt | lt | ior | iand | inot  # Order matters here due to "<=" being caught by "<"
         multop = mult | div | eq | neq | ge | le | gt | lt | ior | iand  # Order matters here due to "<=" being caught by "<"
         expop = Literal("^")
         pi = CaselessLiteral("PI")
@@ -173,7 +176,7 @@ class FormulaParser(object):
             raise Exception('Found an undeclared variable in formula.')
         else:
             # If numeric, convert to numpy float
-            return numpy.array(float(op))
+            return numpy.array(op, dtype='float')
 
     def parse_formula(self, formula):
         """
@@ -232,25 +235,38 @@ class RasterAlgebraParser(FormulaParser):
         # Construct list of numpy arrays holding raster pixel data
         if mask:
             data_arrays = {
-                name: numpy.ma.masked_values(rast.bands[0].data().ravel(), rast.bands[0].nodata_value)
-                for name, rast in data.items()
+                key: numpy.ma.masked_values(rast.bands[0].data().ravel(), rast.bands[0].nodata_value)
+                for key, rast in data.items()
             }
         else:
-            data_arrays = {name: rast.bands[0].data().ravel() for name, rast in data.items()}
+            data_arrays = {key: rast.bands[0].data().ravel() for key, rast in data.items()}
 
         # Evaluate formula on raster data
-        algebra_result = self.evaluate_formula(formula, data_arrays)
+        result = self.evaluate_formula(formula, data_arrays)
 
-        # Copy one raster to hold results
-        result = data.values()[0].warp({'name': 'algebra_result'})
+        # Reference first original raster for constructing result
+        orig = data.values()[0]
+        orig_band = orig.bands[0]
 
-        # Make sure algebra result has the correct data type
-        algebra_result = algebra_result.astype(data_arrays.values()[0].dtype)
+        # Convert to default number type
+        result = result.astype(GDAL_TO_NUMPY_PIXEL_TYPES[orig_band.datatype()])
 
-        # Write result to a target raster
-        result.bands[0].data(algebra_result)
-
-        return result
+        # Return GDALRaster holding results
+        return GDALRaster({
+            'datatype': orig_band.datatype(),
+            'driver': 'MEM',
+            'width': orig.width,
+            'height': orig.height,
+            'nr_of_bands': 1,
+            'srid': orig.srs.srid,
+            'origin': orig.origin,
+            'scale': orig.scale,
+            'skew': orig.skew,
+            'bands': [{
+                'nodata_value': orig_band.nodata_value,
+                'data': result
+            }],
+        })
 
     def check_aligned(self, rasters):
         """
@@ -259,5 +275,6 @@ class RasterAlgebraParser(FormulaParser):
         if not len(set([x.srs.srid for x in rasters])) == 1:
             raise Exception('Raster aligment check failed: SRIDs not all the same')
 
-        if not len(set([x.origin.x for x in rasters])) == 1:
-            raise Exception('Raster aligment check failed: Origins are not all the same')
+        gt = rasters[0].geotransform
+        if any([gt != rast.geotransform for rast in rasters[1:]]):
+            raise Exception('Raster aligment check failed: geotransform arrays are not all the same')
