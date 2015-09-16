@@ -9,9 +9,12 @@ import zipfile
 from django.conf import settings
 from django.contrib.gis.gdal import GDALRaster
 from django.db import connection
+from django.dispatch import Signal
 from raster import tiler
 from raster.const import WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE
 from raster.models import RasterLayerMetadata, RasterTile
+
+rasterlayers_parser_started = Signal(providing_args=['instance'])
 
 
 class RasterLayerParser(object):
@@ -185,6 +188,9 @@ class RasterLayerParser(object):
         try:
             # Clean previous parse log
             self.log('Started parsing raster file', reset=True)
+
+            # Send signal for start of parsing
+            rasterlayers_parser_started.send(sender=self.rasterlayer.__class__, instance=self.rasterlayer)
 
             # Download, unzip and open raster file
             self.get_raster_file()
