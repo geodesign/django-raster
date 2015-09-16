@@ -144,7 +144,7 @@ def aggregator(layer_dict, zoom, geom=None, formula=None, acres=True):
     # Transform pixel count to acres if requested
     scaling_factor = 1
     if acres and rastgeom and len(result):
-        scaling_factor = int(round(abs(rastgeom.scale.x * rastgeom.scale.y) * 0.000247105381))
+        scaling_factor = abs(rastgeom.scale.x * rastgeom.scale.y) * 0.000247105381
 
     results = {str(k): v * scaling_factor for k, v in results.iteritems()}
 

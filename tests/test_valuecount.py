@@ -95,13 +95,14 @@ class RasterValueCountTests(RasterTestCase):
         for pair in zip(val, counts):
             pair = (str(pair[0]), pair[1])
             if pair[0] in expected:
-                expected[pair[0]] += pair[1]
+                expected[pair[0]] += pair[1] * 1.44374266645
             else:
-                expected[pair[0]] = pair[1]
+                expected[pair[0]] = pair[1] * 1.44374266645
 
         # Confirm clipped count
         result = self.rasterlayer.value_count(bbox, area=True)
-        self.assertEqual(result, expected)
+        for k, v in result.items():
+            self.assertAlmostEqual(v, expected[k], 5)
 
     def test_value_count_at_lower_zoom(self):
         # Precompute expected totals from value count
