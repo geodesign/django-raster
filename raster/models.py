@@ -5,6 +5,7 @@ from colorful.fields import RGBColorField
 from django.conf import settings
 from django.contrib.gis.db import models
 from django.contrib.gis.geos import Polygon
+from django.db.models import Max, Min
 from django.db.models.signals import m2m_changed, post_save
 from django.dispatch import receiver
 from raster.const import WEB_MERCATOR_SRID
@@ -49,6 +50,7 @@ class Legend(models.Model):
     description = models.TextField(null=True, blank=True)
     entries = models.ManyToManyField(LegendEntry)
     json = models.TextField(null=True, blank=True)
+    modified = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.title
@@ -130,6 +132,7 @@ class RasterLayer(models.Model, ValueCountMixin):
     parse_log = models.TextField(blank=True, null=True, default='',
                                  editable=False)
     legend = models.ForeignKey(Legend, blank=True, null=True)
+    modified = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return '{} {} (type: {}, srid: {})'.format(self.id, self.name, self.datatype, self.srid)
@@ -170,6 +173,14 @@ class RasterLayer(models.Model, ValueCountMixin):
 
         return self._bbox
 
+    def index_range(self, zoom):
+        """
+        Returns the index range for
+        """
+        return self.rastertile_set.filter(tilez=zoom).aggregate(
+            Min('tilex'), Max('tilex'), Min('tiley'), Max('tiley')
+        )
+
 
 @receiver(models.signals.pre_save, sender=RasterLayer)
 def reset_parse_log_if_data_changed(sender, instance, **kwargs):
@@ -195,7 +206,9 @@ def parse_raster_layer_if_log_is_empty(sender, instance, **kwargs):
 
 
 class RasterLayerMetadata(models.Model):
-    """Stores meta data for a raster layer"""
+    """
+    Stores meta data for a raster layer
+    """
     rasterlayer = models.OneToOneField(RasterLayer)
     uperleftx = models.FloatField(null=True, blank=True)
     uperlefty = models.FloatField(null=True, blank=True)
@@ -212,7 +225,9 @@ class RasterLayerMetadata(models.Model):
 
 
 class RasterTile(models.Model):
-    """Model to store individual tiles of a raster data source layer"""
+    """
+    Store individual tiles of a raster data source layer.
+    """
     ZOOMLEVELS = (
         (1, 1), (2, 2), (3, 3), (4, 4), (5, 5), (6, 6), (7, 7),
         (8, 8), (9, 9), (10, 10), (11, 11), (12, 12), (13, 13),
@@ -222,7 +237,6 @@ class RasterTile(models.Model):
     rast = models.RasterField(null=True, blank=True, srid=WEB_MERCATOR_SRID)
     rasterlayer = models.ForeignKey(RasterLayer, null=True, blank=True, db_index=True)
     filename = models.TextField(null=True, blank=True, db_index=True)
-    is_base = models.BooleanField(default=False)
     tilex = models.IntegerField(db_index=True, null=True)
     tiley = models.IntegerField(db_index=True, null=True)
     tilez = models.IntegerField(db_index=True, null=True, choices=ZOOMLEVELS)

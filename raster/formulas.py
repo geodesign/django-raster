@@ -1,6 +1,10 @@
 import numpy
 from pyparsing import CaselessLiteral, Combine, Forward, Literal, Optional, Word, ZeroOrMore, alphas, nums
 
+from django.contrib.gis.gdal import GDALRaster
+
+from .const import GDAL_TO_NUMPY_PIXEL_TYPES
+
 
 class FormulaParser(object):
     """
@@ -22,13 +26,13 @@ class FormulaParser(object):
         "/": numpy.divide,
         "^": numpy.power,
         "==": numpy.equal,
+        "!=": numpy.not_equal,
         ">": numpy.greater,
         ">=": numpy.greater_equal,
         "<": numpy.less,
         "<=": numpy.less_equal,
         "|": numpy.logical_or,
-        "&": numpy.logical_and,
-        "!": numpy.logical_not,
+        "&": numpy.logical_and
     }
 
     # Map function names to python functions
@@ -66,17 +70,17 @@ class FormulaParser(object):
         mult = Literal("*")
         div = Literal("/")
         eq = Literal("==")
+        neq = Literal("!=")
         lt = Literal("<")
         le = Literal("<=")
         gt = Literal(">")
         ge = Literal(">=")
         ior = Literal("|")
         iand = Literal("&")
-        inot = Literal("!")
         lpar = Literal("(").suppress()
         rpar = Literal(")").suppress()
         addop = plus | minus | eq
-        multop = mult | div | ge | le | gt | lt | ior | iand | inot  # Order matters here due to "<=" being caught by "<"
+        multop = mult | div | eq | neq | ge | le | gt | lt | ior | iand  # Order matters here due to "<=" being caught by "<"
         expop = Literal("^")
         pi = CaselessLiteral("PI")
 
@@ -111,12 +115,12 @@ class FormulaParser(object):
         bnf = Forward()
 
         atom = (
-            Optional("-") + (
-                pi | e | fnumber | ident + lpar + bnf + rpar |  # pi needs to be before the letters, for it to be found
+            Optional('-') + Optional("!") + (
+                pi | e | fnumber | ident + lpar + bnf + rpar |  # pi needs to be before the letters for it to be found
                 aa | bb | cc | dd | ee | ff | gg | hh | ii | jj | kk | ll | mm |
                 nn | oo | pp | qq | rr | ss | tt | uu | vv | ww | xx | yy | zz
             ).setParseAction(self.push_first) | (lpar + bnf.suppress() + rpar)
-        ).setParseAction(self.push_unary_minus)
+        ).setParseAction(self.push_unary_operator)
 
         # By defining exponentiation as "atom [ ^ factor ]..." instead of "atom [ ^ atom ]...",
         # we get right-to-left exponents, instead of left-to-righ
@@ -132,25 +136,38 @@ class FormulaParser(object):
     def push_first(self, strg, loc, toks):
         self.expr_stack.append(toks[0])
 
-    def push_unary_minus(self, strg, loc, toks):
-        if toks and toks[0] == '-':
-            self.expr_stack.append('unary -')
+    def push_unary_operator(self, strg, loc, toks):
+        """
+        Sets custom flag for unary operators.
+        """
+        if toks:
+            if toks[0] == '-':
+                self.expr_stack.append('unary -')
+            elif toks[0] == '!':
+                self.expr_stack.append('unary !')
 
     def evaluate_stack(self, stack):
         """
         Evaluate a stack element.
         """
+        # Get operator element
         op = stack.pop()
+
+        # Evaluate unary operators
         if op == 'unary -':
             return -self.evaluate_stack(stack)
-        if op in ["+", "-", "*", "/", "^", ">", "<", "==", "<=", ">=", "|", "&", "!"]:
+        if op == 'unary !':
+            return numpy.logical_not(self.evaluate_stack(stack))
+
+        # Evaluate binary operators
+        if op in ["+", "-", "*", "/", "^", ">", "<", "==", "!=", "<=", ">=", "|", "&", "!"]:
             op2 = self.evaluate_stack(stack)
             op1 = self.evaluate_stack(stack)
             return self.opn[op](op1, op2)
         elif op == "PI":
-            return numpy.pi  # 3.1415926535
+            return numpy.pi
         elif op == "E":
-            return numpy.e  # 2.718281828
+            return numpy.e
         elif op in self.fn:
             return self.fn[op](self.evaluate_stack(stack))
         elif op[0].isalpha() and len(op[0]) == 1 and op[0] in self.data:
@@ -158,7 +175,8 @@ class FormulaParser(object):
         elif op[0].isalpha() and len(op[0]) == 1:
             raise Exception('Found an undeclared variable in formula.')
         else:
-            return numpy.array(float(op))
+            # If numeric, convert to numpy float
+            return numpy.array(op, dtype='float')
 
     def parse_formula(self, formula):
         """
@@ -217,25 +235,38 @@ class RasterAlgebraParser(FormulaParser):
         # Construct list of numpy arrays holding raster pixel data
         if mask:
             data_arrays = {
-                name: numpy.ma.masked_values(rast.bands[0].data().ravel(), rast.bands[0].nodata_value)
-                for name, rast in data.items()
+                key: numpy.ma.masked_values(rast.bands[0].data().ravel(), rast.bands[0].nodata_value)
+                for key, rast in data.items()
             }
         else:
-            data_arrays = {name: rast.bands[0].data().ravel() for name, rast in data.items()}
+            data_arrays = {key: rast.bands[0].data().ravel() for key, rast in data.items()}
 
         # Evaluate formula on raster data
-        algebra_result = self.evaluate_formula(formula, data_arrays)
+        result = self.evaluate_formula(formula, data_arrays)
 
-        # Copy one raster to hold results
-        result = data.values()[0].warp({'name': 'algebra_result'})
+        # Reference first original raster for constructing result
+        orig = data.values()[0]
+        orig_band = orig.bands[0]
 
-        # Make sure algebra result has the correct data type
-        algebra_result = algebra_result.astype(data_arrays.values()[0].dtype)
+        # Convert to default number type
+        result = result.astype(GDAL_TO_NUMPY_PIXEL_TYPES[orig_band.datatype()])
 
-        # Write result to a target raster
-        result.bands[0].data(algebra_result)
-
-        return result
+        # Return GDALRaster holding results
+        return GDALRaster({
+            'datatype': orig_band.datatype(),
+            'driver': 'MEM',
+            'width': orig.width,
+            'height': orig.height,
+            'nr_of_bands': 1,
+            'srid': orig.srs.srid,
+            'origin': orig.origin,
+            'scale': orig.scale,
+            'skew': orig.skew,
+            'bands': [{
+                'nodata_value': orig_band.nodata_value,
+                'data': result
+            }],
+        })
 
     def check_aligned(self, rasters):
         """
@@ -244,5 +275,6 @@ class RasterAlgebraParser(FormulaParser):
         if not len(set([x.srs.srid for x in rasters])) == 1:
             raise Exception('Raster aligment check failed: SRIDs not all the same')
 
-        if not len(set([x.origin.x for x in rasters])) == 1:
-            raise Exception('Raster aligment check failed: Origins are not all the same')
+        gt = rasters[0].geotransform
+        if any([gt != rast.geotransform for rast in rasters[1:]]):
+            raise Exception('Raster aligment check failed: geotransform arrays are not all the same')

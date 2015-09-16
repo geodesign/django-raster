@@ -1,9 +1,14 @@
+from collections import Counter
+
 import numpy
 
-from django.contrib.gis.geos import GEOSGeometry
+from django.contrib.gis.geos import GEOSGeometry, MultiPolygon, Polygon
 from django.db import connection
-from raster.const import WEB_MERCATOR_SRID
-from raster.rasterize import rasterize
+
+from .const import WEB_MERCATOR_SRID
+from .formulas import RasterAlgebraParser
+from .rasterize import rasterize
+from .tiler import tile_index_range
 
 
 CLIPPED_VALUE_COUNT_SQL = """
@@ -46,6 +51,104 @@ SELECT MAX(tilez)
 FROM raster_rastertile
 WHERE rasterlayer_id={rasterlayer_id}
 """
+
+
+def aggregator(layer_dict, zoom, geom=None, formula=None, acres=True):
+    """
+    Compute aggregate statistics for a layers dictionary, potentially for
+    an algebra expression and clipped by a geometry.
+    """
+    from .models import RasterLayer, RasterTile
+
+    parser = RasterAlgebraParser()
+
+    # Get layers
+    layers = RasterLayer.objects.filter(id__in=layer_dict.values())
+
+    # Compute tilerange for this area and the given zoom level
+    if geom:
+        # Transform geom to web mercator
+        if geom.srid != WEB_MERCATOR_SRID:
+            geom.transform(WEB_MERCATOR_SRID)
+
+        # Clip against max extent for limiting nr of tiles.
+        # This is important for requests on large areas for small rasters.
+        max_extent = MultiPolygon([Polygon.from_bbox(lyr.extent()) for lyr in layers]).envelope
+        max_extent = geom.intersection(max_extent)
+
+        # Compute tile index range for geometry and given zoom level
+        tilerange = tile_index_range(max_extent.extent, zoom)
+    else:
+        # Get index range set for the input layers
+        index_ranges = [lyr.index_range(zoom) for lyr in layers]
+
+        # Compute intersection of index ranges
+        tilerange = [
+            max([dat['tilex__min'] for dat in index_ranges]),
+            max([dat['tiley__min'] for dat in index_ranges]),
+            min([dat['tilex__max'] for dat in index_ranges]),
+            min([dat['tiley__max'] for dat in index_ranges])
+        ]
+
+    # Loop through tiles and evaluate raster algebra for each tile
+    results = Counter({})
+    rastgeom = None
+    for tilex in range(tilerange[0], tilerange[2] + 1):
+        for tiley in range(tilerange[1], tilerange[3] + 1):
+            # Prepare a data dictionary with named tiles for algebra evaluation
+            data = {}
+            for name, layerid in layer_dict.items():
+                tile = RasterTile.objects.filter(
+                    tilex=tilex,
+                    tiley=tiley,
+                    tilez=zoom,
+                    rasterlayer_id=layerid
+                ).first()
+                if tile:
+                    data[name] = tile.rast
+                else:
+                    # Ignore this tile if any layer has no data for it
+                    break
+
+            if data != {}:
+                # Evaluate algebra on tiles
+                result = parser.evaluate_raster_algebra(data, formula, mask=False)
+                result_data = numpy.ma.masked_values(result.bands[0].data(), result.bands[0].nodata_value)
+                if geom:
+                    # Rasterize the aggregation area to the result raster
+                    rastgeom = rasterize(geom, result)
+
+                    # Get boolean mask based on rasterized geom
+                    rastgeom_mask = rastgeom.bands[0].data() == 1
+
+                    # Compute unique counts constrained with the rasterized geom
+                    result = numpy.unique(result_data[rastgeom_mask], return_counts=True)
+                else:
+                    result = numpy.unique(result_data, return_counts=True)
+
+                # Handle continuous case
+                # if self.discrete:
+                    # # Compute unique value counts for discrete rasters
+                    # values, counts = numpy.unique(tile_data, return_counts=True)
+                # else:
+                    # # Compute histogram for continuous rasters
+                    # counts, bins = numpy.histogram(tile_data)
+                    # # Compute bin labels
+                    # values = []
+                    # for i in range(len(bins) - 1):
+                    #     values.append((bins[i], bins[i + 1]))
+
+                # Add counts to results
+                results += Counter(dict(zip(result[0], result[1])))
+
+    # Transform pixel count to acres if requested
+    scaling_factor = 1
+    if acres and rastgeom and len(result):
+        scaling_factor = abs(rastgeom.scale.x * rastgeom.scale.y) * 0.000247105381
+
+    results = {str(k): v * scaling_factor for k, v in results.iteritems()}
+
+    return results
 
 
 class ValueCountMixin(object):
@@ -135,40 +238,8 @@ class ValueCountMixin(object):
         if not zoom:
             zoom = self._max_zoom
 
-        # Get raster tiles
-        if geom:
-            if geom.srid != WEB_MERCATOR_SRID:
-                geom.transform(WEB_MERCATOR_SRID)
+        # Setup layer id and formula for evaluation of aggregator
+        ids = {'a': self.id}
+        formula = 'a'
 
-            # Filter tiles by geometry intersection
-            tiles = self.rastertile_set.raw(
-                "SELECT * FROM raster_rastertile "
-                "WHERE ST_Intersects(rast, ST_GeomFromEWKT('{geom_ewkt}')) "
-                "AND tilez={zoom} "
-                "AND rasterlayer_id={rstid}"
-                .format(geom_ewkt=geom.ewkt, zoom=zoom, rstid=self.id)
-            )
-            rastgeom = rasterize(geom, tiles[0].rast)
-            tile_data = [tile.rast.bands[0].data()[rastgeom.bands[0].data() == 1] for tile in tiles]
-        else:
-            tiles = self.rastertile_set.filter(tilez=zoom)
-            tile_data = [tile.rast.bands[0].data() for tile in tiles]
-
-        if self.discrete:
-            # Compute unique value counts for discrete rasters
-            values, counts = numpy.unique(tile_data, return_counts=True)
-        else:
-            # Compute histogram for continuous rasters
-            counts, bins = numpy.histogram(tile_data)
-            # Compute bin labels
-            values = []
-            for i in range(len(bins) - 1):
-                values.append((bins[i], bins[i + 1]))
-
-        # If requested, convert counts into area
-        if area:
-            # Get scale of rasters in the geometry projection
-            scalex, scaley = self.pixelsize(geom.srid, zoom)
-            counts = counts * scalex * scaley
-
-        return dict(zip(values, counts))
+        return aggregator(ids, zoom, geom, formula, acres=area)
