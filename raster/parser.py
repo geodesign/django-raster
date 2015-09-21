@@ -200,8 +200,11 @@ class RasterLayerParser(object):
             self.rasterlayer.rastertile_set.all().delete()
 
             # Transform raster to global srid
-            self.log('Transforming raster to SRID {0}'.format(WEB_MERCATOR_SRID))
-            self.dataset = self.dataset.transform(WEB_MERCATOR_SRID)
+            if self.dataset.srs.srid == WEB_MERCATOR_SRID:
+                self.log('Dataset already in SRID {0}, skipping transform'.format(WEB_MERCATOR_SRID))
+            else:
+                self.log('Transforming raster to SRID {0}'.format(WEB_MERCATOR_SRID))
+                self.dataset = self.dataset.transform(WEB_MERCATOR_SRID)
 
             # Compute max zoom based on scale of input raster
             max_zoom = tiler.closest_zoomlevel(
