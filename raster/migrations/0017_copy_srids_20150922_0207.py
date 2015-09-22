@@ -12,7 +12,7 @@ def move_srid_from_layer_to_metadata_forward(apps, schema_editor):
     RasterLayer = apps.get_model("raster", "RasterLayer")
     RasterLayerMetadata = apps.get_model("raster", "RasterLayerMetadata")
     for lyr in RasterLayer.objects.all():
-        meta = RasterLayerMetadata.objects.get_or_create(rasterlayer=lyr)
+        meta, created = RasterLayerMetadata.objects.get_or_create(rasterlayer=lyr)
         meta.srid = lyr.srid
         meta.save()
 
