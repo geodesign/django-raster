@@ -45,7 +45,6 @@ class RasterTestCase(TestCase):
                 name='Raster data',
                 description='Small raster for testing',
                 datatype='ca',
-                srid='3086',
                 nodata='255',
                 rasterfile=rasterfile,
                 legend=leg
@@ -55,7 +54,6 @@ class RasterTestCase(TestCase):
             name='Raster data',
             description='Small raster for testing',
             datatype='ca',
-            srid='3086',
             nodata='0',
         )
         # Setup query urls for tests

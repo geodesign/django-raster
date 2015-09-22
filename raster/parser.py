@@ -107,8 +107,7 @@ class RasterLayerParser(object):
         """
         Exports the input raster meta data to a RasterLayerMetadata object.
         """
-        lyrmeta = RasterLayerMetadata.objects.get_or_create(
-            rasterlayer=self.rasterlayer)[0]
+        lyrmeta = RasterLayerMetadata.objects.get_or_create(rasterlayer=self.rasterlayer)[0]
         lyrmeta.uperleftx = self.dataset.origin.x
         lyrmeta.uperlefty = self.dataset.origin.y
         lyrmeta.width = self.dataset.width
@@ -118,6 +117,8 @@ class RasterLayerParser(object):
         lyrmeta.skewx = self.dataset.skew.x
         lyrmeta.skewy = self.dataset.skew.y
         lyrmeta.numbands = len(self.dataset.bands)
+        lyrmeta.srs_wkt = self.dataset.srs.wkt
+        lyrmeta.srid = self.dataset.srs.srid
         lyrmeta.save()
 
     def create_tiles(self, zoom):
