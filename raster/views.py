@@ -257,5 +257,9 @@ class LegendView(RasterView):
             lyr = self.get_layer()
             if lyr.legend:
                 legend = lyr.legend
+            else:
+                raise Http404
+        else:
+            raise Http404
 
         return HttpResponse(legend.json, content_type='application/json')

@@ -26,7 +26,7 @@ urlpatterns = [
 
     # Raster legend endpoint
     url(
-        r'^legend/(?:/(?P<legend_id>[^/]+)/)?$',
+        r'^legend(?:/(?P<legend_id>[^/]+))?/$',
         cache_page(cache_timeout)(LegendView.as_view()),
         name='legend'
     ),

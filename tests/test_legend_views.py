@@ -12,8 +12,18 @@ class RasterLegendViewTests(RasterTestCase):
         self.assertEqual(response.content, '[{"color": "#123456", "expression": "4", "name": "Earth"}]')
         self.assertEqual(response.status_code, 200)
 
-    def test_tms_legend_url_error(self):
+    def test_tms_legend_url_error_wrong_legend_id(self):
         url = reverse('legend', kwargs={'legend_id': '9999'})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
+    def test_tms_legend_url_error_wrong_raster_id(self):
+        url = reverse('legend') + '?layer=9999'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
+    def test_tms_legend_url_error_no_id(self):
+        url = reverse('legend')
         response = self.client.get(url)
         self.assertEqual(response.status_code, 404)
 
