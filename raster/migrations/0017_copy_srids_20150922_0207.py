@@ -10,8 +10,9 @@ def move_srid_from_layer_to_metadata_forward(apps, schema_editor):
     be overwritten automatically when parsing the layer.
     """
     RasterLayer = apps.get_model("raster", "RasterLayer")
+    RasterLayerMetadata = apps.get_model("raster", "RasterLayerMetadata")
     for lyr in RasterLayer.objects.all():
-        meta = lyr.rasterlayermetadata
+        meta = RasterLayerMetadata.objects.get_or_create(rasterlayer=lyr)
         meta.srid = lyr.srid
         meta.save()
 
@@ -22,9 +23,9 @@ def move_srid_from_layer_to_metadata_backward(apps, schema_editor):
     """
     RasterLayer = apps.get_model("raster", "RasterLayer")
     for lyr in RasterLayer.objects.all():
-        meta = lyr.rasterlayermetadata
-        lyr.srid = meta.srid
-        lyr.save()
+        if hasattr(lyr, 'rasterlayermetadata'):
+            lyr.srid = lyr.rasterlayermetadata.srid
+            lyr.save()
 
 
 class Migration(migrations.Migration):
