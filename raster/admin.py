@@ -28,6 +28,7 @@ class TestInline(admin.TabularInline):
     def has_delete_permission(self, request, obj=None):
         return False
 
+
 class RasterLayerModelAdmin(admin.ModelAdmin):
     """
     Admin action to update filepaths only. Files can be uploadded to the
