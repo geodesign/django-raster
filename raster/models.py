@@ -161,7 +161,10 @@ class RasterLayer(models.Model, ValueCountMixin):
             geom = OGRGeometry(Envelope((xmin, ymin, xmax, ymax)).wkt)
 
             # Set original srs
-            geom.srs = SpatialReference(meta.srs_wkt)
+            if meta.srs_wkt:
+                geom.srs = SpatialReference(meta.srs_wkt)
+            else:
+                geom.srid = meta.srid
 
             # Transform to requested srid
             geom.transform(srid)
