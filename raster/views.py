@@ -117,7 +117,12 @@ class RasterView(View):
         Gets layer from request data trying both name and id.
         """
         if not data:
-            data = self.kwargs.get('layer')
+            if 'layer' in self.kwargs:
+                data = self.kwargs.get('layer')
+            elif 'layer' in self.request.GET:
+                data = self.request.GET.get('layer')
+            else:
+                raise Http404
 
         try:
             data = int(data)
@@ -239,19 +244,18 @@ class TmsView(RasterView):
 
 class LegendView(RasterView):
 
-    def get(self, request, layer_or_legend_name):
+    def get(self, request, legend_id):
         """
         Returns the legend for this layer as a json string. The legend is a list of
         legend entries with the attributes "name", "expression" and "color".
         """
-        try:
-            lyr = self.get_layer(layer_or_legend_name)
+        if(legend_id):
+            # Get legend from id
+            legend = get_object_or_404(Legend, id=legend_id)
+        elif 'layer' in request.GET:
+            # If layer query parameter was provided, get legend from layer
+            lyr = self.get_layer()
             if lyr.legend:
                 legend = lyr.legend
-        except Http404:
-            try:
-                legend = Legend.objects.get(title__iexact=layer_or_legend_name)
-            except Legend.DoesNotExist:
-                raise Http404()
 
         return HttpResponse(legend.json, content_type='application/json')
