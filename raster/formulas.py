@@ -3,7 +3,7 @@ from pyparsing import CaselessLiteral, Combine, Forward, Literal, Optional, Word
 
 from django.contrib.gis.gdal import GDALRaster
 
-from .const import GDAL_TO_NUMPY_PIXEL_TYPES
+from .const import ALGEBRA_PIXEL_TYPE_GDAL, ALGEBRA_PIXEL_TYPE_NUMPY
 
 
 class FormulaParser(object):
@@ -176,7 +176,7 @@ class FormulaParser(object):
             raise Exception('Found an undeclared variable in formula.')
         else:
             # If numeric, convert to numpy float
-            return numpy.array(op, dtype='float')
+            return numpy.array(op, dtype=ALGEBRA_PIXEL_TYPE_NUMPY)
 
     def parse_formula(self, formula):
         """
@@ -241,19 +241,16 @@ class RasterAlgebraParser(FormulaParser):
         # Evaluate formula on raster data
         result = self.evaluate_formula(formula, data_arrays)
 
-        # Determine datatype of result raster (take the most complex datatype in dataset)
-        result_datatype = max([x.bands[0].datatype() for x in data.values()])
-
         # Reference first original raster for constructing result
         orig = data.values()[0]
         orig_band = orig.bands[0]
 
         # Convert to default number type
-        result = result.astype(GDAL_TO_NUMPY_PIXEL_TYPES[result_datatype])
+        result = result.astype(ALGEBRA_PIXEL_TYPE_NUMPY)
 
         # Return GDALRaster holding results
         return GDALRaster({
-            'datatype': result_datatype,
+            'datatype': ALGEBRA_PIXEL_TYPE_GDAL,
             'driver': 'MEM',
             'width': orig.width,
             'height': orig.height,

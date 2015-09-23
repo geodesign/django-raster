@@ -152,8 +152,10 @@ def aggregator(layer_dict, zoom, geom=None, formula=None, acres=True):
     scaling_factor = 1
     if acres and rastgeom and len(results):
         scaling_factor = abs(rastgeom.scale.x * rastgeom.scale.y) * 0.000247105381
-
-    results = {str(k): v * scaling_factor for k, v in results.iteritems()}
+    results = {
+        str(int(k) if type(k) == numpy.float64 and int(k) == k else k):
+        v * scaling_factor for k, v in results.iteritems()
+    }
 
     return results
 
