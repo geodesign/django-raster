@@ -80,7 +80,7 @@ class FormulaParserTests(TestCase):
         self.assertFormulaResult("sin(x)", numpy.sin(data['x']), data)
         self.assertFormulaResult("cos(x)", numpy.cos(data['x']), data)
         self.assertFormulaResult("tan(x)", numpy.tan(data['x']), data)
-        self.assertFormulaResult("log(x)", numpy.log(data['x']), data)
+        self.assertFormulaResult("log(a)", numpy.log(data['a']), data)
         self.assertFormulaResult("abs(x)", numpy.abs(data['x']), data)
         self.assertFormulaResult("round(x)", numpy.round(data['x']), data)
         self.assertFormulaResult("sign(x)", numpy.sign(data['x']), data)

@@ -123,3 +123,11 @@ class RasterValueCountTests(RasterTestCase):
             self.rasterlayer.db_value_count(zoom=9),
             expected
         )
+
+    def test_value_count_for_continuous_raster(self):
+        self.rasterlayer.datatype = 'co'
+        self.rasterlayer.save()
+        self.assertEqual(
+            self.rasterlayer.value_count(),
+            {'(0.0, 0.90000000000000002)': 221445, '(8.0999999999999996, 9.0)': 2977, '(1.8, 2.7000000000000002)': 56, '(0.90000000000000002, 1.8)': 695, '(2.7000000000000002, 3.6000000000000001)': 4131, '(7.2000000000000002, 8.0999999999999996)': 1350, '(3.6000000000000001, 4.5)': 31490}
+        )

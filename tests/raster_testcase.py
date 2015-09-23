@@ -60,6 +60,7 @@ class RasterTestCase(TestCase):
         self.tile = self.rasterlayer.rastertile_set.get(tilez=11, tilex=552, tiley=858)
         self.tile_url = reverse('tms', kwargs={'z': self.tile.tilez, 'y': self.tile.tiley, 'x': self.tile.tilex, 'layer': 'raster.tif', 'format': '.png'})
         self.algebra_tile_url = reverse('algebra', kwargs={'z': self.tile.tilez, 'y': self.tile.tiley, 'x': self.tile.tilex, 'format': '.png'})
+
         # Instantiate test client
         self.client = Client()
 
