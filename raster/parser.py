@@ -138,19 +138,40 @@ class RasterLayerParser(object):
         # Count the number of tiles that are required to cover the raster at this zoomlevel
         nr_of_tiles = (indexrange[2] - indexrange[0] + 1) * (indexrange[3] - indexrange[1] + 1)
 
+        # Create destination raster file
+        self.log('Snapping dataset to zoom level {0}'.format(zoom))
+
+        bounds = tiler.tile_bounds(indexrange[0], indexrange[1], zoom)
+        sizex = (indexrange[2] - indexrange[0] + 1) * self.tilesize
+        sizey = (indexrange[3] - indexrange[1] + 1) * self.tilesize
+        dest_file = os.path.join(self.tmpdir, 'djangowarpedraster' + str(zoom) + '.tif')
+
+        snapped_dataset = self.dataset.warp({
+            'name': dest_file,
+            'origin': [bounds[0], bounds[3]],
+            'scale': [tilescale, -tilescale],
+            'width': sizex,
+            'height': sizey,
+        })
+
         self.log('Creating {0} tiles for zoom {1}.'.format(nr_of_tiles, zoom))
 
+        counter = 0
         for tilex in range(indexrange[0], indexrange[2] + 1):
             for tiley in range(indexrange[1], indexrange[3] + 1):
+                # Log progress
+                counter += 1
+                if counter % 250 == 0:
+                    self.log('{0} tiles created at zoom {1}'.format(counter, zoom))
+
                 # Calculate raster tile origin
                 bounds = tiler.tile_bounds(tilex, tiley, zoom)
 
                 # Warp source raster into this tile (in memory)
-                dest = self.dataset.warp({
+                dest = snapped_dataset.warp({
                     'driver': 'MEM',
                     'width': self.tilesize,
                     'height': self.tilesize,
-                    'scale': [tilescale, -tilescale],
                     'origin': [bounds[0], bounds[3]],
                 })
 
