@@ -152,7 +152,7 @@ class RasterLayer(models.Model, ValueCountMixin):
         """
         if not self._bbox:
             # Get bbox for raster in original coordinates
-            meta = self.rasterlayermetadata
+            meta = self.metadata
             xmin = meta.uperleftx
             ymax = meta.uperlefty
             xmax = xmin + meta.width * meta.scalex
@@ -216,7 +216,7 @@ class RasterLayerMetadata(models.Model):
     """
     Stores meta data for a raster layer
     """
-    rasterlayer = models.OneToOneField(RasterLayer)
+    rasterlayer = models.OneToOneField(RasterLayer, related_name='metadata')
     uperleftx = models.FloatField(null=True, blank=True)
     uperlefty = models.FloatField(null=True, blank=True)
     width = models.IntegerField(null=True, blank=True)
@@ -228,6 +228,7 @@ class RasterLayerMetadata(models.Model):
     numbands = models.IntegerField(null=True, blank=True)
     srs_wkt = models.TextField(null=True, blank=True)
     srid = models.PositiveSmallIntegerField(null=True, blank=True)
+    max_zoom = models.PositiveSmallIntegerField(null=True, blank=True)
 
     def __str__(self):
         return self.rasterlayer.name

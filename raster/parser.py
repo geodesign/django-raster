@@ -119,6 +119,11 @@ class RasterLayerParser(object):
         lyrmeta.numbands = len(self.dataset.bands)
         lyrmeta.srs_wkt = self.dataset.srs.wkt
         lyrmeta.srid = self.dataset.srs.srid
+        lyrmeta.max_zoom = tiler.closest_zoomlevel(
+            abs(self.dataset.scale.x),
+            self.zoomdown
+        )
+
         lyrmeta.save()
 
     def create_tiles(self, zoom):
@@ -225,15 +230,9 @@ class RasterLayerParser(object):
                 self.log('Transforming raster to SRID {0}'.format(WEB_MERCATOR_SRID))
                 self.dataset = self.dataset.transform(WEB_MERCATOR_SRID)
 
-            # Compute max zoom based on scale of input raster
-            max_zoom = tiler.closest_zoomlevel(
-                abs(self.dataset.scale.x),
-                self.zoomdown
-            )
-
             # Loop through all lower zoom levels and create tiles to
             # setup TMS aligned tiles in world mercator
-            for iz in range(max_zoom + 1):
+            for iz in range(self.rasterlayer.metadata.max_zoom + 1):
                 self.create_tiles(iz)
 
             self.drop_empty_rasters()
