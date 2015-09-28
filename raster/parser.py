@@ -52,7 +52,8 @@ class RasterLayerParser(object):
         """
         self.log('Getting raster file from storage')
 
-        self.tmpdir = tempfile.mkdtemp()
+        raster_workdir = getattr(settings, 'RASTER_WORKDIR', None)
+        self.tmpdir = tempfile.mkdtemp(dir=raster_workdir)
 
         # Access rasterfile and store in a temp folder
         rasterfile = open(os.path.join(self.tmpdir, self.rastername), 'wb')
