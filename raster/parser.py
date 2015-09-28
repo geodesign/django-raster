@@ -190,6 +190,10 @@ class RasterLayerParser(object):
                     tilez=zoom
                 )
 
+        # Remove snapped dataset
+        self.log('Removing snapped dataset.')
+        os.remove(dest_file)
+
     def drop_empty_rasters(self):
         """
         Remove rasters that are only no-data from the current rasterlayer.
