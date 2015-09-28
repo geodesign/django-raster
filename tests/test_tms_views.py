@@ -20,7 +20,7 @@ class RasterTmsTests(RasterTestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_tms_nonexisting_tile(self):
-        url = reverse('tms', kwargs={'z': 100, 'y': 0, 'x': 0, 'layer': 'raster.tif', 'format': '.png'})
+        url = reverse('tms', kwargs={'z': 100, 'y': 0, 'x': 0, 'layer': self.rasterlayer.id, 'format': '.png'})
         response = self.client.get(url)
         self.assertEqual(response['Content-type'], 'PNG')
         self.assertEqual(
@@ -28,6 +28,12 @@ class RasterTmsTests(RasterTestCase):
             EMPTY_TILE
         )
         self.assertEqual(response.status_code, 200)
+
+    def test_tms_duplicated_layer_filename(self):
+        url = reverse('tms', kwargs={'z': 100, 'y': 0, 'x': 0, 'layer': 'raster.tif', 'format': '.png'})
+        DUPL_MSG = 'get() returned more than one RasterLayer -- it returned 2!'
+        with self.assertRaisesMessage(Exception, DUPL_MSG):
+            self.client.get(url)
 
     def test_tms_existing_tile(self):
         # Get tms tile rendered with legend

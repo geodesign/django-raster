@@ -3,6 +3,7 @@ import numpy
 from django.contrib.gis.geos import Polygon
 from django.test.utils import override_settings
 from raster.const import WEB_MERCATOR_SRID
+from raster.valuecount import aggregator
 
 from .raster_testcase import RasterTestCase
 
@@ -139,3 +140,14 @@ class RasterValueCountTests(RasterTestCase):
                 '(3.6000000000000001, 4.5)': 31490
             }
         )
+
+
+class RasterAggregatorTests(RasterTestCase):
+
+    def test_layer_with_no_tiles(self):
+        result = aggregator(
+            layer_dict={'a': self.rasterlayer.id, 'b': self.empty_rasterlayer.id},
+            zoom=7,
+            formula='a*b'
+        )
+        self.assertDictEqual(result, {})

@@ -80,14 +80,14 @@ def aggregator(layer_dict, zoom, geom=None, formula=None, acres=True):
         tilerange = tile_index_range(max_extent.extent, zoom)
     else:
         # Get index range set for the input layers
-        index_ranges = [lyr.index_range(zoom) for lyr in layers]
+        index_ranges = [tile_index_range(lyr.extent(), zoom) for lyr in layers]
 
         # Compute intersection of index ranges
         tilerange = [
-            max([dat['tilex__min'] for dat in index_ranges]),
-            max([dat['tiley__min'] for dat in index_ranges]),
-            min([dat['tilex__max'] for dat in index_ranges]),
-            min([dat['tiley__max'] for dat in index_ranges])
+            max([dat[0] for dat in index_ranges]),
+            max([dat[1] for dat in index_ranges]),
+            min([dat[2] for dat in index_ranges]),
+            min([dat[3] for dat in index_ranges])
         ]
 
     # Check if all input layers are discrete
@@ -98,6 +98,7 @@ def aggregator(layer_dict, zoom, geom=None, formula=None, acres=True):
     rastgeom = None
     for tilex in range(tilerange[0], tilerange[2] + 1):
         for tiley in range(tilerange[1], tilerange[3] + 1):
+
             # Prepare a data dictionary with named tiles for algebra evaluation
             data = {}
             for name, layerid in layer_dict.items():
@@ -110,48 +111,54 @@ def aggregator(layer_dict, zoom, geom=None, formula=None, acres=True):
                 if tile:
                     data[name] = tile.rast
                 else:
-                    # Ignore this tile if any layer has no data for it
                     break
 
-            if data != {}:
-                # Evaluate algebra on tiles
-                result = parser.evaluate_raster_algebra(data, formula)
+            # Ignore this tile if it is missing in any of the input layers
+            if len(data) < len(layer_dict):
+                continue
 
-                # Get resulting array masked with na values
-                result_data = numpy.ma.masked_values(result.bands[0].data(), result.bands[0].nodata_value)
+            # Evaluate algebra on tiles
+            result = parser.evaluate_raster_algebra(data, formula)
 
-                # Apply rasterized geometry as mask if clip geometry was provided
-                if geom:
-                    # Rasterize the aggregation area to the result raster
-                    rastgeom = rasterize(geom, result)
+            # Get resulting array masked with na values
+            result_data = numpy.ma.masked_values(
+                result.bands[0].data(),
+                result.bands[0].nodata_value
+            )
 
-                    # Get boolean mask based on rasterized geom
-                    rastgeom_mask = rastgeom.bands[0].data() != 1
+            # Apply rasterized geometry as mask if clip geometry was provided
+            if geom:
+                # Rasterize the aggregation area to the result raster
+                rastgeom = rasterize(geom, result)
 
-                    # Apply geometry mask to result data
-                    result_data.mask = result_data.mask | rastgeom_mask
+                # Get boolean mask based on rasterized geom
+                rastgeom_mask = rastgeom.bands[0].data() != 1
 
-                # Compute unique counts for discrete input data
-                if all_discrete:
-                    unique_counts = numpy.unique(result_data, return_counts=True)
-                    # Add counts to results
-                    results += Counter(dict(zip(unique_counts[0], unique_counts[1])))
-                else:
-                    # Handle continuous case - compute histogram
-                    counts, bins = numpy.histogram(result_data)
+                # Apply geometry mask to result data
+                result_data.mask = result_data.mask | rastgeom_mask
 
-                    # Create dictionary with bins as keys and histogram counts as values
-                    values = {}
-                    for i in range(len(bins) - 1):
-                        values[(bins[i], bins[i + 1])] = counts[i]
+            # Compute unique counts for discrete input data
+            if all_discrete:
+                unique_counts = numpy.unique(result_data, return_counts=True)
+                # Add counts to results
+                results += Counter(dict(zip(unique_counts[0], unique_counts[1])))
+            else:
+                # Handle continuous case - compute histogram
+                counts, bins = numpy.histogram(result_data)
 
-                    # Add counts to results
-                    results += Counter(values)
+                # Create dictionary with bins as keys and histogram counts as values
+                values = {}
+                for i in range(len(bins) - 1):
+                    values[(bins[i], bins[i + 1])] = counts[i]
+
+                # Add counts to results
+                results += Counter(values)
 
     # Transform pixel count to acres if requested
     scaling_factor = 1
     if acres and rastgeom and len(results):
         scaling_factor = abs(rastgeom.scale.x * rastgeom.scale.y) * 0.000247105381
+
     results = {
         str(int(k) if type(k) == numpy.float64 and int(k) == k else k):
         v * scaling_factor for k, v in results.iteritems()
