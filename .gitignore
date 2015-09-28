@@ -11,3 +11,6 @@
 # Distribution
 dist
 django_raster.egg-info
+
+# Docs build
+docs/_build
