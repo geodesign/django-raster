@@ -14,7 +14,7 @@ from raster import tiler
 from raster.const import WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE
 from raster.models import RasterLayerMetadata, RasterTile
 
-rasterlayers_parser_started = Signal(providing_args=['instance'])
+rasterlayers_parser_ended = Signal(providing_args=['instance'])
 
 
 class RasterLayerParser(object):
@@ -52,7 +52,8 @@ class RasterLayerParser(object):
         """
         self.log('Getting raster file from storage')
 
-        self.tmpdir = tempfile.mkdtemp()
+        raster_workdir = getattr(settings, 'RASTER_WORKDIR', None)
+        self.tmpdir = tempfile.mkdtemp(dir=raster_workdir)
 
         # Access rasterfile and store in a temp folder
         rasterfile = open(os.path.join(self.tmpdir, self.rastername), 'wb')
@@ -107,8 +108,7 @@ class RasterLayerParser(object):
         """
         Exports the input raster meta data to a RasterLayerMetadata object.
         """
-        lyrmeta = RasterLayerMetadata.objects.get_or_create(
-            rasterlayer=self.rasterlayer)[0]
+        lyrmeta = RasterLayerMetadata.objects.get_or_create(rasterlayer=self.rasterlayer)[0]
         lyrmeta.uperleftx = self.dataset.origin.x
         lyrmeta.uperlefty = self.dataset.origin.y
         lyrmeta.width = self.dataset.width
@@ -118,6 +118,9 @@ class RasterLayerParser(object):
         lyrmeta.skewx = self.dataset.skew.x
         lyrmeta.skewy = self.dataset.skew.y
         lyrmeta.numbands = len(self.dataset.bands)
+        lyrmeta.srs_wkt = self.dataset.srs.wkt
+        lyrmeta.srid = self.dataset.srs.srid
+
         lyrmeta.save()
 
     def create_tiles(self, zoom):
@@ -137,19 +140,40 @@ class RasterLayerParser(object):
         # Count the number of tiles that are required to cover the raster at this zoomlevel
         nr_of_tiles = (indexrange[2] - indexrange[0] + 1) * (indexrange[3] - indexrange[1] + 1)
 
+        # Create destination raster file
+        self.log('Snapping dataset to zoom level {0}'.format(zoom))
+
+        bounds = tiler.tile_bounds(indexrange[0], indexrange[1], zoom)
+        sizex = (indexrange[2] - indexrange[0] + 1) * self.tilesize
+        sizey = (indexrange[3] - indexrange[1] + 1) * self.tilesize
+        dest_file = os.path.join(self.tmpdir, 'djangowarpedraster' + str(zoom) + '.tif')
+
+        snapped_dataset = self.dataset.warp({
+            'name': dest_file,
+            'origin': [bounds[0], bounds[3]],
+            'scale': [tilescale, -tilescale],
+            'width': sizex,
+            'height': sizey,
+        })
+
         self.log('Creating {0} tiles for zoom {1}.'.format(nr_of_tiles, zoom))
 
+        counter = 0
         for tilex in range(indexrange[0], indexrange[2] + 1):
             for tiley in range(indexrange[1], indexrange[3] + 1):
+                # Log progress
+                counter += 1
+                if counter % 250 == 0:
+                    self.log('{0} tiles created at zoom {1}'.format(counter, zoom))
+
                 # Calculate raster tile origin
                 bounds = tiler.tile_bounds(tilex, tiley, zoom)
 
                 # Warp source raster into this tile (in memory)
-                dest = self.dataset.warp({
+                dest = snapped_dataset.warp({
                     'driver': 'MEM',
                     'width': self.tilesize,
                     'height': self.tilesize,
-                    'scale': [tilescale, -tilescale],
                     'origin': [bounds[0], bounds[3]],
                 })
 
@@ -162,6 +186,10 @@ class RasterLayerParser(object):
                     tiley=tiley,
                     tilez=zoom
                 )
+
+        # Remove snapped dataset
+        self.log('Removing snapped dataset.')
+        os.remove(dest_file)
 
     def drop_empty_rasters(self):
         """
@@ -189,9 +217,6 @@ class RasterLayerParser(object):
             # Clean previous parse log
             self.log('Started parsing raster file', reset=True)
 
-            # Send signal for start of parsing
-            rasterlayers_parser_started.send(sender=self.rasterlayer.__class__, instance=self.rasterlayer)
-
             # Download, unzip and open raster file
             self.get_raster_file()
             self.open_raster_file()
@@ -200,14 +225,24 @@ class RasterLayerParser(object):
             self.rasterlayer.rastertile_set.all().delete()
 
             # Transform raster to global srid
-            self.log('Transforming raster to SRID {0}'.format(WEB_MERCATOR_SRID))
-            self.dataset = self.dataset.transform(WEB_MERCATOR_SRID)
+            if self.dataset.srs.srid == WEB_MERCATOR_SRID:
+                self.log('Dataset already in SRID {0}, skipping transform'.format(WEB_MERCATOR_SRID))
+            else:
+                self.log('Transforming raster to SRID {0}'.format(WEB_MERCATOR_SRID))
+                self.dataset = self.dataset.transform(WEB_MERCATOR_SRID)
 
-            # Compute max zoom based on scale of input raster
+            # Compute max zoom at the web mercator projection
             max_zoom = tiler.closest_zoomlevel(
-                abs(self.dataset.scale.x),
-                self.zoomdown
+                abs(self.dataset.scale.x)
             )
+
+            # Store max zoom level in metadata
+            self.rasterlayer.metadata.max_zoom = max_zoom
+            self.rasterlayer.metadata.save()
+
+            # Reduce max zoom by one if zoomdown flag was disabled
+            if not self.zoomdown:
+                max_zoom -= 1
 
             # Loop through all lower zoom levels and create tiles to
             # setup TMS aligned tiles in world mercator
@@ -215,6 +250,9 @@ class RasterLayerParser(object):
                 self.create_tiles(iz)
 
             self.drop_empty_rasters()
+
+            # Send signal for end of parsing
+            rasterlayers_parser_ended.send(sender=self.rasterlayer.__class__, instance=self.rasterlayer)
 
             # Log success of parsing
             self.log('Successfully finished parsing raster')

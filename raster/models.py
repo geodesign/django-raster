@@ -4,13 +4,14 @@ from colorful.fields import RGBColorField
 
 from django.conf import settings
 from django.contrib.gis.db import models
-from django.contrib.gis.geos import Polygon
+from django.contrib.gis.gdal import Envelope, OGRGeometry, SpatialReference
 from django.db.models import Max, Min
 from django.db.models.signals import m2m_changed, post_save
 from django.dispatch import receiver
-from raster.const import WEB_MERCATOR_SRID
-from raster.utils import hex_to_rgba
-from raster.valuecount import ValueCountMixin
+
+from .const import WEB_MERCATOR_SRID
+from .utils import hex_to_rgba
+from .valuecount import ValueCountMixin
 
 
 class LegendSemantics(models.Model):
@@ -127,7 +128,6 @@ class RasterLayer(models.Model, ValueCountMixin):
     datatype = models.CharField(max_length=2, choices=DATATYPES,
                                 default='co')
     rasterfile = models.FileField(upload_to='rasters', null=True, blank=True)
-    srid = models.CharField(max_length=10)
     nodata = models.CharField(max_length=100)
     parse_log = models.TextField(blank=True, null=True, default='',
                                  editable=False)
@@ -135,7 +135,7 @@ class RasterLayer(models.Model, ValueCountMixin):
     modified = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return '{} {} (type: {}, srid: {})'.format(self.id, self.name, self.datatype, self.srid)
+        return '{} {} (type: {})'.format(self.id, self.name, self.datatype)
 
     @property
     def discrete(self):
@@ -152,15 +152,22 @@ class RasterLayer(models.Model, ValueCountMixin):
         """
         if not self._bbox:
             # Get bbox for raster in original coordinates
-            meta = self.rasterlayermetadata
+            meta = self.metadata
             xmin = meta.uperleftx
             ymax = meta.uperlefty
             xmax = xmin + meta.width * meta.scalex
             ymin = ymax + meta.height * meta.scaley
 
-            # Create Polygon box and transform to requested srid
-            geom = Polygon.from_bbox((xmin, ymin, xmax, ymax))
-            geom.srid = int(self.srid)
+            # Create Polygon box
+            geom = OGRGeometry(Envelope((xmin, ymin, xmax, ymax)).wkt)
+
+            # Set original srs
+            if meta.srs_wkt:
+                geom.srs = SpatialReference(meta.srs_wkt)
+            else:
+                geom.srid = meta.srid
+
+            # Transform to requested srid
             geom.transform(srid)
 
             # Calculate value range for bbox
@@ -209,7 +216,7 @@ class RasterLayerMetadata(models.Model):
     """
     Stores meta data for a raster layer
     """
-    rasterlayer = models.OneToOneField(RasterLayer)
+    rasterlayer = models.OneToOneField(RasterLayer, related_name='metadata')
     uperleftx = models.FloatField(null=True, blank=True)
     uperlefty = models.FloatField(null=True, blank=True)
     width = models.IntegerField(null=True, blank=True)
@@ -219,6 +226,9 @@ class RasterLayerMetadata(models.Model):
     skewx = models.FloatField(null=True, blank=True)
     skewy = models.FloatField(null=True, blank=True)
     numbands = models.IntegerField(null=True, blank=True)
+    srs_wkt = models.TextField(null=True, blank=True)
+    srid = models.PositiveSmallIntegerField(null=True, blank=True)
+    max_zoom = models.PositiveSmallIntegerField(null=True, blank=True)
 
     def __str__(self):
         return self.rasterlayer.name

@@ -21,3 +21,6 @@ GDAL_TO_NUMPY_PIXEL_TYPES = {
     6: 'Float32',  # Thirty-two bit floating point
     7: 'Float64',  # Sixty-four bit floating point
 }
+
+ALGEBRA_PIXEL_TYPE_GDAL = 7
+ALGEBRA_PIXEL_TYPE_NUMPY = 'Float64'

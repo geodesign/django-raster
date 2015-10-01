@@ -3,7 +3,7 @@ from pyparsing import CaselessLiteral, Combine, Forward, Literal, Optional, Word
 
 from django.contrib.gis.gdal import GDALRaster
 
-from .const import GDAL_TO_NUMPY_PIXEL_TYPES
+from .const import ALGEBRA_PIXEL_TYPE_GDAL, ALGEBRA_PIXEL_TYPE_NUMPY
 
 
 class FormulaParser(object):
@@ -176,7 +176,7 @@ class FormulaParser(object):
             raise Exception('Found an undeclared variable in formula.')
         else:
             # If numeric, convert to numpy float
-            return numpy.array(op, dtype='float')
+            return numpy.array(op, dtype=ALGEBRA_PIXEL_TYPE_NUMPY)
 
     def parse_formula(self, formula):
         """
@@ -218,7 +218,7 @@ class RasterAlgebraParser(FormulaParser):
     Compute raster algebra expressions using the FormulaParser class.
     """
 
-    def evaluate_raster_algebra(self, data, formula, check_aligned=False, mask=False):
+    def evaluate_raster_algebra(self, data, formula, check_aligned=False):
         """
         Evaluate a raster algebra expression on a set of rasters. All input
         rasters need to be strictly aligned (same size, geotransform and srid).
@@ -233,13 +233,10 @@ class RasterAlgebraParser(FormulaParser):
             self.check_aligned(data.values())
 
         # Construct list of numpy arrays holding raster pixel data
-        if mask:
-            data_arrays = {
-                key: numpy.ma.masked_values(rast.bands[0].data().ravel(), rast.bands[0].nodata_value)
-                for key, rast in data.items()
-            }
-        else:
-            data_arrays = {key: rast.bands[0].data().ravel() for key, rast in data.items()}
+        data_arrays = {
+            key: numpy.ma.masked_values(rast.bands[0].data().ravel(), rast.bands[0].nodata_value)
+            for key, rast in data.items()
+        }
 
         # Evaluate formula on raster data
         result = self.evaluate_formula(formula, data_arrays)
@@ -249,11 +246,11 @@ class RasterAlgebraParser(FormulaParser):
         orig_band = orig.bands[0]
 
         # Convert to default number type
-        result = result.astype(GDAL_TO_NUMPY_PIXEL_TYPES[orig_band.datatype()])
+        result = result.astype(ALGEBRA_PIXEL_TYPE_NUMPY)
 
         # Return GDALRaster holding results
         return GDALRaster({
-            'datatype': orig_band.datatype(),
+            'datatype': ALGEBRA_PIXEL_TYPE_GDAL,
             'driver': 'MEM',
             'width': orig.width,
             'height': orig.height,

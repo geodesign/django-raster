@@ -14,6 +14,21 @@ class FilenameActionForm(forms.Form):
     path = forms.CharField(label='Filepath', required=False)
 
 
+class TestInline(admin.TabularInline):
+    model = RasterLayerMetadata
+
+    readonly_fields = (
+        'rasterlayer', 'uperleftx', 'uperlefty', 'width', 'height',
+        'scalex', 'scaley', 'skewx', 'skewy', 'numbands', 'srid', 'srs_wkt',
+    )
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 class RasterLayerModelAdmin(admin.ModelAdmin):
     """
     Admin action to update filepaths only. Files can be uploadded to the
@@ -25,6 +40,7 @@ class RasterLayerModelAdmin(admin.ModelAdmin):
     actions = ['reparse_rasters', 'manually_update_filepath']
     list_filter = ('datatype', )
     search_fields = ('name', 'rasterfile')
+    inlines = (TestInline, )
 
     def reparse_rasters(self, request, queryset):
         """
@@ -71,9 +87,10 @@ class RasterLayerModelAdmin(admin.ModelAdmin):
 
 
 class RasterLayerMetadataModelAdmin(admin.ModelAdmin):
-    readonly_fields = ('rasterlayer', 'uperleftx', 'uperlefty',
-                       'width', 'height', 'scalex', 'scaley', 'skewx',
-                       'skewy', 'numbands')
+    readonly_fields = (
+        'rasterlayer', 'uperleftx', 'uperlefty', 'width', 'height',
+        'scalex', 'scaley', 'skewx', 'skewy', 'numbands', 'srid', 'srs_wkt',
+    )
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -83,8 +100,9 @@ class RasterLayerMetadataModelAdmin(admin.ModelAdmin):
 
 
 class RasterTileModelAdmin(admin.ModelAdmin):
-    readonly_fields = ('rast', 'rasterlayer', 'filename', 'tilex',
-                       'tiley', 'tilez')
+    readonly_fields = (
+        'rast', 'rasterlayer', 'filename', 'tilex', 'tiley', 'tilez',
+    )
 
     def has_add_permission(self, request, obj=None):
         return False

@@ -45,23 +45,25 @@ class RasterTestCase(TestCase):
                 name='Raster data',
                 description='Small raster for testing',
                 datatype='ca',
-                srid='3086',
                 nodata='255',
                 rasterfile=rasterfile,
                 legend=leg
             )
-        # Create empty raster layer
-        self.empty_rasterlayer = RasterLayer.objects.create(
-            name='Raster data',
-            description='Small raster for testing',
-            datatype='ca',
-            srid='3086',
-            nodata='0',
-        )
+            # Create another layer with no tiles
+            self.empty_rasterlayer = RasterLayer.objects.create(
+                name='Raster data',
+                description='Small raster for testing',
+                datatype='ca',
+                nodata='255',
+                rasterfile=rasterfile
+            )
+            self.empty_rasterlayer.rastertile_set.all().delete()
+
         # Setup query urls for tests
         self.tile = self.rasterlayer.rastertile_set.get(tilez=11, tilex=552, tiley=858)
-        self.tile_url = reverse('tms', kwargs={'z': self.tile.tilez, 'y': self.tile.tiley, 'x': self.tile.tilex, 'layer': 'raster.tif', 'format': '.png'})
+        self.tile_url = reverse('tms', kwargs={'z': self.tile.tilez, 'y': self.tile.tiley, 'x': self.tile.tilex, 'layer': self.rasterlayer.id, 'format': '.png'})
         self.algebra_tile_url = reverse('algebra', kwargs={'z': self.tile.tilez, 'y': self.tile.tiley, 'x': self.tile.tilex, 'format': '.png'})
+
         # Instantiate test client
         self.client = Client()
 

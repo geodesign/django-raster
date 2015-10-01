@@ -10,17 +10,24 @@ else:
 
 urlpatterns = [
 
-    # Url to request raster tiles
-    url(r'^tiles/(?P<layer>[^/]+)/(?P<z>[0-9]+)/(?P<x>[0-9]+)/(?P<y>[0-9]+)(?P<format>\.jpg|\.png)$',
+    # Normal raster tiles endpoint
+    url(
+        r'^tiles/(?P<layer>[^/]+)/(?P<z>[0-9]+)/(?P<x>[0-9]+)/(?P<y>[0-9]+)(?P<format>\.jpg|\.png)$',
         cache_page(cache_timeout)(TmsView.as_view()),
-        name='tms'),
+        name='tms'
+    ),
 
-    url(r'^algebra/(?P<z>[0-9]+)/(?P<x>[0-9]+)/(?P<y>[0-9]+)(?P<format>\.jpg|\.png)$',
+    # Raster algebra endpoint
+    url(
+        r'^algebra/(?P<z>[0-9]+)/(?P<x>[0-9]+)/(?P<y>[0-9]+)(?P<format>\.jpg|\.png)$',
         cache_page(cache_timeout)(AlgebraView.as_view()),
-        name='algebra'),
+        name='algebra'
+    ),
 
-    # Url to return legend as a json array (list of legend entries)
-    url(r'^legend/(?P<layer_or_legend_name>[^/]+)$',
+    # Raster legend endpoint
+    url(
+        r'^legend(?:/(?P<legend_id>[^/]+))?/$',
         cache_page(cache_timeout)(LegendView.as_view()),
-        name='legend'),
+        name='legend'
+    ),
 ]

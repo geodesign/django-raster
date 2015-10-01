@@ -112,6 +112,36 @@ class RasterView(View):
 
         return result
 
+    def get_layer(self, data=None):
+        """
+        Gets layer from request data trying both name and id.
+        """
+        if not data:
+            if 'layer' in self.kwargs:
+                data = self.kwargs.get('layer')
+            elif 'layer' in self.request.GET:
+                data = self.request.GET.get('layer')
+            else:
+                raise Http404
+
+        try:
+            data = int(data)
+        except:
+            pass
+
+        if isinstance(data, int):
+            layer = get_object_or_404(
+                RasterLayer,
+                id=data
+            )
+        else:
+            layer = get_object_or_404(
+                RasterLayer,
+                rasterfile__contains='rasters/' + data
+            )
+
+        return layer
+
 
 class AlgebraView(RasterView):
     """
@@ -183,23 +213,7 @@ class TmsView(RasterView):
         Returns an image rendered from a raster tile.
         """
         # Get layer
-        layer = self.kwargs.get('layer')
-
-        try:
-            layer = int(layer)
-        except:
-            pass
-
-        if isinstance(layer, int):
-            layer = get_object_or_404(
-                RasterLayer,
-                id=layer
-            )
-        else:
-            layer = get_object_or_404(
-                RasterLayer,
-                rasterfile__contains='rasters/' + self.kwargs.get('layer')
-            )
+        layer = self.get_layer()
 
         # Override color map if arg provided
         colormap = self.get_colormap(layer)
@@ -228,21 +242,24 @@ class TmsView(RasterView):
         return self.write_img_to_response(img, stats)
 
 
-class LegendView(View):
+class LegendView(RasterView):
 
-    def get(self, request, layer_or_legend_name):
+    def get(self, request, legend_id):
         """
         Returns the legend for this layer as a json string. The legend is a list of
         legend entries with the attributes "name", "expression" and "color".
         """
-        try:
-            lyr = RasterLayer.objects.get(rasterfile__contains='rasters/' + layer_or_legend_name)
+        if(legend_id):
+            # Get legend from id
+            legend = get_object_or_404(Legend, id=legend_id)
+        elif 'layer' in request.GET:
+            # If layer query parameter was provided, get legend from layer
+            lyr = self.get_layer()
             if lyr.legend:
                 legend = lyr.legend
-        except RasterLayer.DoesNotExist:
-            try:
-                legend = Legend.objects.get(title__iexact=layer_or_legend_name)
-            except Legend.DoesNotExist:
-                raise Http404()
+            else:
+                raise Http404
+        else:
+            raise Http404
 
         return HttpResponse(legend.json, content_type='application/json')

@@ -7,15 +7,25 @@ addons:
   postgresql : "9.3"
 
 env:
-  - DB_NAME=raster_test DJANGO_SETTINGS_MODULE=settings PYTHONPATH=$PYTHONPATH:$HOME/workspace/src/github.com/geodesign/django-raster
+  global:
+    - DB_NAME=raster_test
+    - DJANGO_SETTINGS_MODULE=settings
+    - PYTHONPATH=$PYTHONPATH:$HOME/workspace/src/github.com/geodesign/django-raster
 
 before_install:
   - psql -c 'create database raster_test;' -U postgres
   - psql -d raster_test -c 'create extension postgis;' -U postgres
 
 install:
-  - pip install psycopg2==2.5.3 celery==3.1.15 numpy==1.9.2 Pillow==2.7.0 django-colorful==1.0.1 flake8==2.4.0 isort==3.9.6 pyparsing==2.0.3
-  - pip install git+https://github.com/django/django.git@master
+    - pip install psycopg2==2.5.3
+    - pip install celery==3.1.15
+    - pip install numpy==1.9.2
+    - pip install Pillow==2.7.0
+    - pip install django-colorful==1.0.1
+    - pip install pyparsing==2.0.3
+    - pip install Django==1.9a1
+    - pip install flake8==2.4.0
+    - pip install isort==3.9.6
 
 script: django-admin.py test
 
