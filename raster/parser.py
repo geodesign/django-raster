@@ -29,6 +29,7 @@ class RasterLayerParser(object):
         # Set raster tilesize
         self.tilesize = int(getattr(settings, 'RASTER_TILESIZE', WEB_MERCATOR_TILESIZE))
         self.zoomdown = getattr(settings, 'RASTER_ZOOM_NEXT_HIGHER', True)
+        self.compress = getattr(settings, 'RASTER_COMPRESS_METHOD', 'lzw')
 
     def log(self, msg, reset=False):
         """
@@ -154,6 +155,7 @@ class RasterLayerParser(object):
             'scale': [tilescale, -tilescale],
             'width': sizex,
             'height': sizey,
+            'compress': self.compress,
         })
 
         self.log('Creating {0} tiles for zoom {1}.'.format(nr_of_tiles, zoom))
@@ -229,7 +231,7 @@ class RasterLayerParser(object):
                 self.log('Dataset already in SRID {0}, skipping transform'.format(WEB_MERCATOR_SRID))
             else:
                 self.log('Transforming raster to SRID {0}'.format(WEB_MERCATOR_SRID))
-                self.dataset = self.dataset.transform(WEB_MERCATOR_SRID)
+                self.dataset = self.dataset.transform(WEB_MERCATOR_SRID, compress=self.compress)
 
             # Compute max zoom at the web mercator projection
             max_zoom = tiler.closest_zoomlevel(

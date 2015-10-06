@@ -140,3 +140,9 @@ An example to create a Legend object with one LegendEntry is shown in the follow
         >>> legend.entries.add(entry)
         >>> legend.json
         ... '[{"color": "#FFFFFF", "expression": "1", "name": "Earth"}]'
+
+Compression
+-----------
+By default all rasters are compressed during parsing using LZW compression. This potentially saves a lot of storage space for large rasters,
+but might slow down the parsing process due to the compression overhead. The compress method can be changed using the ``RASTER_COMPRESS_METHOD`` setting.
+Allowed options are ``JPEG``, ``LZW``, ``PACKBITS``,  ``DEFLATE``, ``CCITTRLE``,  ``CCITTFAX3``, ``CCITTFAX4``, ``LZMA``. To disable compression, specify this setting as an empty string ``''``.
