@@ -3,27 +3,13 @@ import numpy
 from django.contrib.gis.geos import Polygon
 from django.test.utils import override_settings
 from raster.const import WEB_MERCATOR_SRID
-from raster.valuecount import aggregator
+from raster.valuecount import RasterAggregationException, aggregator
 
 from .raster_testcase import RasterTestCase
 
 
 @override_settings(RASTER_TILE_CACHE_TIMEOUT=0)
 class RasterValueCountTests(RasterTestCase):
-
-    def setUp(self):
-        super(RasterValueCountTests, self).setUp()
-        # Precompute expected totals from value count
-        expected = {}
-        for tile in self.rasterlayer.rastertile_set.filter(tilez=11):
-            val, counts = numpy.unique(tile.rast.bands[0].data(), return_counts=True)
-            for pair in zip(val, counts):
-                if pair[0] in expected:
-                    expected[pair[0]] += pair[1]
-                else:
-                    expected[pair[0]] = pair[1]
-
-        self.expected_totals = expected
 
     def test_value_count_no_geom(self):
         self.assertEqual(
@@ -130,15 +116,7 @@ class RasterValueCountTests(RasterTestCase):
         self.rasterlayer.save()
         self.assertEqual(
             self.rasterlayer.value_count(),
-            {
-                '(0.0, 0.90000000000000002)': 221445,
-                '(8.0999999999999996, 9.0)': 2977,
-                '(1.8, 2.7000000000000002)': 56,
-                '(0.90000000000000002, 1.8)': 695,
-                '(2.7000000000000002, 3.6000000000000001)': 4131,
-                '(7.2000000000000002, 8.0999999999999996)': 1350,
-                '(3.6000000000000001, 4.5)': 31490
-            }
+            self.continuous_expected_histogram
         )
 
 
@@ -147,7 +125,58 @@ class RasterAggregatorTests(RasterTestCase):
     def test_layer_with_no_tiles(self):
         result = aggregator(
             layer_dict={'a': self.rasterlayer.id, 'b': self.empty_rasterlayer.id},
-            zoom=7,
             formula='a*b'
         )
         self.assertDictEqual(result, {})
+
+    def test_layer_discrete_grouping(self):
+        result = aggregator(
+            layer_dict={'a': self.rasterlayer.id},
+            formula='a',
+            grouping='discrete'
+        )
+        self.assertDictEqual(
+            result,
+            {str(k): v for k, v in self.expected_totals.items()}
+        )
+
+    def test_layer_continuous_grouping(self):
+        result = aggregator(
+            layer_dict={'a': self.rasterlayer.id},
+            formula='a',
+            grouping='continuous'
+        )
+        self.assertDictEqual(
+            result,
+            self.continuous_expected_histogram
+        )
+
+    def test_layer_with_legend_grouping(self):
+        # Use a legend with simple int expression
+        result = aggregator(
+            layer_dict={'a': self.rasterlayer.id},
+            formula='a',
+            grouping=self.legend.id
+        )
+        self.assertDictEqual(
+            result,
+            {'2': self.expected_totals[2]}
+        )
+        # Use a legend with formula expression
+        result = aggregator(
+            layer_dict={'a': self.rasterlayer.id},
+            formula='a',
+            grouping=self.legend_with_expression.id
+        )
+        self.assertDictEqual(
+            result,
+            {'(x >= 2) & (x < 5)': self.expected_totals[2] + self.expected_totals[3] + self.expected_totals[4]}
+        )
+
+    def test_valuecount_exception(self):
+        with self.assertRaises(RasterAggregationException):
+            aggregator(
+                layer_dict={'a': self.rasterlayer.id},
+                formula='a',
+                grouping='unknown'
+            )

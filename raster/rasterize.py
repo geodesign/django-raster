@@ -15,7 +15,7 @@ rasterize_geometries = voidptr_output(std_call('GDALRasterizeGeometries'),
 )
 
 
-def rasterize(geom, rast):
+def rasterize(geom, rast, burn_value=1):
     """
     Rasterize a geometry. The result is aligned with the input raster.
     """
@@ -35,7 +35,7 @@ def rasterize(geom, rast):
     band_indices_to_rasterize = (c_int * 1)(1)
 
     nr_of_geometries = 1
-    burn_value = (c_double * 1)(1)
+    burn_value = (c_double * 1)(burn_value)
     geometry_list = (c_void_p * 1)(geom.ptr)
 
     # Rasterize this geometry
