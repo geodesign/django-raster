@@ -115,6 +115,12 @@ def aggregator(layer_dict, zoom=None, geom=None, formula=None, acres=True, group
     if grouping == 'auto':
         all_discrete = all([lyr.datatype in ['ca', 'ma'] for lyr in layers])
         grouping = 'discrete' if all_discrete else 'continuous'
+    else:
+        # Try converting the grouping input to int
+        try:
+            grouping = int(grouping)
+        except ValueError:
+            pass
 
     # Loop through tiles and evaluate raster algebra for each tile
     results = Counter({})
