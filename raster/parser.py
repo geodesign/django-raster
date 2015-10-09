@@ -171,12 +171,28 @@ class RasterLayerParser(object):
                 # Calculate raster tile origin
                 bounds = tiler.tile_bounds(tilex, tiley, zoom)
 
+                # Construct band data arrays
+                pixeloffset = (
+                    (tilex - indexrange[0]) * self.tilesize,
+                    (tiley - indexrange[1]) * self.tilesize
+                )
+
+                band_data = [
+                    {
+                        'data': band.data(offset=pixeloffset, size=(self.tilesize, self.tilesize)),
+                        'nodata_value': band.nodata_value
+                    } for band in snapped_dataset.bands
+                ]
+
                 # Warp source raster into this tile (in memory)
-                dest = snapped_dataset.warp({
-                    'driver': 'MEM',
+                dest = GDALRaster({
                     'width': self.tilesize,
                     'height': self.tilesize,
                     'origin': [bounds[0], bounds[3]],
+                    'scale': [tilescale, -tilescale],
+                    'srid': WEB_MERCATOR_SRID,
+                    'datatype': snapped_dataset.bands[0].datatype(),
+                    'bands': band_data,
                 })
 
                 # Store tile

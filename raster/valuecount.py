@@ -172,8 +172,8 @@ def aggregator(layer_dict, zoom=None, geom=None, formula=None, acres=True, group
                 # Add counts to results
                 results += Counter(dict(zip(unique_counts[0], unique_counts[1])))
             elif grouping == 'continuous':
-                # Handle continuous case - compute histogram
-                counts, bins = numpy.histogram(result_data)
+                # Handle continuous case - compute histogram on masked (compresed) data
+                counts, bins = numpy.histogram(result_data.compressed())
 
                 # Create dictionary with bins as keys and histogram counts as values
                 values = {}

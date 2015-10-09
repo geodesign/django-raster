@@ -85,10 +85,12 @@ class RasterTestCase(TestCase):
                 else:
                     expected[pair[0]] = pair[1]
 
+        expected['--'] = expected.pop(255)
+
         self.expected_totals = expected
 
         self.continuous_expected_histogram = {
-            '(0.0, 0.90000000000000002)': 221445,
+            '(0.0, 0.90000000000000002)': 21741,
             '(8.0999999999999996, 9.0)': 2977,
             '(1.8, 2.7000000000000002)': 56,
             '(0.90000000000000002, 1.8)': 695,
