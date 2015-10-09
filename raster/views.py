@@ -27,14 +27,25 @@ class RasterView(View):
             colormap = json.loads(clmp)
             colormap = {k: hex_to_rgba(v) if isinstance(v, (unicode, str, int)) else v for k, v in colormap.items()}
         else:
-            # Get Legend, check if custom legend has been requested
+            # Try to get Legend, using request input
             legend = self.request.GET.get('legend', None)
             if legend:
-                legend = Legend.objects.filter(title__iexact=legend).first()
+                # Convert legend to id if its an integer
+                try:
+                    legend = int(legend)
+                except ValueError:
+                    pass
+
+                # Try to get legend by id, name or from input layer
+                if isinstance(legend, int):
+                    legend = get_object_or_404(Legend, id=legend)
+                elif legend:
+                    legend = Legend.objects.filter(title__iexact=legend).first()
             elif lyr:
+                # As fallback, try to get legend from layer
                 legend = lyr.legend
 
-            # Get colormap
+            # Get colormap from legend
             if legend:
                 colormap = legend.colormap
                 # Check if custom legend entries have been requested
@@ -126,7 +137,7 @@ class RasterView(View):
 
         try:
             data = int(data)
-        except:
+        except ValueError:
             pass
 
         if isinstance(data, int):
