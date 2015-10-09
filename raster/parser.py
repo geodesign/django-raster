@@ -35,7 +35,7 @@ class RasterLayerParser(object):
         Write a message to the parse log of the rasterlayer instance.
         """
         # Prepare datetime stamp for log
-        now = '[{0}] '.format(datetime.datetime.now().strftime('%Y-%m-%d %T'))
+        now = '[{0}] '.format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
         # Write log, reset if requested
         if reset:
@@ -103,6 +103,17 @@ class RasterLayerParser(object):
 
         # Store original metadata for this raster
         self.store_original_metadata()
+
+    def close_raster_file(self):
+        """
+        On Windows close and release the GDALRaster resources
+        """
+        try:
+            if self.dataset:
+                del self.dataset
+                self.dataset = None
+        except AttributeError:
+            pass
 
     def store_original_metadata(self):
         """
@@ -189,6 +200,8 @@ class RasterLayerParser(object):
 
         # Remove snapped dataset
         self.log('Removing snapped dataset.')
+        del snapped_dataset
+        snapped_dataset = None
         os.remove(dest_file)
 
     def drop_empty_rasters(self):
@@ -260,4 +273,5 @@ class RasterLayerParser(object):
             self.log(traceback.format_exc())
             raise
         finally:
+            self.close_raster_file()
             shutil.rmtree(self.tmpdir)
