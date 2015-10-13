@@ -29,7 +29,7 @@ class RasterLayerParser(object):
         # Set raster tilesize
         self.tilesize = int(getattr(settings, 'RASTER_TILESIZE', WEB_MERCATOR_TILESIZE))
         self.zoomdown = getattr(settings, 'RASTER_ZOOM_NEXT_HIGHER', True)
-        self.compress = getattr(settings, 'RASTER_COMPRESS_METHOD', 'lzw')
+        self.compress = getattr(settings, 'RASTER_COMPRESS_METHOD', None)
 
     def log(self, msg, reset=False):
         """
