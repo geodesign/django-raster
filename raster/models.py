@@ -74,6 +74,11 @@ class Legend(models.Model):
             cmap[leg['expression']] = hex_to_rgba(leg['color'])
         return cmap
 
+    def save(self, *args, **kwargs):
+        if self.id:
+            self.update_json()
+        super(Legend, self).save(*args, **kwargs)
+
 
 def legend_entries_changed(sender, instance, action, **kwargs):
     """
