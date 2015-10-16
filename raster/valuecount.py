@@ -97,6 +97,10 @@ def aggregator(layer_dict, zoom=None, geom=None, formula=None, acres=True, group
         max_extent = MultiPolygon([Polygon.from_bbox(lyr.extent()) for lyr in layers]).envelope
         max_extent = geom.intersection(max_extent)
 
+        # Abort if there is no spatial overlay
+        if max_extent.empty:
+            return {}
+
         # Compute tile index range for geometry and given zoom level
         tilerange = tile_index_range(max_extent.extent, zoom)
     else:
