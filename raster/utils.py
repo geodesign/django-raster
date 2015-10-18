@@ -35,6 +35,8 @@ def band_data_to_image(band_data, colormap):
         orig_key = key
         try:
             # Try to use the key as number directly
+            if '=' in key:
+                key = key.split('=')[1]
             key = float(key)
             selector = dat == key
             rgba[selector] = color

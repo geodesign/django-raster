@@ -200,7 +200,6 @@ class RasterLayerParser(object):
 
         # Remove snapped dataset
         self.log('Removing snapped dataset.')
-        del snapped_dataset
         snapped_dataset = None
         os.remove(dest_file)
 
