@@ -172,7 +172,7 @@ def aggregator(layer_dict, zoom=None, geom=None, formula=None, acres=True, group
 
             if grouping == 'discrete':
                 # Compute unique counts for discrete input data
-                unique_counts = numpy.unique(result_data, return_counts=True)
+                unique_counts = numpy.unique(result_data.compressed(), return_counts=True)
                 # Add counts to results
                 values = dict(zip(unique_counts[0], unique_counts[1]))
 

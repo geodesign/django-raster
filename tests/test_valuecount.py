@@ -34,7 +34,6 @@ class RasterValueCountTests(RasterTestCase):
             {str(key): val for key, val in self.expected_totals.items()}
         )
         # Drop nodata value from expected data
-        self.expected_totals.pop('--')
         self.assertEqual(
             self.rasterlayer.db_value_count(bbox),
             self.expected_totals
@@ -58,7 +57,8 @@ class RasterValueCountTests(RasterTestCase):
                 expected[pair[0]] += pair[1]
             else:
                 expected[pair[0]] = pair[1]
-        expected['--'] = expected.pop(255)
+        # Drop nodata value (aggregation uses masked arrays)
+        expected.pop(255)
 
         # Confirm clipped count
         self.assertEqual(
@@ -66,7 +66,6 @@ class RasterValueCountTests(RasterTestCase):
             {str(k): v for k, v in expected.items()}
         )
         # For db based counts, remove nodata
-        expected.pop('--')
         self.assertEqual(
             self.rasterlayer.db_value_count(bbox),
             expected
@@ -90,7 +89,8 @@ class RasterValueCountTests(RasterTestCase):
                 expected[pair[0]] += pair[1] * 1.44374266645
             else:
                 expected[pair[0]] = pair[1] * 1.44374266645
-        expected['--'] = expected.pop('255')
+        # Drop nodata value (aggregation uses masked arrays)
+        expected.pop('255')
 
         # Confirm clipped count
         result = self.rasterlayer.value_count(bbox, area=True)
@@ -107,13 +107,13 @@ class RasterValueCountTests(RasterTestCase):
                     expected[pair[0]] += pair[1]
                 else:
                     expected[pair[0]] = pair[1]
-        expected['--'] = expected.pop(255)
+        # Drop nodata value (aggregation uses masked arrays)
+        expected.pop(255)
 
         self.assertEqual(
             self.rasterlayer.value_count(zoom=9),
             {str(k): v for k, v in expected.items()}
         )
-        expected.pop('--')
         self.assertEqual(
             self.rasterlayer.db_value_count(zoom=9),
             expected

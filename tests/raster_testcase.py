@@ -85,7 +85,8 @@ class RasterTestCase(TestCase):
                 else:
                     expected[pair[0]] = pair[1]
 
-        expected['--'] = expected.pop(255)
+        # Drop nodata value (aggregation uses masked arrays)
+        expected.pop(255)
 
         self.expected_totals = expected
 
