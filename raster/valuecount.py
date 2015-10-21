@@ -170,11 +170,12 @@ def aggregator(layer_dict, zoom=None, geom=None, formula=None, acres=True, group
                 # Apply geometry mask to result data
                 result_data.mask = result_data.mask | rastgeom_mask
 
-            # Compute unique counts for discrete input data
             if grouping == 'discrete':
+                # Compute unique counts for discrete input data
                 unique_counts = numpy.unique(result_data, return_counts=True)
                 # Add counts to results
-                results += Counter(dict(zip(unique_counts[0], unique_counts[1])))
+                values = dict(zip(unique_counts[0], unique_counts[1]))
+
             elif grouping == 'continuous':
                 # Handle continuous case - compute histogram on masked (compresed) data
                 counts, bins = numpy.histogram(result_data.compressed())
@@ -184,8 +185,6 @@ def aggregator(layer_dict, zoom=None, geom=None, formula=None, acres=True, group
                 for i in range(len(bins) - 1):
                     values[(bins[i], bins[i + 1])] = counts[i]
 
-                # Add counts to results
-                results += Counter(values)
             elif isinstance(grouping, int):
                 # Use legend to compute value counts
                 formula_parser = FormulaParser()
@@ -199,11 +198,13 @@ def aggregator(layer_dict, zoom=None, geom=None, formula=None, acres=True, group
                         # Otherwise use it as numpy expression directly
                         selector = formula_parser.evaluate_formula(key, {'x': result_data})
                     values[key] = numpy.sum(selector)
-                results += Counter(values)
+
             else:
                 raise RasterAggregationException(
                     'Unknown grouping value found in aggregator.'
                 )
+            # Add counts to results
+            results += Counter(values)
 
     # Transform pixel count to acres if requested
     scaling_factor = 1
