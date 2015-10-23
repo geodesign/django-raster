@@ -182,11 +182,20 @@ class FormulaParser(object):
         """
         Parse a string formula into a BNF expression.
         """
+        # Clean formula before parsing
+        formula = self.clean_formula(formula)
+
         # Reset expression stack
         self.expr_stack = []
 
         # Use bnf to parse the string
         self.bnf.parseString(formula)
+
+    def clean_formula(self, formula):
+        """
+        Remove any white space and line breaks from formula.
+        """
+        return formula.replace(' ', '').replace('\n', '').replace('\r', '')
 
     def evaluate(self, data=None):
         """
