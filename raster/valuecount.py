@@ -119,12 +119,16 @@ def aggregator(layer_dict, zoom=None, geom=None, formula=None, acres=True, group
     if grouping == 'auto':
         all_discrete = all([lyr.datatype in ['ca', 'ma'] for lyr in layers])
         grouping = 'discrete' if all_discrete else 'continuous'
+    elif grouping in ('discrete', 'continuous'):
+        pass
     else:
         # Try converting the grouping input to int
         try:
             grouping = int(grouping)
-        except ValueError:
-            pass
+        except:
+            raise RasterAggregationException(
+                'Invalid grouping value found for valuecount.'
+            )
 
     # Loop through tiles and evaluate raster algebra for each tile
     results = Counter({})
@@ -199,10 +203,6 @@ def aggregator(layer_dict, zoom=None, geom=None, formula=None, acres=True, group
                         selector = formula_parser.evaluate_formula(key, {'x': result_data})
                     values[key] = numpy.sum(selector)
 
-            else:
-                raise RasterAggregationException(
-                    'Unknown grouping value found in aggregator.'
-                )
             # Add counts to results
             results += Counter(values)
 
