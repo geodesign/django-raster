@@ -69,6 +69,9 @@ class RasterView(View):
         Writes rgba numpy array to http response.
         """
         # Create response, and add image
+        #having issue with numpy int32 not json serializable
+        stats = {k: int(v) if numpy.issubdtype(v, int) else v for k,v in stats.items()}
+
         response = HttpResponse()
         frmt = self.get_format()
         response['Content-Type'] = frmt

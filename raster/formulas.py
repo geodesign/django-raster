@@ -52,6 +52,7 @@ class FormulaParser(object):
         """
         Setup the Backus Normal Form (BNF) parser logic.
         """
+        self.dtype=ALGEBRA_PIXEL_TYPE_NUMPY
         point = Literal(".")
 
         e = CaselessLiteral("E")
@@ -176,7 +177,7 @@ class FormulaParser(object):
             raise Exception('Found an undeclared variable in formula.')
         else:
             # If numeric, convert to numpy float
-            return numpy.array(op, dtype=ALGEBRA_PIXEL_TYPE_NUMPY)
+            return numpy.array(op, dtype=self.dtype)
 
     def parse_formula(self, formula):
         """
@@ -214,10 +215,11 @@ class FormulaParser(object):
 
         return self.result
 
-    def evaluate_formula(self, formula, data={}):
+    def evaluate_formula(self, formula, data={}, dtype=ALGEBRA_PIXEL_TYPE_NUMPY):
         """
         Helper function to set formula and evaluate in one call.
         """
+        self.dtype = dtype
         self.parse_formula(formula)
         return self.evaluate(data)
 
