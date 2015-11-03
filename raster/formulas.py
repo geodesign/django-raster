@@ -239,7 +239,7 @@ class RasterAlgebraParser(FormulaParser):
         """
         # Check that all input rasters are aligned
         if check_aligned:
-            self.check_aligned(data.values())
+            self.check_aligned(list(data.values()))
 
         # Construct list of numpy arrays holding raster pixel data
         data_arrays = {
@@ -251,7 +251,7 @@ class RasterAlgebraParser(FormulaParser):
         result = self.evaluate_formula(formula, data_arrays)
 
         # Reference first original raster for constructing result
-        orig = data.values()[0]
+        orig = list(data.values())[0]
         orig_band = orig.bands[0]
 
         # Convert to default number type

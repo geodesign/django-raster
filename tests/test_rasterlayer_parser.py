@@ -27,7 +27,7 @@ class RasterLayerParserWithoutCeleryTests(RasterTestCase):
     def test_raster_layer_parsing_after_file_change(self):
         self.rasterlayer.rastertile_set.all().delete()
         self.rasterlayer.rasterfile.name = 'raster_new.tif.zip'
-        sourcefile = File(open(os.path.join(self.pwd, 'raster.tif.zip')),
+        sourcefile = File(open(os.path.join(self.pwd, 'raster.tif.zip'), 'rb'),
                           'raster_new.tif.zip')
         self.rasterlayer.rasterfile = sourcefile
         with self.settings(MEDIA_ROOT=self.media_root):

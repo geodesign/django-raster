@@ -6,6 +6,7 @@ from PIL import Image
 from django.conf import settings
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
+from django.utils import six
 from django.views.generic import View
 from raster.const import WEB_MERCATOR_TILESIZE
 from raster.formulas import RasterAlgebraParser
@@ -25,7 +26,7 @@ class RasterView(View):
         clmp = self.request.GET.get('colormap', None)
         if clmp:
             colormap = json.loads(clmp)
-            colormap = {k: hex_to_rgba(v) if isinstance(v, (unicode, str, int)) else v for k, v in colormap.items()}
+            colormap = {k: hex_to_rgba(v) if isinstance(v, (six.string_types, int)) else v for k, v in colormap.items()}
         else:
             # Try to get Legend, using request input
             legend = self.request.GET.get('legend', None)

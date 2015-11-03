@@ -42,7 +42,7 @@ def band_data_to_image(band_data, colormap):
             # Otherwise use it as numpy expression directly
             selector = parser.evaluate_formula(key, {'x': dat})
             rgba[selector] = color
-        stats[orig_key] = numpy.sum(selector)
+        stats[orig_key] = int(numpy.sum(selector))
 
     # Reshape array to image size
     rgba = rgba.reshape(band_data.shape[0], band_data.shape[1], 4)

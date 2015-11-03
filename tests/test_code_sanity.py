@@ -11,7 +11,7 @@ class CodeSanityTests(TestCase):
         """
         result = Popen('flake8', stdin=PIPE, stdout=PIPE, stderr=PIPE)
         output, err = result.communicate()
-        self.assertTrue(result.returncode == 0, 'Flake8 Log not empty\n' + output)
+        self.assertTrue(result.returncode == 0, 'Flake8 Log not empty\n' + str(output))
 
     def test_isort_check(self):
         """
@@ -22,4 +22,4 @@ class CodeSanityTests(TestCase):
             stdin=PIPE, stdout=PIPE, stderr=PIPE
         )
         output, err = result.communicate()
-        self.assertTrue(result.returncode == 0, 'Isort Log not empty\n' + output)
+        self.assertTrue(result.returncode == 0, 'Isort Log not empty\n' + str(output))

@@ -18,7 +18,7 @@ class RasterTestCase(TestCase):
         self.pwd = os.path.dirname(os.path.abspath(
             inspect.getfile(inspect.currentframe())
         ))
-        rasterfile = File(open(os.path.join(self.pwd, 'raster.tif.zip')))
+        rasterfile = File(open(os.path.join(self.pwd, 'raster.tif.zip'), 'rb'))
         # Create legend semantics
         sem1 = LegendSemantics.objects.create(name='Earth')
         sem2 = LegendSemantics.objects.create(name='Wind')

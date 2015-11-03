@@ -213,7 +213,7 @@ def aggregator(layer_dict, zoom=None, geom=None, formula=None, acres=True, group
 
     results = {
         str(int(k) if type(k) == numpy.float64 and int(k) == k else k):
-        v * scaling_factor for k, v in results.iteritems()
+        v * scaling_factor for k, v in results.items()
     }
 
     return results
