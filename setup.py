@@ -20,7 +20,7 @@ setup(
     author_email='daniel@urbmet.com',
     install_requires=[
         'psycopg2>=2.5.3',
-        'Django>=1.9',
+        'Django==1.9b1',
         'numpy>=1.9.1',
         'Pillow>=2.7.0',
         'django-colorful>=1.0.1',
