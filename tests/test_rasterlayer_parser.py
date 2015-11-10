@@ -39,6 +39,10 @@ class RasterLayerParserWithoutCeleryTests(RasterTestCase):
         self.assertEqual(self.rasterlayer.metadata.width, 163)
         self.assertEqual(self.rasterlayer.metadata.max_zoom, 12)
 
+    def test_parsestatus_creation(self):
+        self.assertEqual(self.rasterlayer.parsestatus.status, self.rasterlayer.parsestatus.FINISHED)
+        self.assertEqual(self.rasterlayer.parsestatus.tile_level, 12)
+
 
 @override_settings(CELERY_ALWAYS_EAGER=True,
                    CELERY_EAGER_PROPAGATES_EXCEPTIONS=True,

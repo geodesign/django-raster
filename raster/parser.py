@@ -12,7 +12,7 @@ from django.db import connection
 from django.dispatch import Signal
 from raster import tiler
 from raster.const import WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE
-from raster.models import RasterLayerMetadata, RasterTile
+from raster.models import RasterTile
 
 rasterlayers_parser_ended = Signal(providing_args=['instance'])
 
@@ -23,27 +23,36 @@ class RasterLayerParser(object):
     """
     def __init__(self, rasterlayer):
         self.rasterlayer = rasterlayer
-
         self.rastername = os.path.basename(rasterlayer.rasterfile.name)
 
         # Set raster tilesize
         self.tilesize = int(getattr(settings, 'RASTER_TILESIZE', WEB_MERCATOR_TILESIZE))
         self.zoomdown = getattr(settings, 'RASTER_ZOOM_NEXT_HIGHER', True)
 
-    def log(self, msg, reset=False):
+    def log(self, msg, reset=False, status=None, zoom=None):
         """
-        Write a message to the parse log of the rasterlayer instance.
+        Write a message to the parse log of the rasterlayer instance and update
+        the parse status object.
         """
+        if status is not None:
+            self.rasterlayer.parsestatus.status = status
+
+        if zoom is not None:
+            self.rasterlayer.parsestatus.tile_level = zoom
+
         # Prepare datetime stamp for log
         now = '[{0}] '.format(datetime.datetime.now().strftime('%Y-%m-%d %T'))
 
         # Write log, reset if requested
         if reset:
             self.rasterlayer.parse_log = now + msg
+            self.rasterlayer.parsestatus.log = now + msg
         else:
             self.rasterlayer.parse_log += '\n' + now + msg
+            self.rasterlayer.parsestatus.log += '\n' + now + msg
 
         self.rasterlayer.save()
+        self.rasterlayer.parsestatus.save()
 
     def get_raster_file(self):
         """
@@ -108,20 +117,21 @@ class RasterLayerParser(object):
         """
         Exports the input raster meta data to a RasterLayerMetadata object.
         """
-        lyrmeta = RasterLayerMetadata.objects.get_or_create(rasterlayer=self.rasterlayer)[0]
-        lyrmeta.uperleftx = self.dataset.origin.x
-        lyrmeta.uperlefty = self.dataset.origin.y
-        lyrmeta.width = self.dataset.width
-        lyrmeta.height = self.dataset.height
-        lyrmeta.scalex = self.dataset.scale.x
-        lyrmeta.scaley = self.dataset.scale.y
-        lyrmeta.skewx = self.dataset.skew.x
-        lyrmeta.skewy = self.dataset.skew.y
-        lyrmeta.numbands = len(self.dataset.bands)
-        lyrmeta.srs_wkt = self.dataset.srs.wkt
-        lyrmeta.srid = self.dataset.srs.srid
+        meta = self.rasterlayer.metadata
 
-        lyrmeta.save()
+        meta.uperleftx = self.dataset.origin.x
+        meta.uperlefty = self.dataset.origin.y
+        meta.width = self.dataset.width
+        meta.height = self.dataset.height
+        meta.scalex = self.dataset.scale.x
+        meta.scaley = self.dataset.scale.y
+        meta.skewx = self.dataset.skew.x
+        meta.skewy = self.dataset.skew.y
+        meta.numbands = len(self.dataset.bands)
+        meta.srs_wkt = self.dataset.srs.wkt
+        meta.srid = self.dataset.srs.srid
+
+        meta.save()
 
     def create_tiles(self, zoom):
         """
@@ -204,14 +214,17 @@ class RasterLayerParser(object):
                 )
 
         # Remove snapped dataset
-        self.log('Removing snapped dataset.')
+        self.log('Removing snapped dataset.', zoom=zoom)
         os.remove(dest_file)
 
     def drop_empty_rasters(self):
         """
         Remove rasters that are only no-data from the current rasterlayer.
         """
-        self.log('Dropping empty raster tiles.')
+        self.log(
+            'Dropping empty raster tiles.',
+            status=self.rasterlayer.parsestatus.DROPPING_EMPTY_TILES
+        )
 
         # Setup SQL command
         sql = (
@@ -231,7 +244,11 @@ class RasterLayerParser(object):
         """
         try:
             # Clean previous parse log
-            self.log('Started parsing raster file', reset=True)
+            self.log(
+                'Started parsing raster file',
+                reset=True,
+                status=self.rasterlayer.parsestatus.DOWNLOADING_FILE
+            )
 
             # Download, unzip and open raster file
             self.get_raster_file()
@@ -244,7 +261,10 @@ class RasterLayerParser(object):
             if self.dataset.srs.srid == WEB_MERCATOR_SRID:
                 self.log('Dataset already in SRID {0}, skipping transform'.format(WEB_MERCATOR_SRID))
             else:
-                self.log('Transforming raster to SRID {0}'.format(WEB_MERCATOR_SRID))
+                self.log(
+                    'Transforming raster to SRID {0}'.format(WEB_MERCATOR_SRID),
+                    status=self.rasterlayer.parsestatus.REPROJECTING_RASTER
+                )
                 self.dataset = self.dataset.transform(WEB_MERCATOR_SRID)
 
             # Compute max zoom at the web mercator projection
@@ -260,6 +280,11 @@ class RasterLayerParser(object):
             if not self.zoomdown:
                 max_zoom -= 1
 
+            self.log(
+                'Started creating tiles',
+                status=self.rasterlayer.parsestatus.CREATING_TILES
+            )
+
             # Loop through all lower zoom levels and create tiles to
             # setup TMS aligned tiles in world mercator
             for iz in range(max_zoom + 1):
@@ -271,9 +296,15 @@ class RasterLayerParser(object):
             rasterlayers_parser_ended.send(sender=self.rasterlayer.__class__, instance=self.rasterlayer)
 
             # Log success of parsing
-            self.log('Successfully finished parsing raster')
+            self.log(
+                'Successfully finished parsing raster',
+                status=self.rasterlayer.parsestatus.FINISHED
+            )
         except:
-            self.log(traceback.format_exc())
+            self.log(
+                traceback.format_exc(),
+                status=self.rasterlayer.parsestatus.FAILED
+            )
             raise
         finally:
             shutil.rmtree(self.tmpdir)

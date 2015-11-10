@@ -6,7 +6,7 @@ from django.conf import settings
 from django.contrib.gis.db import models
 from django.contrib.gis.gdal import Envelope, OGRGeometry, SpatialReference
 from django.db.models import Max, Min
-from django.db.models.signals import m2m_changed, post_save
+from django.db.models.signals import m2m_changed, post_save, pre_save
 from django.dispatch import receiver
 
 from .const import WEB_MERCATOR_SRID
@@ -182,7 +182,6 @@ class RasterLayer(models.Model, ValueCountMixin):
 
             # Set bbox
             self._bbox = (min(xvals), min(yvals), max(xvals), max(yvals))
-
         return self._bbox
 
     def index_range(self, zoom):
@@ -194,7 +193,7 @@ class RasterLayer(models.Model, ValueCountMixin):
         )
 
 
-@receiver(models.signals.pre_save, sender=RasterLayer)
+@receiver(pre_save, sender=RasterLayer)
 def reset_parse_log_if_data_changed(sender, instance, **kwargs):
     try:
         obj = RasterLayer.objects.get(pk=instance.pk)
@@ -202,12 +201,16 @@ def reset_parse_log_if_data_changed(sender, instance, **kwargs):
         pass
     else:
         if obj.rasterfile.name != instance.rasterfile.name:
-            instance.parse_log = ''
+            instance.parsestatus.log = ''
 
 
-@receiver(models.signals.post_save, sender=RasterLayer)
-def parse_raster_layer_if_log_is_empty(sender, instance, **kwargs):
-    if instance.rasterfile.name and instance.parse_log == '':
+@receiver(post_save, sender=RasterLayer)
+def parse_raster_layer_if_log_is_empty(sender, instance, created, **kwargs):
+    if created:
+        RasterLayerParseStatus.objects.create(rasterlayer=instance)
+        RasterLayerMetadata.objects.create(rasterlayer=instance)
+
+    if instance.rasterfile.name and instance.parsestatus.log == '':
         if hasattr(settings, 'RASTER_USE_CELERY') and settings.RASTER_USE_CELERY:
             from raster.tasks import parse_raster_layer_with_celery
             parse_raster_layer_with_celery.delay(instance)
@@ -237,6 +240,36 @@ class RasterLayerMetadata(models.Model):
 
     def __str__(self):
         return self.rasterlayer.name
+
+
+class RasterLayerParseStatus(models.Model):
+    """
+    Tracks the parsing status of the raster layer.
+    """
+    UNPARSED = 0
+    DOWNLOADING_FILE = 1
+    REPROJECTING_RASTER = 2
+    CREATING_TILES = 3
+    DROPPING_EMPTY_TILES = 4
+    FINISHED = 5
+    FAILED = 6
+
+    STATUS_CHOICES = (
+        (UNPARSED, 'Layer not yet parsed'),
+        (DOWNLOADING_FILE, 'Downloading file'),
+        (REPROJECTING_RASTER, 'Reprojecting'),
+        (CREATING_TILES, 'Creating tiles'),
+        (DROPPING_EMPTY_TILES, 'Dropping empty tiles'),
+        (FINISHED, 'Finished parsing'),
+        (FAILED, 'Failed parsing'),
+    )
+    rasterlayer = models.OneToOneField(RasterLayer, related_name='parsestatus')
+    status = models.IntegerField(choices=STATUS_CHOICES, default=UNPARSED)
+    tile_level = models.IntegerField(null=True, blank=True)
+    log = models.TextField(default='', editable=False)
+
+    def __str__(self):
+        return '{0} - {1}'.format(self.rasterlayer.name, self.get_status_display())
 
 
 class RasterTile(models.Model):
