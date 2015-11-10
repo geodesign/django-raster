@@ -3,7 +3,9 @@ from django.contrib import admin, messages
 from django.http import HttpResponseRedirect
 from django.shortcuts import render
 
-from .models import Legend, LegendEntry, LegendSemantics, RasterLayer, RasterLayerMetadata, RasterTile
+from .models import (
+    Legend, LegendEntry, LegendSemantics, RasterLayer, RasterLayerMetadata, RasterLayerParseStatus, RasterTile
+)
 
 
 class FilenameActionForm(forms.Form):
@@ -16,11 +18,22 @@ class FilenameActionForm(forms.Form):
 
 class RasterLayerMetadataInline(admin.TabularInline):
     model = RasterLayerMetadata
-
     readonly_fields = (
-        'rasterlayer', 'uperleftx', 'uperlefty', 'width', 'height',
-        'scalex', 'scaley', 'skewx', 'skewy', 'numbands', 'srid', 'srs_wkt', 'max_zoom',
+        'srid', 'uperleftx', 'uperlefty', 'width', 'height',
+        'scalex', 'scaley', 'skewx', 'skewy', 'numbands',
+        'srs_wkt',
     )
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class RasterLayerParseStatusInline(admin.TabularInline):
+    model = RasterLayerParseStatus
+    readonly_fields = ('status', 'tile_level', 'log', )
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -36,18 +49,20 @@ class RasterLayerModelAdmin(admin.ModelAdmin):
     raster objects through this action. This might be useful for large raster
     files.
     """
-    readonly_fields = ('parse_log',)
     actions = ['reparse_rasters', 'manually_update_filepath']
     list_filter = ('datatype', )
     search_fields = ('name', 'rasterfile')
-    inlines = (RasterLayerMetadataInline, )
+    inlines = (
+        RasterLayerMetadataInline,
+        RasterLayerParseStatusInline,
+    )
 
     def reparse_rasters(self, request, queryset):
         """
         Admin action to re-parse a set of rasterlayers.
         """
         for rasterlayer in queryset:
-            rasterlayer.parse_log = ''
+            rasterlayer.parsestatus.log = ''
             rasterlayer.save()
 
         msg = 'Parsing Rasters, check parse logs for progress'

@@ -134,8 +134,6 @@ class RasterLayer(models.Model, ValueCountMixin):
                                 default='co')
     rasterfile = models.FileField(upload_to='rasters', null=True, blank=True)
     nodata = models.CharField(max_length=100)
-    parse_log = models.TextField(blank=True, null=True, default='',
-                                 editable=False)
     legend = models.ForeignKey(Legend, blank=True, null=True)
     modified = models.DateTimeField(auto_now=True)
 
