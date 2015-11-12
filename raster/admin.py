@@ -4,7 +4,8 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import render
 
 from .models import (
-    Legend, LegendEntry, LegendSemantics, RasterLayer, RasterLayerMetadata, RasterLayerParseStatus, RasterTile, RasterLayerBandMetadata
+    Legend, LegendEntry, LegendSemantics, RasterLayer, RasterLayerBandMetadata, RasterLayerMetadata,
+    RasterLayerParseStatus, RasterTile
 )
 
 
@@ -48,8 +49,8 @@ class RasterLayerBandMetadataInline(admin.TabularInline):
     model = RasterLayerBandMetadata
     extra = 0
     readonly_fields = (
-       'band', 'nodata_value', 'max', 'min',
-       'hist_values', 'hist_bins',
+        'band', 'nodata_value', 'max', 'min',
+        'hist_values', 'hist_bins',
     )
 
     def has_add_permission(self, request, obj=None):
