@@ -18,13 +18,13 @@ before_install:
   - psql -d raster_test -c 'create extension postgis;' -U postgres
 
 install:
+    - pip install git+https://github.com/geodesign/django.git@geodesign_v2
     - pip install psycopg2==2.5.3
     - pip install celery==3.1.15
     - pip install numpy==1.10.1
     - pip install Pillow==2.7.0
     - pip install django-colorful==1.0.1
     - pip install pyparsing==2.0.3
-    - pip install django==1.9b1
     - pip install flake8==2.5.0
     - pip install isort==4.2.2
 

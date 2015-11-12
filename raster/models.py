@@ -1,10 +1,13 @@
 import json
+import math
 
+import numpy
 from colorful.fields import RGBColorField
 
 from django.conf import settings
 from django.contrib.gis.db import models
 from django.contrib.gis.gdal import Envelope, OGRGeometry, SpatialReference
+from django.contrib.postgres.fields import ArrayField
 from django.db.models import Max, Min
 from django.db.models.signals import m2m_changed, post_save, pre_save
 from django.dispatch import receiver
@@ -133,7 +136,7 @@ class RasterLayer(models.Model, ValueCountMixin):
     datatype = models.CharField(max_length=2, choices=DATATYPES,
                                 default='co')
     rasterfile = models.FileField(upload_to='rasters', null=True, blank=True)
-    nodata = models.CharField(max_length=100)
+    nodata = models.CharField(max_length=100, null=True, blank=True)
     legend = models.ForeignKey(Legend, blank=True, null=True)
     modified = models.DateTimeField(auto_now=True)
 
@@ -268,6 +271,36 @@ class RasterLayerParseStatus(models.Model):
 
     def __str__(self):
         return '{0} - {1}'.format(self.rasterlayer.name, self.get_status_display())
+
+
+class RasterLayerBandMetadata(models.Model):
+
+    HISTOGRAM_BINS = 100
+
+    rasterlayer = models.ForeignKey(RasterLayer)
+    band = models.PositiveIntegerField()
+    nodata_value = models.FloatField(null=True)
+    max = models.FloatField()
+    min = models.FloatField()
+    hist_values = ArrayField(models.FloatField(), size=HISTOGRAM_BINS)
+    hist_bins = ArrayField(models.FloatField(), size=HISTOGRAM_BINS + 1)
+
+    def __str__(self):
+        return '{} - Min {} - Max {}'.format(self.rasterlayer.name, self.min, self.max)
+
+    def save(self, *args, **kwargs):
+        if not self.pk:
+            # Construct empty histogram
+            hist = numpy.histogram(
+                [],
+                range=(math.floor(self.min), math.ceil(self.max)),
+                bins=self.HISTOGRAM_BINS
+            )
+            # Set empty histogram values
+            self.hist_values = hist[0].tolist()
+            self.hist_bins = hist[1].tolist()
+
+        super(RasterLayerBandMetadata, self).save(*args, **kwargs)
 
 
 class RasterTile(models.Model):

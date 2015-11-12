@@ -107,6 +107,7 @@ class RasterValueCountTests(RasterTestCase):
                     expected[pair[0]] += pair[1]
                 else:
                     expected[pair[0]] = pair[1]
+
         # Drop nodata value (aggregation uses masked arrays)
         expected.pop(255)
 

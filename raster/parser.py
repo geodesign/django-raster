@@ -6,13 +6,15 @@ import tempfile
 import traceback
 import zipfile
 
+import numpy
+
 from django.conf import settings
 from django.contrib.gis.gdal import GDALRaster
 from django.db import connection
 from django.dispatch import Signal
 from raster import tiler
 from raster.const import WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE
-from raster.models import RasterTile
+from raster.models import RasterLayerBandMetadata, RasterTile
 
 rasterlayers_parser_ended = Signal(providing_args=['instance'])
 
@@ -45,10 +47,8 @@ class RasterLayerParser(object):
 
         # Write log, reset if requested
         if reset:
-            self.rasterlayer.parse_log = now + msg
             self.rasterlayer.parsestatus.log = now + msg
         else:
-            self.rasterlayer.parse_log += '\n' + now + msg
             self.rasterlayer.parsestatus.log += '\n' + now + msg
 
         self.rasterlayer.save()
@@ -106,17 +106,26 @@ class RasterLayerParser(object):
         self.dataset = GDALRaster(os.path.join(self.tmpdir, self.rastername), write=True)
 
         # Make sure nodata value is set from input
-        if self.rasterlayer.nodata is not None:
-            for band in self.dataset.bands:
+        self.hist_values = []
+        self.hist_bins = []
+        for i, band in enumerate(self.dataset.bands):
+            if self.rasterlayer.nodata is not None:
                 band.nodata_value = float(self.rasterlayer.nodata)
 
-        # Store original metadata for this raster
-        self.store_original_metadata()
+            # Create band metatdata object
+            bandmeta = RasterLayerBandMetadata.objects.create(
+                rasterlayer=self.rasterlayer,
+                band=i,
+                nodata_value=band.nodata_value,
+                min=band.min,
+                max=band.max
+            )
 
-    def store_original_metadata(self):
-        """
-        Exports the input raster meta data to a RasterLayerMetadata object.
-        """
+            # Prepare numpy hist values and bins
+            self.hist_values.append(numpy.array(bandmeta.hist_values))
+            self.hist_bins.append(numpy.array(bandmeta.hist_bins))
+
+        # Store original metadata for this raster
         meta = self.rasterlayer.metadata
 
         meta.uperleftx = self.dataset.origin.x
@@ -192,6 +201,10 @@ class RasterLayerParser(object):
                     } for band in snapped_dataset.bands
                 ]
 
+                # Add tile data to histogram
+                if zoom == self.max_zoom:
+                    self.push_histogram(band_data)
+
                 # Warp source raster into this tile (in memory)
                 dest = GDALRaster({
                     'width': self.tilesize,
@@ -213,9 +226,27 @@ class RasterLayerParser(object):
                     tilez=zoom
                 )
 
+        # Store histogram data
+        if zoom == self.max_zoom:
+            bandmetas = RasterLayerBandMetadata.objects.filter(rasterlayer=self.rasterlayer)
+            for bandmeta in bandmetas:
+                bandmeta.hist_values = self.hist_values[bandmeta.band].tolist()
+                bandmeta.save()
+
         # Remove snapped dataset
         self.log('Removing snapped dataset.', zoom=zoom)
         os.remove(dest_file)
+
+    def push_histogram(self, data):
+        """
+        Add data to band level histogram histogram.
+        """
+        # Loop through bands of this tile
+        for i, dat in enumerate(data):
+            # Create histogram for new data with the same bins
+            new_hist = numpy.histogram(dat['data'], bins=self.hist_bins[i])
+            # Add counts of this tile to band metadata histogram
+            self.hist_values[i] += new_hist[0]
 
     def drop_empty_rasters(self):
         """
@@ -268,17 +299,17 @@ class RasterLayerParser(object):
                 self.dataset = self.dataset.transform(WEB_MERCATOR_SRID)
 
             # Compute max zoom at the web mercator projection
-            max_zoom = tiler.closest_zoomlevel(
+            self.max_zoom = tiler.closest_zoomlevel(
                 abs(self.dataset.scale.x)
             )
 
             # Store max zoom level in metadata
-            self.rasterlayer.metadata.max_zoom = max_zoom
+            self.rasterlayer.metadata.max_zoom = self.max_zoom
             self.rasterlayer.metadata.save()
 
             # Reduce max zoom by one if zoomdown flag was disabled
             if not self.zoomdown:
-                max_zoom -= 1
+                self.max_zoom -= 1
 
             self.log(
                 'Started creating tiles',
@@ -287,7 +318,7 @@ class RasterLayerParser(object):
 
             # Loop through all lower zoom levels and create tiles to
             # setup TMS aligned tiles in world mercator
-            for iz in range(max_zoom + 1):
+            for iz in range(self.max_zoom + 1):
                 self.create_tiles(iz)
 
             self.drop_empty_rasters()
