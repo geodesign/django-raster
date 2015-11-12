@@ -4,7 +4,7 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import render
 
 from .models import (
-    Legend, LegendEntry, LegendSemantics, RasterLayer, RasterLayerMetadata, RasterLayerParseStatus, RasterTile
+    Legend, LegendEntry, LegendSemantics, RasterLayer, RasterLayerMetadata, RasterLayerParseStatus, RasterTile, RasterLayerBandMetadata
 )
 
 
@@ -18,6 +18,7 @@ class FilenameActionForm(forms.Form):
 
 class RasterLayerMetadataInline(admin.TabularInline):
     model = RasterLayerMetadata
+    extra = 0
     readonly_fields = (
         'srid', 'uperleftx', 'uperlefty', 'width', 'height',
         'scalex', 'scaley', 'skewx', 'skewy', 'numbands',
@@ -33,7 +34,23 @@ class RasterLayerMetadataInline(admin.TabularInline):
 
 class RasterLayerParseStatusInline(admin.TabularInline):
     model = RasterLayerParseStatus
+    extra = 0
     readonly_fields = ('status', 'tile_level', 'log', )
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class RasterLayerBandMetadataInline(admin.TabularInline):
+    model = RasterLayerBandMetadata
+    extra = 0
+    readonly_fields = (
+       'band', 'nodata_value', 'max', 'min',
+       'hist_values', 'hist_bins',
+    )
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -53,8 +70,9 @@ class RasterLayerModelAdmin(admin.ModelAdmin):
     list_filter = ('datatype', )
     search_fields = ('name', 'rasterfile')
     inlines = (
-        RasterLayerMetadataInline,
         RasterLayerParseStatusInline,
+        RasterLayerMetadataInline,
+        RasterLayerBandMetadataInline,
     )
 
     def reparse_rasters(self, request, queryset):
