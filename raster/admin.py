@@ -68,7 +68,7 @@ class RasterLayerModelAdmin(admin.ModelAdmin):
     files.
     """
     actions = ['reparse_rasters', 'manually_update_filepath']
-    list_filter = ('datatype', )
+    list_filter = ('datatype', 'parsestatus__status')
     search_fields = ('name', 'rasterfile')
     inlines = (
         RasterLayerParseStatusInline,
