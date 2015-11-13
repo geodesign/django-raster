@@ -315,7 +315,6 @@ class RasterTile(models.Model):
     rid = models.AutoField(primary_key=True)
     rast = models.RasterField(null=True, blank=True, srid=WEB_MERCATOR_SRID)
     rasterlayer = models.ForeignKey(RasterLayer, null=True, blank=True, db_index=True)
-    filename = models.TextField(null=True, blank=True, db_index=True)
     tilex = models.IntegerField(db_index=True, null=True)
     tiley = models.IntegerField(db_index=True, null=True)
     tilez = models.IntegerField(db_index=True, null=True, choices=ZOOMLEVELS)

@@ -220,7 +220,6 @@ class RasterLayerParser(object):
                 RasterTile.objects.create(
                     rast=dest,
                     rasterlayer=self.rasterlayer,
-                    filename=self.rastername,
                     tilex=tilex,
                     tiley=tiley,
                     tilez=zoom
