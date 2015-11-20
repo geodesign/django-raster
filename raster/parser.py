@@ -112,14 +112,14 @@ class RasterLayerParser(object):
             if self.rasterlayer.nodata is not None:
                 band.nodata_value = float(self.rasterlayer.nodata)
 
-            # Create band metatdata object
-            bandmeta = RasterLayerBandMetadata.objects.create(
-                rasterlayer=self.rasterlayer,
-                band=i,
-                nodata_value=band.nodata_value,
-                min=band.min,
-                max=band.max
-            )
+            bandmeta = RasterLayerBandMetadata.objects.filter(rasterlayer=self.rasterlayer, band=i).first()
+            if not bandmeta:
+                bandmeta = RasterLayerBandMetadata(rasterlayer=self.rasterlayer, band=i)
+
+            bandmeta.nodata_value = band.nodata_value
+            bandmeta.min = band.min
+            bandmeta.max = band.max
+            bandmeta.save()
 
             # Prepare numpy hist values and bins
             self.hist_values.append(numpy.array(bandmeta.hist_values))

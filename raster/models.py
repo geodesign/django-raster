@@ -302,6 +302,9 @@ class RasterLayerBandMetadata(models.Model):
 
         super(RasterLayerBandMetadata, self).save(*args, **kwargs)
 
+    class Meta:
+        unique_together = ('rasterlayer', 'band')
+
 
 class RasterTile(models.Model):
     """
