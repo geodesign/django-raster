@@ -109,7 +109,7 @@ class RasterLayerParser(object):
         self.hist_values = []
         self.hist_bins = []
         for i, band in enumerate(self.dataset.bands):
-            if self.rasterlayer.nodata is not None:
+            if self.rasterlayer.nodata not in ('', None):
                 band.nodata_value = float(self.rasterlayer.nodata)
 
             bandmeta = RasterLayerBandMetadata.objects.filter(rasterlayer=self.rasterlayer, band=i).first()
