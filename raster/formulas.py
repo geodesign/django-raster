@@ -1,5 +1,10 @@
+import functools
+import operator
+
 import numpy
-from pyparsing import CaselessLiteral, Combine, Forward, Literal, Optional, Word, ZeroOrMore, alphas, nums
+from pyparsing import (
+    CaselessLiteral, Combine, Forward, Literal, Optional, ParseException, Word, ZeroOrMore, alphas, nums
+)
 
 from django.contrib.gis.gdal import GDALRaster
 
@@ -84,41 +89,16 @@ class FormulaParser(object):
         expop = Literal("^")
         pi = CaselessLiteral("PI")
 
-        # Letters for variables
-        aa = CaselessLiteral("a")
-        bb = CaselessLiteral("b")
-        cc = CaselessLiteral("c")
-        dd = CaselessLiteral("d")
-        ee = CaselessLiteral("e")
-        ff = CaselessLiteral("f")
-        gg = CaselessLiteral("g")
-        hh = CaselessLiteral("h")
-        ii = CaselessLiteral("i")
-        jj = CaselessLiteral("j")
-        kk = CaselessLiteral("k")
-        ll = CaselessLiteral("l")
-        mm = CaselessLiteral("m")
-        nn = CaselessLiteral("n")
-        oo = CaselessLiteral("o")
-        pp = CaselessLiteral("p")
-        qq = CaselessLiteral("q")
-        rr = CaselessLiteral("r")
-        ss = CaselessLiteral("s")
-        tt = CaselessLiteral("t")
-        uu = CaselessLiteral("u")
-        vv = CaselessLiteral("v")
-        ww = CaselessLiteral("w")
-        xx = CaselessLiteral("x")
-        yy = CaselessLiteral("y")
-        zz = CaselessLiteral("z")
+        # Allow all letters as variables (case sensitive)
+        alpha_literals = (Literal(x) for x in alphas)
 
         bnf = Forward()
 
+        # In atoms, pi and e need to be before the letters for it to be found
         atom = (
             Optional('-') + Optional("!") + (
-                pi | e | fnumber | ident + lpar + bnf + rpar |  # pi needs to be before the letters for it to be found
-                aa | bb | cc | dd | ee | ff | gg | hh | ii | jj | kk | ll | mm |
-                nn | oo | pp | qq | rr | ss | tt | uu | vv | ww | xx | yy | zz
+                pi | e | fnumber | ident + lpar + bnf + rpar |
+                functools.reduce(operator.or_, alpha_literals)
             ).setParseAction(self.push_first) | (lpar + bnf.suppress() + rpar)
         ).setParseAction(self.push_unary_operator)
 
@@ -173,7 +153,7 @@ class FormulaParser(object):
         elif op[0].isalpha() and len(op[0]) == 1 and op[0] in self.data:
             return self.data[op[0]]
         elif op[0].isalpha() and len(op[0]) == 1:
-            raise Exception('Found an undeclared variable in formula.')
+            raise ParseException('Found an undeclared variable in formula.')
         else:
             # If numeric, convert to numpy float
             return numpy.array(op, dtype=ALGEBRA_PIXEL_TYPE_NUMPY)
@@ -203,7 +183,7 @@ class FormulaParser(object):
         """
         # Make sure a formula has been parsed before evaluating
         if self.expr_stack == []:
-            raise Exception('Please specify a formula to evaluate.')
+            raise ParseException('Please specify a formula to evaluate.')
 
         # Update dataset
         if data:
@@ -279,8 +259,8 @@ class RasterAlgebraParser(FormulaParser):
         Assert that all input rasters are properly aligned.
         """
         if not len(set([x.srs.srid for x in rasters])) == 1:
-            raise Exception('Raster aligment check failed: SRIDs not all the same')
+            raise ParseException('Raster aligment check failed: SRIDs not all the same')
 
         gt = rasters[0].geotransform
         if any([gt != rast.geotransform for rast in rasters[1:]]):
-            raise Exception('Raster aligment check failed: geotransform arrays are not all the same')
+            raise ParseException('Raster aligment check failed: geotransform arrays are not all the same')

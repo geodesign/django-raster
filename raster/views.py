@@ -2,6 +2,7 @@ import json
 
 import numpy
 from PIL import Image
+from pyparsing import ParseException
 
 from django.conf import settings
 from django.http import Http404, HttpResponse
@@ -186,12 +187,12 @@ class AlgebraView(RasterView):
         # Get formula from request
         formula = request.GET.get('formula')
 
-        # Evaluate raster algebra expression, return 404 if not successfull
+        # Evaluate raster algebra expression, return 404 if not successful
         try:
             # Evaluate raster algebra expression
             result = self.parser.evaluate_raster_algebra(data, formula)
-        except:
-            raise Http404('Failed to evaluate raster algebra.')
+        except ParseException as e:
+            raise Http404('Failed to evaluate raster algebra. {0}'.format(e))
 
         # Get array from algebra result
         result = result.bands[0].data()

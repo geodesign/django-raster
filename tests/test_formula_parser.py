@@ -11,9 +11,6 @@ class FormulaParserTests(TestCase):
 
         val = parser.evaluate_formula(formula, data)
 
-        # Check that nan values are the same
-        self.assertTrue(numpy.array_equal(numpy.isnan(expVal), numpy.isnan(val)))
-
         # Drop nan values
         if data and any(numpy.isnan(expVal)):
             val = val[numpy.logical_not(numpy.isnan(val))]
@@ -21,6 +18,9 @@ class FormulaParserTests(TestCase):
 
         # Assert non nan values are as expected
         self.assertTrue((numpy.array(val) == expVal).all())
+
+        # Check that nan values are the same
+        self.assertTrue(numpy.array_equal(numpy.isnan(expVal), numpy.isnan(val)))
 
     def test_formula_parser_without_vars(self):
         self.assertFormulaResult("9", 9)
@@ -75,6 +75,8 @@ class FormulaParserTests(TestCase):
             "x": numpy.array([1.2, 0, -1.2]),
             "y": numpy.array([0, 1, 0]),
             "z": numpy.array([-5, 78, 912]),
+            "u": numpy.array([2, 4, 6]),
+            "A": numpy.array([1E5]),
         }
         self.assertFormulaResult("-x", -data['x'], data)
         self.assertFormulaResult("sin(x)", numpy.sin(data['x']), data)
@@ -87,7 +89,7 @@ class FormulaParserTests(TestCase):
         self.assertFormulaResult("x == 0", [0, 1, 0], data)
         self.assertFormulaResult("x > 0", [1, 0, 0], data)
         self.assertFormulaResult("x < 0", [0, 0, 1], data)
-        self.assertFormulaResult("x >= 1", [1, 0, 0], data)
+        self.assertFormulaResult("x >= 1.0", [1, 0, 0], data)
         self.assertFormulaResult("x >= 1.2", [1, 0, 0], data)
         self.assertFormulaResult("x <= 0", [0, 1, 1], data)
         self.assertFormulaResult("x <= 1", [0, 1, 1], data)
@@ -106,6 +108,14 @@ class FormulaParserTests(TestCase):
         self.assertFormulaResult("b & c", [True, False, False], data)
         self.assertFormulaResult("b | c", [True, False, True], data)
         self.assertFormulaResult("b | !c", [True, True, True], data)
+        # Nested expressions can be evaluated
+        self.assertFormulaResult(
+            "((a * 2) + (x * 3)) * 6",
+            [(2 * 2 + 1.2 * 3) * 6, (4 * 2 + 0 * 3) * 6, (6 * 2 + -1.2 * 3) * 6],
+            data
+        )
+        # Formula is case sensitive
+        self.assertFormulaResult("-A", -data['A'], data)
 
         # This is not desired behavior, should be changed in formula parser
         # to raise error or accept multi character words.
