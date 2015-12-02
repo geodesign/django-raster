@@ -5,6 +5,8 @@ from PIL import Image
 from pyparsing import ParseException
 
 from django.conf import settings
+from django.core.exceptions import SuspiciousOperation
+from django.db.models import Q
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import six
@@ -18,45 +20,38 @@ from raster.utils import IMG_FORMATS, band_data_to_image, hex_to_rgba
 
 class RasterView(View):
 
-    def get_colormap(self, lyr=None):
+    def get_colormap(self, layer=None):
         """
         Returns colormap from request and layer, looking for a colormap in
         the request, a custom legend name to construct the legend or the
         default colormap from the layer legend.
         """
-        clmp = self.request.GET.get('colormap', None)
-        if clmp:
-            colormap = json.loads(clmp)
+        if 'colormap' in self.request.GET:
+            colormap = self.request.GET['colormap']
+            colormap = json.loads(colormap)
             colormap = {k: hex_to_rgba(v) if isinstance(v, (six.string_types, int)) else v for k, v in colormap.items()}
-        else:
-            # Try to get Legend, using request input
-            legend = self.request.GET.get('legend', None)
-            if legend:
-                # Convert legend to id if its an integer
-                try:
-                    legend = int(legend)
-                except ValueError:
-                    pass
+        elif 'legend' in self.request.GET:
+            legend_input = self.request.GET['legend']
+            try:
+                legend_input = int(legend_input)
+            except ValueError:
+                pass
 
-                # Try to get legend by id, name or from input layer
-                if isinstance(legend, int):
-                    legend = get_object_or_404(Legend, id=legend)
-                elif legend:
-                    legend = Legend.objects.filter(title__iexact=legend).first()
-            elif lyr:
-                # As fallback, try to get legend from layer
-                legend = lyr.legend
-
-            # Get colormap from legend
-            if legend:
-                colormap = legend.colormap
-                # Check if custom legend entries have been requested
-                entries = self.request.GET.get('entries', None)
-                if entries:
-                    entries = entries.split(',')
-                    colormap = {k: v for (k, v) in colormap.items() if str(k) in entries}
+            # Try to get legend by id, name or from input layer
+            if isinstance(legend_input, int):
+                legend = get_object_or_404(Legend, id=legend_input)
             else:
-                colormap = None
+                legend = Legend.objects.filter(title__iexact=legend_input).first()
+            colormap = legend.colormap
+        elif layer:
+            colormap = layer.legend.colormap
+        else:
+            return
+
+        # Filter by custom entries if requested
+        if 'entries' in self.request.GET:
+            entries = self.request.GET['entries'].split(',')
+            colormap = {k: v for (k, v) in colormap.items() if str(k) in entries}
 
         return colormap
 
@@ -125,35 +120,25 @@ class RasterView(View):
 
         return result
 
-    def get_layer(self, data=None):
+    def get_layer(self):
         """
         Gets layer from request data trying both name and id.
         """
-        if not data:
-            if 'layer' in self.kwargs:
-                data = self.kwargs.get('layer')
-            elif 'layer' in self.request.GET:
-                data = self.request.GET.get('layer')
-            else:
-                raise Http404
-
+        # Get layer query data from input
+        if 'layer' in self.kwargs:
+            data = self.kwargs.get('layer')
+        elif 'layer' in self.request.GET:
+            data = self.request.GET.get('layer')
+        else:
+            raise Http404
+        # Determine query paremeter type
         try:
             data = int(data)
+            query = Q(id=data)
         except ValueError:
-            pass
+            query = Q(rasterfile__contains='rasters/' + data)
 
-        if isinstance(data, int):
-            layer = get_object_or_404(
-                RasterLayer,
-                id=data
-            )
-        else:
-            layer = get_object_or_404(
-                RasterLayer,
-                rasterfile__contains='rasters/' + data
-            )
-
-        return layer
+        return get_object_or_404(RasterLayer, query)
 
 
 class AlgebraView(RasterView):
@@ -191,8 +176,8 @@ class AlgebraView(RasterView):
         try:
             # Evaluate raster algebra expression
             result = self.parser.evaluate_raster_algebra(data, formula)
-        except ParseException as e:
-            raise Http404('Failed to evaluate raster algebra. {0}'.format(e))
+        except ParseException:
+            raise SuspiciousOperation('Failed to evaluate raster algebra.')
 
         # Get array from algebra result
         result = result.bands[0].data()
@@ -265,14 +250,11 @@ class LegendView(RasterView):
         if(legend_id):
             # Get legend from id
             legend = get_object_or_404(Legend, id=legend_id)
-        elif 'layer' in request.GET:
-            # If layer query parameter was provided, get legend from layer
-            lyr = self.get_layer()
-            if lyr.legend:
-                legend = lyr.legend
-            else:
-                raise Http404
         else:
-            raise Http404
+            # Try to get legend from layer
+            lyr = self.get_layer()
+            if not lyr.legend:
+                raise Http404
+            legend = lyr.legend
 
         return HttpResponse(legend.json, content_type='application/json')

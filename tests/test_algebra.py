@@ -49,13 +49,9 @@ class RasterAlgebraViewTests(RasterTestCase):
         response = self.client.get(self.algebra_tile_url + '?layers=a={0}&formula=a'.format(self.rasterlayer.id))
         self.assertEqual(response.status_code, 200)
 
-    def test_variable_name_lenghth_error(self):
-        response = self.client.get(self.algebra_tile_url + '?layers=a={0}&formula=aa'.format(self.rasterlayer.id))
-        self.assertEqual(response.status_code, 404)
-
     def test_undeclared_variable_name_error(self):
         response = self.client.get(self.algebra_tile_url + '?layers=a={0}&formula=a*b'.format(self.rasterlayer.id))
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 400)
 
     def test_valid_multi_formula_request(self):
         formula = iri_to_uri('a*(a<=5) + (a<5)')
