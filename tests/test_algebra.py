@@ -1,5 +1,3 @@
-from unittest import skipIf
-
 from django.contrib.gis.gdal import GDALRaster
 from django.test import TestCase
 from django.test.utils import override_settings
@@ -51,7 +49,6 @@ class RasterAlgebraViewTests(RasterTestCase):
         response = self.client.get(self.algebra_tile_url + '?layers=a={0}&formula=a'.format(self.rasterlayer.id))
         self.assertEqual(response.status_code, 200)
 
-    @skipIf(True, 'Not implemented yet, parser simply keeps first character from word.')
     def test_variable_name_lenghth_error(self):
         response = self.client.get(self.algebra_tile_url + '?layers=a={0}&formula=aa'.format(self.rasterlayer.id))
         self.assertEqual(response.status_code, 404)
