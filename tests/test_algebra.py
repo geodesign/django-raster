@@ -80,3 +80,7 @@ class RasterAlgebraViewTests(RasterTestCase):
     def test_nested_algebra_request(self):
         response = self.client.get(self.algebra_tile_url + '?layers=a={0},b={0}&formula=((a*5)%2B(b*3))*4'.format(self.rasterlayer.id))
         self.assertEqual(response.status_code, 200)
+
+    def test_long_variable_algebra_request(self):
+        response = self.client.get(self.algebra_tile_url + '?layers=abc={0},def={0}&formula=((abc*5)%2B(def*3))*4'.format(self.rasterlayer.id))
+        self.assertEqual(response.status_code, 200)

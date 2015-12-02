@@ -1,9 +1,6 @@
-import functools
-import operator
-
 import numpy
 from pyparsing import (
-    CaselessLiteral, Combine, Forward, Literal, Optional, ParseException, Word, ZeroOrMore, alphas, nums
+    CaselessLiteral, Combine, Forward, Literal, Optional, ParseException, Word, ZeroOrMore, alphanums, alphas, nums
 )
 
 from django.contrib.gis.gdal import GDALRaster
@@ -53,12 +50,15 @@ class FormulaParser(object):
         "sign": numpy.sign,
     }
 
+    # Euler number and pi
+    euler = 'E'
+    pi = 'PI'
+
     def __init__(self):
         """
         Setup the Backus Normal Form (BNF) parser logic.
         """
         point = Literal(".")
-
 
         fnumber = Combine(
             Word("+-" + nums, nums) +
@@ -81,26 +81,27 @@ class FormulaParser(object):
         ge = Literal(">=")
         ior = Literal("|")
         iand = Literal("&")
+
+        # Parenthesis
         lpar = Literal("(").suppress()
         rpar = Literal(")").suppress()
+
+        # Operator types
         addop = plus | minus | eq
         multop = mult | div | eq | neq | ge | le | gt | lt | ior | iand  # Order matters here due to "<=" being caught by "<"
         expop = Literal("^")
 
         # Euler number and Pi
-        e = Literal('E')
-        pi = Literal('PI')
-
-        # Allow all letters as variables (case sensitive)
-        alpha_literals = (Literal(x) for x in alphas)
+        e = Literal(self.euler)
+        pi = Literal(self.pi)
 
         bnf = Forward()
 
         # In atoms, pi and e need to be before the letters for it to be found
         atom = (
             Optional('-') + Optional("!") + (
-                ident + lpar + bnf + rpar | pi | e |fnumber |
-                functools.reduce(operator.or_, alpha_literals)
+                ident + lpar + bnf + rpar | pi | e | fnumber |
+                Word(alphanums)
             ).setParseAction(self.push_first) | (lpar + bnf.suppress() + rpar)
         ).setParseAction(self.push_unary_operator)
 
@@ -141,28 +142,24 @@ class FormulaParser(object):
         if op == 'unary !':
             return numpy.logical_not(self.evaluate_stack(stack))
 
-        # Evaluate binary operators
         if op in ["+", "-", "*", "/", "^", ">", "<", "==", "!=", "<=", ">=", "|", "&", "!"]:
+            # Evaluate binary operators
             op2 = self.evaluate_stack(stack)
             op1 = self.evaluate_stack(stack)
             return self.opn[op](op1, op2)
-        elif op == "PI":
-            return numpy.pi
-        elif op == "E":
+        elif op == self.euler:
             return numpy.e
+        elif op == self.pi:
+            return numpy.pi
         elif op in self.fn:
             return self.fn[op](self.evaluate_stack(stack))
-        elif op[0].isalpha():
-            if len(op[0]) > 1:
-                import ipdb; ipdb.set_trace()
-                raise ParseException('Variables are required to be of length 1.')
-            elif op[0] in self.data:
-                return self.data[op[0]]
-            else:
-                raise ParseException('Found an undeclared variable in formula.')
+        elif op in self.data:
+            return self.data[op]
         else:
-            # If numeric, convert to numpy float
-            return numpy.array(op, dtype=ALGEBRA_PIXEL_TYPE_NUMPY)
+            try:
+                return numpy.array(op, dtype=ALGEBRA_PIXEL_TYPE_NUMPY)
+            except ValueError:
+                raise ParseException('Found an undeclared variable in formula.')
 
     def parse_formula(self, formula):
         """

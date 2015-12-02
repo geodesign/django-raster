@@ -1,4 +1,5 @@
 import numpy
+from pyparsing import ParseException
 
 from django.test import TestCase
 from raster.formulas import FormulaParser
@@ -79,7 +80,9 @@ class FormulaParserTests(TestCase):
             "z": numpy.array([-5, 78, 912]),
             "u": numpy.array([2, 4, 6]),
             "A": numpy.array([1E5, 2.3e4]),
-            "e": numpy.array([2, 11e3])
+            "e": numpy.array([2, 11e3]),
+            "aLongVariable": numpy.array([1, 2, 3]),
+            "A1A": numpy.array([1, 2, 3]),
         }
         self.assertFormulaResult("-x", -data['x'], data)
         self.assertFormulaResult("sin(x)", numpy.sin(data['x']), data)
@@ -122,7 +125,12 @@ class FormulaParserTests(TestCase):
         )
         # Formula is case sensitive
         self.assertFormulaResult("-A", -data['A'], data)
-
-        # This is not desired behavior, should be changed in formula parser
-        # to raise error or accept multi character words.
-        self.assertFormulaResult("aaa", data['a'], data)
+        # Long variable name is accepted
+        self.assertFormulaResult("-aLongVariable", -data['aLongVariable'], data)
+        # Alphanumeric variable name
+        self.assertFormulaResult("-A1A", -data['A1A'], data)
+        # Unknown variable raises error
+        parser = FormulaParser()
+        msg = 'Found an undeclared variable in formula.'
+        with self.assertRaisesMessage(ParseException, msg):
+            parser.evaluate_formula("3 * not_a_var", data)
