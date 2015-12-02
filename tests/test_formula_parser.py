@@ -26,7 +26,6 @@ class FormulaParserTests(TestCase):
         self.assertFormulaResult("9", 9)
         self.assertFormulaResult("-9", -9)
         self.assertFormulaResult("--9", 9)
-        self.assertFormulaResult("-E", -numpy.e)
         self.assertFormulaResult("9 + 3 + 6", 9 + 3 + 6)
         self.assertFormulaResult("9 + 3 / 11", 9 + 3.0 / 11)
         self.assertFormulaResult("(9 + 3)", (9 + 3))
@@ -40,9 +39,10 @@ class FormulaParserTests(TestCase):
         self.assertFormulaResult("PI^2", numpy.pi ** 2)
         self.assertFormulaResult("round(PI^2)", round(numpy.pi ** 2))
         self.assertFormulaResult("6.02E23 * 8.048", 6.02E23 * 8.048)
-        self.assertFormulaResult("e / 3", numpy.e / 3)
+        self.assertFormulaResult("6.02e23 * 8.048", 6.02E23 * 8.048)
         self.assertFormulaResult("sin(PI / 2)", numpy.sin(numpy.pi / 2))
         self.assertFormulaResult("cos(PI / 5)", numpy.cos(numpy.pi / 5))
+        self.assertFormulaResult("-E", -numpy.e)
         self.assertFormulaResult("int(E)", int(numpy.e))
         self.assertFormulaResult("int(-E)", int(-numpy.e))
         self.assertFormulaResult("round(E)", round(numpy.e))
@@ -54,7 +54,8 @@ class FormulaParserTests(TestCase):
         self.assertFormulaResult("sign(-2)", -1)
         self.assertFormulaResult("sign(0)", 0)
         self.assertFormulaResult("sign(0.1)", 1)
-        self.assertFormulaResult("exp(0)", numpy.e)
+        self.assertFormulaResult("exp(0)", 1)
+        self.assertFormulaResult("exp(1)", numpy.e)
         self.assertFormulaResult("log(1)", 0)
         self.assertFormulaResult("0 | 1", 1)
         self.assertFormulaResult("1 & 1", 1)
@@ -72,11 +73,13 @@ class FormulaParserTests(TestCase):
             "a": numpy.array([2, 4, 6]),
             "b": numpy.array([True, False, True]),
             "c": numpy.array([True, False, False]),
+            "d": [2, 4, 6],
             "x": numpy.array([1.2, 0, -1.2]),
             "y": numpy.array([0, 1, 0]),
             "z": numpy.array([-5, 78, 912]),
             "u": numpy.array([2, 4, 6]),
-            "A": numpy.array([1E5]),
+            "A": numpy.array([1E5, 2.3e4]),
+            "e": numpy.array([2, 11e3])
         }
         self.assertFormulaResult("-x", -data['x'], data)
         self.assertFormulaResult("sin(x)", numpy.sin(data['x']), data)
@@ -108,6 +111,9 @@ class FormulaParserTests(TestCase):
         self.assertFormulaResult("b & c", [True, False, False], data)
         self.assertFormulaResult("b | c", [True, False, True], data)
         self.assertFormulaResult("b | !c", [True, True, True], data)
+        self.assertFormulaResult("d", numpy.array(data['d']), data)
+        # Mix euler number, scientific notation and variable called e
+        self.assertFormulaResult("E * 1e5 * e", numpy.e * 1e5 * data['e'], data)
         # Nested expressions can be evaluated
         self.assertFormulaResult(
             "((a * 2) + (x * 3)) * 6",

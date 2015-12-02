@@ -59,12 +59,11 @@ class FormulaParser(object):
         """
         point = Literal(".")
 
-        e = CaselessLiteral("E")
 
         fnumber = Combine(
             Word("+-" + nums, nums) +
             Optional(point + Optional(Word(nums))) +
-            Optional(e + Word("+-" + nums, nums))
+            Optional(CaselessLiteral('e') + Word("+-" + nums, nums))
         )
 
         ident = Word(alphas, alphas + nums + "_$")
@@ -87,7 +86,10 @@ class FormulaParser(object):
         addop = plus | minus | eq
         multop = mult | div | eq | neq | ge | le | gt | lt | ior | iand  # Order matters here due to "<=" being caught by "<"
         expop = Literal("^")
-        pi = CaselessLiteral("PI")
+
+        # Euler number and Pi
+        e = Literal('E')
+        pi = Literal('PI')
 
         # Allow all letters as variables (case sensitive)
         alpha_literals = (Literal(x) for x in alphas)
@@ -97,7 +99,7 @@ class FormulaParser(object):
         # In atoms, pi and e need to be before the letters for it to be found
         atom = (
             Optional('-') + Optional("!") + (
-                pi | e | fnumber | ident + lpar + bnf + rpar |
+                ident + lpar + bnf + rpar | pi | e |fnumber |
                 functools.reduce(operator.or_, alpha_literals)
             ).setParseAction(self.push_first) | (lpar + bnf.suppress() + rpar)
         ).setParseAction(self.push_unary_operator)
@@ -150,10 +152,14 @@ class FormulaParser(object):
             return numpy.e
         elif op in self.fn:
             return self.fn[op](self.evaluate_stack(stack))
-        elif op[0].isalpha() and len(op[0]) == 1 and op[0] in self.data:
-            return self.data[op[0]]
-        elif op[0].isalpha() and len(op[0]) == 1:
-            raise ParseException('Found an undeclared variable in formula.')
+        elif op[0].isalpha():
+            if len(op[0]) > 1:
+                import ipdb; ipdb.set_trace()
+                raise ParseException('Variables are required to be of length 1.')
+            elif op[0] in self.data:
+                return self.data[op[0]]
+            else:
+                raise ParseException('Found an undeclared variable in formula.')
         else:
             # If numeric, convert to numpy float
             return numpy.array(op, dtype=ALGEBRA_PIXEL_TYPE_NUMPY)
