@@ -1,6 +1,8 @@
 import numpy
 from PIL import Image
 
+from django.core.exceptions import SuspiciousOperation
+
 from .formulas import FormulaParser
 
 IMG_FORMATS = {'.png': 'PNG', '.jpg': 'JPEG'}
@@ -12,7 +14,11 @@ def hex_to_rgba(value, alpha=255):
     """
     value = value.lstrip('#')
     lv = len(value)
-    rgb = tuple(int(value[i:i + lv // 3], 16) for i in range(0, lv, lv // 3))
+    try:
+        rgb = tuple(int(value[i:i + lv // 3], 16) for i in range(0, lv, lv // 3))
+    except ValueError:
+        raise SuspiciousOperation('Invalid color, could not convert hex to rgb.')
+
     return rgb + (alpha, )
 
 
