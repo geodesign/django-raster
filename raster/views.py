@@ -152,10 +152,20 @@ class AlgebraView(RasterView):
 
     def get(self, request, masked=False, *args, **kwargs):
         # Get layer ids
-        ids = request.GET.get('layers').split(',')
+        ids = request.GET.get('layers', '').split(',')
 
-        # Parse layer ids into dictionary with variable names
-        ids = {idx.split('=')[0]: idx.split('=')[1] for idx in ids}
+        # Check if layer parameter is valid
+        if not len(ids) or not all('=' in idx for idx in ids):
+            raise SuspiciousOperation('Layer parameter is not valid.')
+
+        # Split id/name input pairs
+        ids = [idx.split('=') for idx in ids]
+
+        # Convert ids to integer
+        try:
+            ids = {idx[0]: int(idx[1]) for idx in ids}
+        except ValueError:
+            raise SuspiciousOperation('Layer parameter is not valid.')
 
         # Get raster data as 1D arrays and store in dict that can be used
         # for formula evaluation.

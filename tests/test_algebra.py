@@ -77,3 +77,21 @@ class RasterAlgebraViewTests(RasterTestCase):
     def test_long_variable_algebra_request(self):
         response = self.client.get(self.algebra_tile_url + '?layers=abc={0},def={0}&formula=((abc*5)%2B(def*3))*4'.format(self.rasterlayer.id))
         self.assertEqual(response.status_code, 200)
+
+    def test_broken_formula_request(self):
+        response = self.client.get(self.algebra_tile_url + '?layers=a={0}&formula=3*a bc abc/'.format(self.rasterlayer.id))
+        self.assertEqual(response.status_code, 400)
+
+    def test_broken_layers_request(self):
+        # Missing parameter
+        response = self.client.get(self.algebra_tile_url + '?formula=3*a')
+        self.assertEqual(response.status_code, 400)
+        # Empty parameter
+        response = self.client.get(self.algebra_tile_url + '?layers=&formula=3*a')
+        self.assertEqual(response.status_code, 400)
+        # Missing equal sign
+        response = self.client.get(self.algebra_tile_url + '?layers=1234,a=1&formula=3*a')
+        self.assertEqual(response.status_code, 400)
+        # Layer id is not an integer
+        response = self.client.get(self.algebra_tile_url + '?layers=a=x&formula=3*a')
+        self.assertEqual(response.status_code, 400)
