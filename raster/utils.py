@@ -1,7 +1,7 @@
 import numpy
 from PIL import Image
 
-from django.core.exceptions import SuspiciousOperation
+from raster.exceptions import RasterException
 
 from .formulas import FormulaParser
 
@@ -17,7 +17,7 @@ def hex_to_rgba(value, alpha=255):
     try:
         rgb = tuple(int(value[i:i + lv // 3], 16) for i in range(0, lv, lv // 3))
     except ValueError:
-        raise SuspiciousOperation('Invalid color, could not convert hex to rgb.')
+        raise RasterException('Invalid color, could not convert hex to rgb.')
 
     return rgb + (alpha, )
 

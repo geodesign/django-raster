@@ -5,13 +5,13 @@ from PIL import Image
 from pyparsing import ParseException
 
 from django.conf import settings
-from django.core.exceptions import SuspiciousOperation
 from django.db.models import Q
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import six
 from django.views.generic import View
 from raster.const import WEB_MERCATOR_TILESIZE
+from raster.exceptions import RasterAlgebraException
 from raster.formulas import RasterAlgebraParser
 from raster.models import Legend, RasterLayer, RasterTile
 from raster.tiler import tile_bounds, tile_scale
@@ -156,7 +156,7 @@ class AlgebraView(RasterView):
 
         # Check if layer parameter is valid
         if not len(ids) or not all('=' in idx for idx in ids):
-            raise SuspiciousOperation('Layer parameter is not valid.')
+            raise RasterAlgebraException('Layer parameter is not valid.')
 
         # Split id/name input pairs
         ids = [idx.split('=') for idx in ids]
@@ -165,7 +165,7 @@ class AlgebraView(RasterView):
         try:
             ids = {idx[0]: int(idx[1]) for idx in ids}
         except ValueError:
-            raise SuspiciousOperation('Layer parameter is not valid.')
+            raise RasterAlgebraException('Layer parameter is not valid.')
 
         # Get raster data as 1D arrays and store in dict that can be used
         # for formula evaluation.
@@ -182,12 +182,12 @@ class AlgebraView(RasterView):
         # Get formula from request
         formula = request.GET.get('formula')
 
-        # Evaluate raster algebra expression, return 404 if not successful
+        # Evaluate raster algebra expression, return 400 if not successful
         try:
             # Evaluate raster algebra expression
             result = self.parser.evaluate_raster_algebra(data, formula)
         except ParseException:
-            raise SuspiciousOperation('Failed to evaluate raster algebra.')
+            raise RasterAlgebraException('Failed to evaluate raster algebra.')
 
         # Get array from algebra result
         result = result.bands[0].data()
