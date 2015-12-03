@@ -9,7 +9,6 @@ class FormulaParserTests(TestCase):
 
     def assertFormulaResult(self, formula, expVal, data={}):
         parser = FormulaParser()
-
         val = parser.evaluate_formula(formula, data)
 
         # Drop nan values
@@ -50,6 +49,7 @@ class FormulaParserTests(TestCase):
         self.assertFormulaResult("round(-E)", round(-numpy.e))
         self.assertFormulaResult("E^PI", numpy.e ** numpy.pi)
         self.assertFormulaResult("2^3^2", 2 ** 3 ** 2)
+        self.assertFormulaResult("2^3^(2 + 1)", 2 ** 3 ** 3)
         self.assertFormulaResult("2^3 + 2", 2 ** 3 + 2)
         self.assertFormulaResult("2^9", 2 ** 9)
         self.assertFormulaResult("sign(-2)", -1)
@@ -68,6 +68,7 @@ class FormulaParserTests(TestCase):
         self.assertFormulaResult("1 == 1", True)
         self.assertFormulaResult("1 != 2", True)
         self.assertFormulaResult("!1", False)
+        self.assertFormulaResult("!-1", False)
 
     def test_formula_parser_with_vars(self):
         data = {

@@ -58,56 +58,65 @@ class FormulaParser(object):
         """
         Setup the Backus Normal Form (BNF) parser logic.
         """
-        point = Literal(".")
+        # Instantiate blank parser for BNF construction
+        bnf = Forward()
 
-        fnumber = Combine(
-            Word("+-" + nums, nums) +
-            Optional(point + Optional(Word(nums))) +
-            Optional(CaselessLiteral('e') + Word("+-" + nums, nums))
-        )
-
-        ident = Word(alphas, alphas + nums + "_$")
-
-        # Operators
-        plus = Literal("+")
-        minus = Literal("-")
-        mult = Literal("*")
-        div = Literal("/")
-        eq = Literal("==")
-        neq = Literal("!=")
-        lt = Literal("<")
-        le = Literal("<=")
-        gt = Literal(">")
-        ge = Literal(">=")
-        ior = Literal("|")
-        iand = Literal("&")
-
-        # Parenthesis
+        # Expression for parenthesis, which are suppressed in the atoms
+        # after matching.
         lpar = Literal("(").suppress()
         rpar = Literal(")").suppress()
 
-        # Operator types
-        addop = plus | minus | eq
-        multop = mult | div | eq | neq | ge | le | gt | lt | ior | iand  # Order matters here due to "<=" being caught by "<"
-        expop = Literal("^")
-
-        # Euler number and Pi
+        # Expression for mathematical constants: Euler number and Pi
         e = Literal(self.euler)
         pi = Literal(self.pi)
 
-        bnf = Forward()
+        # Additive operators
+        addop = Literal("+") | Literal("-") | Literal("==")
+
+        # Multiplicative operators. The order the operators in this list
+        # matters due to "<=" being caught by "<".
+        multop = (
+            Literal("*") | Literal("/") | Literal("!=") | Literal("<=") |
+            Literal(">=") | Literal("<") | Literal(">") | Literal("|") |
+            Literal("&")
+        )
+
+        # Exponential operator
+        expop = Literal("^")
+
+        # Unary operators
+        unary = Optional('-') + Optional("!")
+
+        # Expression for floating point numbers, allowing for
+        # scientific notation.
+        number = Combine(
+            Word("+-" + nums, nums) +
+            Optional(Literal('.') + Optional(Word(nums))) +
+            Optional(CaselessLiteral('e') + Word("+-" + nums, nums))
+        )
+
+        # Variables are alphanumeric strings that represent keys in the input
+        # data dictionary.
+        variable = Word(alphanums)
+
+        # Functional calls
+        function = Word(alphas, alphas + nums + "_$") + lpar + bnf + rpar
+
+        # Atom core - a single element is either a math constant,
+        # a function or a variable.
+        atom_core = function | pi | e | number | variable
+
+        # Atom subelement between parenthesis
+        atom_subelement = lpar + bnf.suppress() + rpar
 
         # In atoms, pi and e need to be before the letters for it to be found
         atom = (
-            Optional('-') + Optional("!") + (
-                ident + lpar + bnf + rpar | pi | e | fnumber |
-                Word(alphanums)
-            ).setParseAction(self.push_first) | (lpar + bnf.suppress() + rpar)
+            unary + atom_core.setParseAction(self.push_first) | atom_subelement
         ).setParseAction(self.push_unary_operator)
 
-        # By defining exponentiation as "atom [ ^ factor ]..." instead of "atom [ ^ atom ]...",
-        # we get right-to-left exponents, instead of left-to-righ
-        # that is, 2^3^2 = 2^(3^2), not (2^3)^2.
+        # By defining exponentiation as "atom [ ^ factor ]..." instead of
+        # "atom [ ^ atom ]...", we get right-to-left exponents, instead of
+        # left-to-right that is, 2^3^2 = 2^(3^2), not (2^3)^2.
         factor = Forward()
         factor << atom + ZeroOrMore((expop + factor).setParseAction(self.push_first))
 
@@ -121,7 +130,7 @@ class FormulaParser(object):
 
     def push_unary_operator(self, strg, loc, toks):
         """
-        Sets custom flag for unary operators.
+        Set custom flag for unary operators.
         """
         if toks:
             if toks[0] == '-':
@@ -199,7 +208,7 @@ class FormulaParser(object):
 
     def evaluate_formula(self, formula, data={}):
         """
-        Helper function to set formula and evaluate in one call.
+        Set formula and evaluate in one call.
         """
         self.parse_formula(formula)
         return self.evaluate(data)
