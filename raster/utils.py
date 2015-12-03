@@ -13,17 +13,16 @@ def hex_to_rgba(value, alpha=255):
     Converts a HEX color string to a RGBA 4-tuple.
     """
     value = value.lstrip('#')
-    lv = len(value)
-    if lv == 2:
-        value *= 3
-    elif lv == 3:
-        value *= 2
-    elif lv != 6 or not value.isalnum():
+
+    # Check length and input string property
+    if len(value) not in [1, 2, 3, 6] or not value.isalnum():
         raise RasterException('Invalid color, could not convert hex to rgb.')
 
-    rgb = tuple(int(value[i:i + lv // 3], 16) for i in range(0, lv, lv // 3))
+    # Repeat values for shortened input
+    value = (value * 6)[:6]
 
-    return rgb + (alpha, )
+    # Convert to rgb
+    return int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16), alpha
 
 
 def band_data_to_image(band_data, colormap):
