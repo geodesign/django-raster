@@ -1,3 +1,7 @@
+=====
+Views
+=====
+
 TMS View
 --------
 Leveraging the img property of the rasters, a Tile Map Service (TMS) view is part of this package. The url can be included by::
