@@ -1,3 +1,6 @@
+import operator
+from functools import reduce
+
 import numpy
 from pyparsing import (
     CaselessLiteral, Combine, Forward, Literal, Optional, ParseException, Word, ZeroOrMore, alphanums, alphas, nums
@@ -15,13 +18,21 @@ class FormulaParser(object):
 
     Adopted from: http://pyparsing.wikispaces.com/file/view/fourFn.py
     """
-    expr_stack = []
-
-    # The data dictionary holds the values on which to evaluate the formula
-    data = {}
+    # Map function names to python functions
+    numpy_functions = {
+        "sin": numpy.sin,
+        "cos": numpy.cos,
+        "tan": numpy.tan,
+        "log": numpy.log,
+        "exp": numpy.exp,
+        "abs": numpy.abs,
+        "int": numpy.int,
+        "round": numpy.round,
+        "sign": numpy.sign,
+    }
 
     # Map operator symbols to arithmetic operations in numpy
-    opn = {
+    numpy_operators = {
         "+": numpy.add,
         "-": numpy.subtract,
         "*": numpy.multiply,
@@ -34,21 +45,26 @@ class FormulaParser(object):
         "<": numpy.less,
         "<=": numpy.less_equal,
         "|": numpy.logical_or,
-        "&": numpy.logical_and
+        "&": numpy.logical_and,
     }
 
-    # Map function names to python functions
-    fn = {
-        "sin": numpy.sin,
-        "cos": numpy.cos,
-        "tan": numpy.tan,
-        "log": numpy.log,
-        "exp": numpy.exp,
-        "abs": numpy.abs,
-        "int": numpy.int,
-        "round": numpy.round,
-        "sign": numpy.sign,
+    numpy_unary_operators = {
+        "unary !": numpy.logical_not,
+        "unary -": numpy.negative,
     }
+
+    # Additive operators
+    addop = ("+", "-", "==")
+
+    # Exponential operator
+    expop = ("^", )
+
+    # Unary operators
+    unary = {"-": "unary -", "!": "unary !"}
+
+    # Multiplicative operators. The order the operators in this list
+    # matters due to "<=" being caught by "<".
+    multop = ("*", "/", "!=", "<=", ">=", "<", ">", "|", "&")
 
     # Euler number and pi
     euler = 'E'
@@ -58,8 +74,14 @@ class FormulaParser(object):
         """
         Setup the Backus Normal Form (BNF) parser logic.
         """
+        # The data dictionary holds the values on which to evaluate the formula.
+        self.data = {}
+
+        # The list holding parsed expressions used for evaluation of the formula.
+        self.expr_stack = []
+
         # Instantiate blank parser for BNF construction
-        bnf = Forward()
+        self.bnf = Forward()
 
         # Expression for parenthesis, which are suppressed in the atoms
         # after matching.
@@ -70,22 +92,11 @@ class FormulaParser(object):
         e = Literal(self.euler)
         pi = Literal(self.pi)
 
-        # Additive operators
-        addop = Literal("+") | Literal("-") | Literal("==")
-
-        # Multiplicative operators. The order the operators in this list
-        # matters due to "<=" being caught by "<".
-        multop = (
-            Literal("*") | Literal("/") | Literal("!=") | Literal("<=") |
-            Literal(">=") | Literal("<") | Literal(">") | Literal("|") |
-            Literal("&")
-        )
-
-        # Exponential operator
-        expop = Literal("^")
-
-        # Unary operators
-        unary = Optional('-') + Optional("!")
+        # Prepare operator expressions
+        addop = reduce(operator.or_, (Literal(x) for x in self.addop))
+        multop = reduce(operator.or_, (Literal(x) for x in self.multop))
+        expop = reduce(operator.or_, (Literal(x) for x in self.expop))
+        unary = reduce(operator.add, (Optional(x) for x in self.unary.keys()))
 
         # Expression for floating point numbers, allowing for
         # scientific notation.
@@ -100,14 +111,14 @@ class FormulaParser(object):
         variable = Word(alphanums)
 
         # Functional calls
-        function = Word(alphas, alphas + nums + "_$") + lpar + bnf + rpar
+        function = Word(alphas, alphas + nums + "_$") + lpar + self.bnf + rpar
 
         # Atom core - a single element is either a math constant,
         # a function or a variable.
         atom_core = function | pi | e | number | variable
 
         # Atom subelement between parenthesis
-        atom_subelement = lpar + bnf.suppress() + rpar
+        atom_subelement = lpar + self.bnf.suppress() + rpar
 
         # In atoms, pi and e need to be before the letters for it to be found
         atom = (
@@ -121,9 +132,7 @@ class FormulaParser(object):
         factor << atom + ZeroOrMore((expop + factor).setParseAction(self.push_first))
 
         term = factor + ZeroOrMore((multop + factor).setParseAction(self.push_first))
-        bnf << term + ZeroOrMore((addop + term).setParseAction(self.push_first))
-
-        self.bnf = bnf
+        self.bnf << term + ZeroOrMore((addop + term).setParseAction(self.push_first))
 
     def push_first(self, strg, loc, toks):
         self.expr_stack.append(toks[0])
@@ -132,36 +141,27 @@ class FormulaParser(object):
         """
         Set custom flag for unary operators.
         """
-        if toks:
-            if toks[0] == '-':
-                self.expr_stack.append('unary -')
-            elif toks[0] == '!':
-                self.expr_stack.append('unary !')
+        if toks and toks[0] in self.unary:
+            self.expr_stack.append(self.unary[toks[0]])
 
     def evaluate_stack(self, stack):
         """
         Evaluate a stack element.
         """
-        # Get operator element
         op = stack.pop()
 
-        # Evaluate unary operators
-        if op == 'unary -':
-            return -self.evaluate_stack(stack)
-        if op == 'unary !':
-            return numpy.logical_not(self.evaluate_stack(stack))
-
-        if op in ["+", "-", "*", "/", "^", ">", "<", "==", "!=", "<=", ">=", "|", "&", "!"]:
-            # Evaluate binary operators
+        if op in self.numpy_unary_operators:
+            return self.numpy_unary_operators[op](self.evaluate_stack(stack))
+        elif op in self.numpy_operators.keys():
             op2 = self.evaluate_stack(stack)
             op1 = self.evaluate_stack(stack)
-            return self.opn[op](op1, op2)
+            return self.numpy_operators[op](op1, op2)
+        elif op in self.numpy_functions:
+            return self.numpy_functions[op](self.evaluate_stack(stack))
         elif op == self.euler:
             return numpy.e
         elif op == self.pi:
             return numpy.pi
-        elif op in self.fn:
-            return self.fn[op](self.evaluate_stack(stack))
         elif op in self.data:
             return self.data[op]
         else:
