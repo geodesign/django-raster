@@ -74,6 +74,9 @@ class FormulaParser(object):
         """
         Setup the Backus Normal Form (BNF) parser logic.
         """
+        # Set an empty formula attribute
+        self.formula = None
+
         # The data dictionary holds the values on which to evaluate the formula.
         self.data = {}
 
@@ -175,13 +178,10 @@ class FormulaParser(object):
         Parse a string formula into a BNF expression.
         """
         # Clean formula before parsing
-        formula = self.clean_formula(formula)
+        self.formula = self.clean_formula(formula)
 
         # Reset expression stack
         self.expr_stack = []
-
-        # Use bnf to parse the string
-        self.bnf.parseString(formula)
 
     def clean_formula(self, formula):
         """
@@ -193,9 +193,12 @@ class FormulaParser(object):
         """
         Evaluate the input data using the current formula expression stack.
         """
-        # Make sure a formula has been parsed before evaluating
-        if self.expr_stack == []:
+        # Make sure a formula has been specified before evaluating
+        if not self.formula:
             raise ParseException('Please specify a formula to evaluate.')
+
+        # Populate the expression stack
+        self.bnf.parseString(self.formula)
 
         # Update dataset
         if data:

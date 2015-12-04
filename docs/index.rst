@@ -1,61 +1,55 @@
-.. django-raster documentation master file, created by
-   sphinx-quickstart on Mon Sep  7 15:14:34 2015.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+Raster utilities for Django
+===========================
+Django-raster provides raster data integration for Django projects with a
+PostGIS database backend. It is based on the Django internal raster data type
+`RasterField`_ and gdal bindings through `GDALRaster`_.
 
-Welcome to django-raster's documentation!
-=========================================
-
-Contents:
-
-.. toctree::
-   :maxdepth: 2
-
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
-
-
-Rasters for Django
-==================
-Django-raster provides basic raster data integration for Django projects with a PostGIS database backend.
-
-
-Setup
------
-**Note: This package requires a PostGIS >= 2.0**
+Installation
+------------
 
 1. Install package with ``pip install django-raster``
 
 2. Add "raster" to your INSTALLED_APPS setting like this::
 
-        INSTALLED_APPS = (
-            ...
-            'raster',
-        )
+    INSTALLED_APPS = (
+        ...
+        'raster',
+    )
 
 3. Run ``python manage.py migrate`` to create the raster models
 
-4. Add the TMS Endpoint to your urlconf::
+4. Add the raster urls to your main urlconf::
 
-        urlpatterns = patterns('',
-            ...
-            url(r'tiles/', include('raster.urls')),
-        )
+    urlpatterns = patterns('',
+        ...
+        url(r'raster/', include('raster.urls')),
+    )
 
-5. (Optional) Add ``RASTER_USE_CELERY = True`` to your project's setting to enable asynchronous raster parsing.
+5. (Optional) Add ``RASTER_USE_CELERY = True`` to your project's setting to
+   enable asynchronous raster parsing.
 
-6. To add data, upload a raster file through the admin. Create a Legend object and call the tiles through the ``/tiles/myrasterfile.tif/{z}/{x}/{y}.png`` url setup previously.
+Requirements
+^^^^^^^^^^^^
+Django-raster requires `Django >= 1.9`_ configured with the `PostGIS`__ backend,
+as well as `GDAL`__.
+
+.. _Django >= 1.9: https://docs.djangoproject.com/en/1.9/
+__ http://postgis.net/
+__ http://gdal.org/
 
 
 Description
 -----------
-Django-raster provides basic integration of `raster data <http://en.wikipedia.org/wiki/GIS_file_formats#Raster>`_ into Django. It is based on the python bindings provided by the `GDAL <https://pypi.python.org/pypi/GDAL/>`_ package and PostGIS. Raster files can be uploaded and parsed through the admin interface. The raw raster data can be parsed asynchronously if `Celery <http://celeryproject.org/>`_ is integrated into the Django project (see below).
+Django-raster provides high level utilities to work with `raster data`__ in
+Django. It is based on the Django internal `GDALRaster`_ object and
+`RasterField`_ datatype.
+
+There are three main components inb
+
+
+Raster files can be uploaded and parsed through the admin interface. The raw raster data can be parsed asynchronously if `Celery <http://celeryproject.org/>`_ is integrated into the Django project (see below).
+
+__ http://en.wikipedia.org/wiki/GIS_file_formats#Raster
 
 Once a raster file is uploaded, the parser will extract the data in the raster file and store the rasters in regular tiles of 256x256 pixels in a PostGIS raster table. Each tile will be one row in a PostGIS raster table.
 
@@ -65,14 +59,14 @@ For this, the package defines two models and one field:
 
 * ``RasterTile`` - storing the parsed raster in PostGis. The raster data is split into tiles of 256x256 pixels and each tile is stored as an instance of RasterTile. The raster data itself is stored in a *RasterField* within the RasterTile model.
 
-* ``RasterField`` - an extension of the Django base Field class to store the raster data. The field converts PostGIS raster data from a database into Gdal Raster python objects and vice versa.
-
-* ``OGRRaster`` - an object that stores raster data, in analogy to the OGRGeometry objects in GeoDjango.
-
-Due to the simplicity of the implementation, currently no spatial querying can be done on the raster data through python. This package is not integrated with GeoDjango and has a very limited set of features when compared with GeoDjango spatial models (however, integration with GeoDjango is underway). If required, custom SQL can be used to make spatial queries on the raster data.
+.. _RasterField: https://docs.djangoproject.com/en/dev/ref/contrib/gis/model-api/#rasterfield
+.. _GDALRaster: https://docs.djangoproject.com/en/1.9/ref/contrib/gis/gdal/#raster-data-objects
 
 Usage
 -----
+To add data, upload a raster file through the admin. Create a Legend object and call the tiles through the ``/raster/tiles/myrasterfile.tif/{z}/{x}/{y}.png`` url setup previously.
+
+
 After setting the package up, raster files can be uploaded through the admin interface using the RasterLayer model. Specify a layer name, the raster data type (continuous, categorical, mask or rank ordered), the raster's srid, the nodata value and the raster file to be uploaded.
 
 Upon saving the a RasterLayer instance with a raster file, django-raster automatically loads the raster data from the file into a raster field in the RasterTile model. The RasterLayer instances have a *parse_log* field, which stores information about the parsing process. For debugging, there might be some useful information in the parse log.
@@ -95,10 +89,10 @@ Overview levels (or pyramids) are automatically created at the moment of importi
 
 Tile size
 ---------
-The default tile size is 100x100 pixels. The tile size can be changed by providing an integer value in the ``RASTER_TILESIZE`` setting. The tiles are always saquares, so the tileize is set by one integer that specifies the number of pixels in each tile. For instance, setting::
+The default tile size is 256x256 pixels. The tile size can be changed by providing an integer value in the ``RASTER_TILESIZE`` setting. The tiles are always saquares, so the tileize is set by one integer that specifies the number of pixels in each tile. For instance, setting::
 
         RASTER_TILESIZE = 100
-        
+
 will import the raster in tiles of 100x100 pixels.
 
 Re-parsing data
@@ -117,22 +111,6 @@ The RasterLayer model will be extended such that it has spatial operations that 
               {'count': 685432, 'value': 3.0},
               {'count': 153598, 'value': 9.0}]
 
-OGRRaster objects
------------------
-The RasterField uses OGRRaster objects to make raster data available through the field. The OGRRaster object stores the raster data in a gdal raster python object in the attribute ``ptr``. There are several methods that allow interacting with the data, such as the ``metadata`` property, that will return a dictionary with the raster header information.
-
-Export raster as PIL Image
---------------------------
-The OGRRaster objects that have discrete pixel values can be converted to a PIL image, through the img property. For each pixel value, an RGBA tuple can be specified in a dictionary colormap and passed to the img function. For example::
-
-        >>> categories =  {
-            1:  (225, 225, 225, 255),
-            2:  (156, 156, 156, 255),
-            3:  (255, 255, 190, 255),
-            }
-        >>> img = rast.img(categories)
-        >>> img.size
-        ... (200, 200)
 
 TMS View
 --------
@@ -170,3 +148,9 @@ By default all rasters are compressed during parsing using LZW compression. This
 but might slow down the parsing process due to the compression overhead. The compress method can be changed using the ``RASTER_COMPRESS_METHOD`` setting.
 Allowed options are ``JPEG``, ``LZW``, ``PACKBITS``,  ``DEFLATE``, ``CCITTRLE``,  ``CCITTFAX3``, ``CCITTFAX4``, ``LZMA``. To disable compression, specify this setting as an empty string ``''``.
 
+Indices and tables
+------------------
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`
