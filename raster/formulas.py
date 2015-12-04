@@ -18,7 +18,7 @@ class FormulaParser(object):
 
     Adopted from: http://pyparsing.wikispaces.com/file/view/fourFn.py
     """
-    # Map function names to python functions
+    # Map function names to numpy functions
     numpy_functions = {
         "sin": numpy.sin,
         "cos": numpy.cos,
