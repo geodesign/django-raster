@@ -15,6 +15,7 @@
 import os
 import shlex
 import sys
+
 from recommonmark.parser import CommonMarkParser
 
 # If extensions (or modules to document with autodoc) are in another directory,
