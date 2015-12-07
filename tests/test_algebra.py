@@ -1,10 +1,9 @@
 from django.contrib.gis.gdal import GDALRaster
 from django.test import TestCase
 from django.test.utils import override_settings
-from django.utils.encoding import iri_to_uri
-from raster.formulas import RasterAlgebraParser
-
-from .raster_testcase import RasterTestCase
+from django.utils.http import urlquote
+from raster.algebra.parser import RasterAlgebraParser
+from tests.raster_testcase import RasterTestCase
 
 
 class RasterAlgebraParserTests(TestCase):
@@ -54,7 +53,7 @@ class RasterAlgebraViewTests(RasterTestCase):
         self.assertEqual(response.status_code, 400)
 
     def test_valid_multi_formula_request(self):
-        formula = iri_to_uri('a*(a<=5) + (a<5)')
+        formula = urlquote('a*(a<=5)+(a<5)')
         response = self.client.get(self.algebra_tile_url + '?layers=a={0}&formula={1}'.format(self.rasterlayer.id, formula))
         self.assertEqual(response.status_code, 200)
 

@@ -11,10 +11,9 @@ from django.contrib.postgres.fields import ArrayField
 from django.db.models import Max, Min
 from django.db.models.signals import m2m_changed, post_save, pre_save
 from django.dispatch import receiver
-
-from .const import WEB_MERCATOR_SRID
-from .utils import hex_to_rgba
-from .valuecount import ValueCountMixin
+from raster.const import WEB_MERCATOR_SRID
+from raster.utils import hex_to_rgba
+from raster.valuecount import ValueCountMixin
 
 
 class LegendSemantics(models.Model):

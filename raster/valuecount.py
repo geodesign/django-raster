@@ -4,11 +4,10 @@ import numpy
 
 from django.contrib.gis.geos import GEOSGeometry, MultiPolygon, Polygon
 from django.db import connection
-
-from .const import WEB_MERCATOR_SRID
-from .formulas import FormulaParser, RasterAlgebraParser
-from .rasterize import rasterize
-from .tiler import tile_index_range
+from raster.algebra.parser import FormulaParser, RasterAlgebraParser
+from raster.const import WEB_MERCATOR_SRID
+from raster.rasterize import rasterize
+from raster.tiler import tile_index_range
 
 
 CLIPPED_VALUE_COUNT_SQL = """
@@ -200,7 +199,7 @@ def aggregator(layer_dict, zoom=None, geom=None, formula=None, acres=True, group
                         selector = result_data == float(key)
                     except ValueError:
                         # Otherwise use it as numpy expression directly
-                        selector = formula_parser.evaluate_formula(key, {'x': result_data})
+                        selector = formula_parser.evaluate({'x': result_data}, key)
                     values[key] = numpy.sum(selector)
 
             # Add counts to results

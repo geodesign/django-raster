@@ -1,15 +1,20 @@
 import numpy
-from pyparsing import ParseException
 
 from django.test import TestCase
-from raster.formulas import FormulaParser
+from raster.algebra.parser import FormulaParser
+from raster.exceptions import RasterAlgebraException
 
 
 class FormulaParserTests(TestCase):
 
     def assertFormulaResult(self, formula, expVal, data={}):
+        # Get data from test object if not passed as an argument
+        if hasattr(self, 'data'):
+            data = self.data
+
+        # Evaluate
         parser = FormulaParser()
-        val = parser.evaluate_formula(formula, data)
+        val = parser.evaluate(data, formula)
 
         # Drop nan values
         if data and any(numpy.isnan(expVal)):
@@ -17,7 +22,12 @@ class FormulaParserTests(TestCase):
             expVal = expVal[numpy.logical_not(numpy.isnan(expVal))]
 
         # Assert non nan values are as expected
-        self.assertTrue((numpy.array(val) == expVal).all())
+        if isinstance(val, numpy.ndarray):
+            val = val.tolist()
+        if isinstance(expVal, numpy.ndarray):
+            expVal = expVal.tolist()
+
+        self.assertEqual(val, expVal)
 
         # Check that nan values are the same
         self.assertTrue(numpy.array_equal(numpy.isnan(expVal), numpy.isnan(val)))
@@ -26,6 +36,7 @@ class FormulaParserTests(TestCase):
         self.assertFormulaResult("9", 9)
         self.assertFormulaResult("-9", -9)
         self.assertFormulaResult("--9", 9)
+        self.assertFormulaResult("+9 - 8", 1)
         self.assertFormulaResult("9 + 3 + 6", 9 + 3 + 6)
         self.assertFormulaResult("9 + 3 / 11", 9 + 3.0 / 11)
         self.assertFormulaResult("(9 + 3)", (9 + 3))
@@ -48,7 +59,8 @@ class FormulaParserTests(TestCase):
         self.assertFormulaResult("round(E)", round(numpy.e))
         self.assertFormulaResult("round(-E)", round(-numpy.e))
         self.assertFormulaResult("E^PI", numpy.e ** numpy.pi)
-        self.assertFormulaResult("2^3^2", 2 ** 3 ** 2)
+        self.assertFormulaResult("2^1^3^2", 2 ** 1 ** 3 ** 2)
+        self.assertFormulaResult("2^0", 1)
         self.assertFormulaResult("2^3^(2 + 1)", 2 ** 3 ** 3)
         self.assertFormulaResult("2^3 + 2", 2 ** 3 + 2)
         self.assertFormulaResult("2^9", 2 ** 9)
@@ -58,9 +70,11 @@ class FormulaParserTests(TestCase):
         self.assertFormulaResult("exp(0)", 1)
         self.assertFormulaResult("exp(1)", numpy.e)
         self.assertFormulaResult("log(1)", 0)
-        self.assertFormulaResult("0 | 1", 1)
-        self.assertFormulaResult("1 & 1", 1)
-        self.assertFormulaResult("1 & 0", 0)
+        self.assertFormulaResult("TRUE", True)
+        self.assertFormulaResult("FALSE", False)
+        self.assertFormulaResult("FALSE | TRUE", True)
+        self.assertFormulaResult("TRUE & TRUE", True)
+        self.assertFormulaResult("TRUE & FALSE", False)
         self.assertFormulaResult("2 > 1", True)
         self.assertFormulaResult("2 >= 1", True)
         self.assertFormulaResult("2 < 1", False)
@@ -69,9 +83,10 @@ class FormulaParserTests(TestCase):
         self.assertFormulaResult("1 != 2", True)
         self.assertFormulaResult("!1", False)
         self.assertFormulaResult("!-1", False)
+        self.assertFormulaResult("!2", False)
 
     def test_formula_parser_with_vars(self):
-        data = {
+        d = self.data = {
             "a": numpy.array([2, 4, 6]),
             "b": numpy.array([True, False, True]),
             "c": numpy.array([True, False, False]),
@@ -85,53 +100,73 @@ class FormulaParserTests(TestCase):
             "aLongVariable": numpy.array([1, 2, 3]),
             "A1A": numpy.array([1, 2, 3]),
         }
-        self.assertFormulaResult("-x", -data['x'], data)
-        self.assertFormulaResult("sin(x)", numpy.sin(data['x']), data)
-        self.assertFormulaResult("cos(x)", numpy.cos(data['x']), data)
-        self.assertFormulaResult("tan(x)", numpy.tan(data['x']), data)
-        self.assertFormulaResult("log(a)", numpy.log(data['a']), data)
-        self.assertFormulaResult("abs(x)", numpy.abs(data['x']), data)
-        self.assertFormulaResult("round(x)", numpy.round(data['x']), data)
-        self.assertFormulaResult("sign(x)", numpy.sign(data['x']), data)
-        self.assertFormulaResult("x == 0", [0, 1, 0], data)
-        self.assertFormulaResult("x > 0", [1, 0, 0], data)
-        self.assertFormulaResult("x < 0", [0, 0, 1], data)
-        self.assertFormulaResult("x >= 1.0", [1, 0, 0], data)
-        self.assertFormulaResult("x >= 1.2", [1, 0, 0], data)
-        self.assertFormulaResult("x <= 0", [0, 1, 1], data)
-        self.assertFormulaResult("x <= 1", [0, 1, 1], data)
-        self.assertFormulaResult("(x >= 0) * (x <= 0)", [0, 1, 0], data)
-        self.assertFormulaResult("(x >= 0) & (x <= 0)", [0, 1, 0], data)
-        self.assertFormulaResult("(x > 1) + (x >= 0)", [1, 1, 0], data)
-        self.assertFormulaResult("(x > 1) | (x >= 0)", [1, 1, 0], data)
-        self.assertFormulaResult("x + x", [2.4, 0, -2.4], data)
-        self.assertFormulaResult("x - x", [0, 0, 0], data)
-        self.assertFormulaResult("x * x", [1.2 * 1.2, 0, -1.2 * -1.2], data)
-        self.assertFormulaResult("x / (x + y)", [1, 0, 1], data)
-        self.assertFormulaResult("x * 99999 + 0.5 * y)", [1.2 * 99999, 0.5, -1.2 * 99999], data)
-        self.assertFormulaResult("x + y + z + a)", data['x'] + data['y'] + data['z'] + data['a'], data)
-        self.assertFormulaResult("a ^ 2)", [4, 16, 36], data)
-        self.assertFormulaResult("!b", [False, True, False], data)
-        self.assertFormulaResult("b & c", [True, False, False], data)
-        self.assertFormulaResult("b | c", [True, False, True], data)
-        self.assertFormulaResult("b | !c", [True, True, True], data)
-        self.assertFormulaResult("d", numpy.array(data['d']), data)
+        self.assertFormulaResult("-x", -d['x'])
+        self.assertFormulaResult("sin(x)", numpy.sin(d['x']))
+        self.assertFormulaResult("cos(x)", numpy.cos(d['x']))
+        self.assertFormulaResult("tan(x)", numpy.tan(d['x']))
+        self.assertFormulaResult("log(a)", numpy.log(d['a']))
+        self.assertFormulaResult("abs(x)", numpy.abs(d['x']))
+        self.assertFormulaResult("round(x)", numpy.round(d['x']))
+        self.assertFormulaResult("sign(x)", numpy.sign(d['x']))
+        self.assertFormulaResult("x == 0", [0, 1, 0])
+        self.assertFormulaResult("x > 0", [1, 0, 0])
+        self.assertFormulaResult("x < 0", [0, 0, 1])
+        self.assertFormulaResult("x >= 1.0", [1, 0, 0])
+        self.assertFormulaResult("x >= 1.2", [1, 0, 0])
+        self.assertFormulaResult("x <= 0", [0, 1, 1])
+        self.assertFormulaResult("x <= 1", [0, 1, 1])
+        self.assertFormulaResult("(x >= 0) & (x <= 0)", [0, 1, 0])
+        self.assertFormulaResult("(x > 1) | (x >= 0)", [1, 1, 0])
+        self.assertFormulaResult("x + x", [2.4, 0, -2.4])
+        self.assertFormulaResult("x - x", [0, 0, 0])
+        self.assertFormulaResult("x * x", [1.2 * 1.2, 0, -1.2 * -1.2])
+        self.assertFormulaResult("x + y", d['x'] + d['y'])
+        self.assertFormulaResult("x / (x + y)", [1, 0, 1])
+        self.assertFormulaResult("x * 99999 + 0.5 * y", [1.2 * 99999, 0.5, -1.2 * 99999])
+        self.assertFormulaResult("x + y + z + a", d['x'] + d['y'] + d['z'] + d['a'])
+        self.assertFormulaResult("a ^ 2", [4, 16, 36])
+        self.assertFormulaResult("!b", [False, True, False])
+        self.assertFormulaResult("b & c", [True, False, False])
+        self.assertFormulaResult("b | c", [True, False, True])
+        self.assertFormulaResult("b | !c", [True, True, True])
+        self.assertFormulaResult("b == TRUE", [True, False, True])
+        self.assertFormulaResult("(b == TRUE) & (c == FALSE)", [False, False, True])
+        self.assertFormulaResult("(b == TRUE) | (c == FALSE)", [True, True, True])
+        self.assertFormulaResult("d", d['d'])
         # Mix euler number, scientific notation and variable called e
-        self.assertFormulaResult("E * 1e5 * e", numpy.e * 1e5 * data['e'], data)
+        self.assertFormulaResult("E * 1e5 * e", numpy.e * 1e5 * d['e'])
         # Nested expressions can be evaluated
         self.assertFormulaResult(
             "((a * 2) + (x * 3)) * 6",
-            [(2 * 2 + 1.2 * 3) * 6, (4 * 2 + 0 * 3) * 6, (6 * 2 + -1.2 * 3) * 6],
-            data
+            [(2 * 2 + 1.2 * 3) * 6, (4 * 2 + 0 * 3) * 6, (6 * 2 + -1.2 * 3) * 6]
         )
         # Formula is case sensitive
-        self.assertFormulaResult("-A", -data['A'], data)
+        self.assertFormulaResult("-A", -d['A'])
         # Long variable name is accepted
-        self.assertFormulaResult("-aLongVariable", -data['aLongVariable'], data)
+        self.assertFormulaResult("-aLongVariable", -d['aLongVariable'])
         # Alphanumeric variable name
-        self.assertFormulaResult("-A1A", -data['A1A'], data)
+        self.assertFormulaResult("-A1A", -d['A1A'])
+        # Formula with Linebreaks and white space
+        self.assertFormulaResult("\n x \n + \r y \r +     z", d['x'] + d['y'] + d['z'])
+        # Long formulas mixing logical with numerical expressions
+        self.assertFormulaResult(
+            'x*(x>1) + 2*y + 3*z*(z==78)',
+            d['x'] * (d['x'] > 1) + 2 * d['y'] + 3 * d['z'] * (d['z'] == 78),
+            d
+        )
+        self.assertFormulaResult('x*(x>1)', d['x'] * (d['x'] > 1))
+        self.assertFormulaResult('a*(a<=1)+(a>1)', d['a'] * (d['a'] <= 1) + (d['a'] > 1))
+
+    def test_formula_parser_with_unknown_vars(self):
         # Unknown variable raises error
         parser = FormulaParser()
-        msg = 'Found an undeclared variable in formula.'
-        with self.assertRaisesMessage(ParseException, msg):
-            parser.evaluate_formula("3 * not_a_var", data)
+        msg = 'Found an undeclared variable "not_a_var" in formula.'
+        with self.assertRaisesMessage(RasterAlgebraException, msg):
+            parser.evaluate({}, "3 * not_a_var")
+
+    def test_formula_parser_without_formula(self):
+        # Unknown variable raises error
+        parser = FormulaParser()
+        msg = 'Formula not specified.'
+        with self.assertRaisesMessage(RasterAlgebraException, msg):
+            parser.evaluate({})

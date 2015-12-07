@@ -1,9 +1,8 @@
 import numpy
 from PIL import Image
 
+from raster.algebra.parser import FormulaParser
 from raster.exceptions import RasterException
-
-from .formulas import FormulaParser
 
 IMG_FORMATS = {'.png': 'PNG', '.jpg': 'JPEG'}
 
@@ -49,7 +48,7 @@ def band_data_to_image(band_data, colormap):
             rgba[selector] = color
         except ValueError:
             # Otherwise use it as numpy expression directly
-            selector = parser.evaluate_formula(key, {'x': dat})
+            selector = parser.evaluate(key, {'x': dat})
             rgba[selector] = color
         stats[orig_key] = int(numpy.sum(selector))
 
