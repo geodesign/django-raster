@@ -1,11 +1,11 @@
-=============
-API Reference
-=============
+=========
+Reference
+=========
 
 .. toctree::
    :maxdepth: 2
 
-   formulas
+   algebra/parser
    models
    parser
    rasterize

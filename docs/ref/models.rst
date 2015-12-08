@@ -16,6 +16,13 @@ An example to create a Legend object with one LegendEntry is shown in the follow
         >>> legend.json
         ... '[{"color": "#FFFFFF", "expression": "1", "name": "Earth"}]'
 
+.. class:: Legend
+
+.. class:: LegendEntry
+
+.. class:: LegendSemantics
+
+
 Compression
 -----------
 By default all rasters are compressed during parsing using LZW compression. This potentially saves a lot of storage space for large rasters,

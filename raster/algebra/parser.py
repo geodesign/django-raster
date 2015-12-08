@@ -23,8 +23,6 @@ class FormulaParser(object):
 
     This formula parser was inspired by the fourFun pyparsing example and also
     benefited from additional substantial contributions by Paul McGuire.
-
-    http://pyparsing.wikispaces.com/file/view/fourFn.py
     """
 
     # Additive operators
