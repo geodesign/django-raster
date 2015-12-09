@@ -48,7 +48,7 @@ def band_data_to_image(band_data, colormap):
             rgba[selector] = color
         except ValueError:
             # Otherwise use it as numpy expression directly
-            selector = parser.evaluate(key, {'x': dat})
+            selector = parser.evaluate({'x': dat}, key)
             rgba[selector] = color
         stats[orig_key] = int(numpy.sum(selector))
 
