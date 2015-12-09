@@ -9,7 +9,7 @@ os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
 setup(
     name='django-raster',
     version='0.1.7',
-    packages=['raster', 'raster.migrations'],
+    packages=['raster', 'raster.migrations', 'raster.algebra'],
     include_package_data=True,
     license='BSD',
     description='Simple raster file implementation for Django based on PostGis',
