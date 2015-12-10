@@ -39,9 +39,7 @@ class LegendEntry(models.Model):
     color = RGBColorField()
 
     def __str__(self):
-        return '{}, {}, {}'.format(self.semantics.name,
-                                   self.expression,
-                                   self.color)
+        return '{}, {}, {}'.format(self.semantics.name, self.expression, self.color)
 
 
 class Legend(models.Model):
@@ -322,4 +320,4 @@ class RasterTile(models.Model):
     tilez = models.IntegerField(db_index=True, null=True, choices=ZOOMLEVELS)
 
     def __str__(self):
-        return '{0} {1}'.format(self.rid, self.filename)
+        return '{} {}'.format(self.rid, self.rasterlayer.name)
