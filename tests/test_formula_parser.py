@@ -83,9 +83,13 @@ class FormulaParserTests(TestCase):
         self.assertFormulaResult("2 <= 1", False)
         self.assertFormulaResult("1 == 1", True)
         self.assertFormulaResult("1 != 2", True)
+        self.assertFormulaResult("!TRUE", False)
         self.assertFormulaResult("!1", False)
         self.assertFormulaResult("!-1", False)
         self.assertFormulaResult("!2", False)
+        self.assertFormulaResult("2 * 3 * 4 * 5", 2 * 3 * 4 * 5)
+        self.assertFormulaResult("2 + 3 + 4 + 5", 2 + 3 + 4 + 5)
+        self.assertFormulaResult("(2 + 3 * 6) * ((2 + 3 * (3 * 4 + 1)) + 4 + 5)", 1000)
 
     def test_formula_parser_with_vars(self):
         d = self.data = {
@@ -127,10 +131,8 @@ class FormulaParserTests(TestCase):
         self.assertFormulaResult("x * 99999 + 0.5 * y", [1.2 * 99999, 0.5, -1.2 * 99999])
         self.assertFormulaResult("x + y + z + a", d['x'] + d['y'] + d['z'] + d['a'])
         self.assertFormulaResult("a ^ 2", [4, 16, 36])
-        self.assertFormulaResult("!b", [False, True, False])
         self.assertFormulaResult("b & c", [True, False, False])
         self.assertFormulaResult("b | c", [True, False, True])
-        self.assertFormulaResult("b | !c", [True, True, True])
         self.assertFormulaResult("b == TRUE", [True, False, True])
         self.assertFormulaResult("(b == TRUE) & (c == FALSE)", [False, False, True])
         self.assertFormulaResult("(b == TRUE) | (c == FALSE)", [True, True, True])
@@ -152,6 +154,14 @@ class FormulaParserTests(TestCase):
         self.assertFormulaResult("\n x \n + \r y \r +     z", d['x'] + d['y'] + d['z'])
         # Long formulas mixing logical with numerical expressions
         self.assertFormulaResult('x*(x>1)', d['x'] * (d['x'] > 1))
+        self.assertFormulaResult(
+            '(b>0) & (a > 1) & (c < 1) & (d > 0)',
+            (d['b'] > 0) & (d['a'] > 1) & (d['c'] < 1) & (d['a'] > 0)
+        )
+        self.assertFormulaResult(
+            '(a*b)*((b>0) & (a > 1)) + 99*a*(b <=0)',
+            d['a'] * d['b'] * ((d['b'] > 0) & (d['a'] > 0)) + 99 * d['a'] * (d['b'] <= 0)
+        )
         self.assertFormulaResult(
             'x*(x>1) + 2*y + 3*z*(z==78)',
             d['x'] * (d['x'] > 1) + 2 * d['y'] + 3 * d['z'] * (d['z'] == 78),

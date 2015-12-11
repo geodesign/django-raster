@@ -7,8 +7,8 @@ from pyparsing import (
 from django.contrib.gis.gdal import GDALRaster
 from raster.algebra import const
 from raster.algebra.evaluators import (
-    EvalAdd, EvalAnd, EvalComparison, EvalConstant, EvalExp, EvalFunction, EvalMult, EvalNot, EvalNull, EvalOr,
-    EvalUnary, EvalVariable
+    EvalAdd, EvalAnd, EvalComparison, EvalConstant, EvalExp, EvalFunction, EvalMult, EvalNull, EvalOr, EvalUnary,
+    EvalVariable
 )
 from raster.const import ALGEBRA_PIXEL_TYPE_GDAL, ALGEBRA_PIXEL_TYPE_NUMPY
 from raster.exceptions import RasterAlgebraException
@@ -58,7 +58,6 @@ class FormulaParser(object):
         unary = oneOf(const.UNOP)
         andop = oneOf(const.ANDOP)
         orop = oneOf(const.OROP)
-        notop = oneOf(const.NOTOP)
 
         # Expression for null values
         null = Keyword(const.NULL).setParseAction(EvalNull)
@@ -95,22 +94,12 @@ class FormulaParser(object):
                 (eqop, 2, opAssoc.LEFT, EvalComparison),
                 (sizeeqop, 2, opAssoc.LEFT, EvalComparison),
                 (sizeop, 2, opAssoc.LEFT, EvalComparison),
-            ]
-        )
-
-        # The order of the operators matters, see comment above
-        comp_expr = Group(arith_expr + (eqop | sizeeqop | sizeop | andop | orop) + arith_expr).setParseAction(EvalComparison)
-        bool_term = true_exp | false_exp | comp_expr
-        bool_expr = infixNotation(
-            bool_term,
-            [
-                (notop, 1, opAssoc.RIGHT, EvalNot),
                 (andop, 2, opAssoc.LEFT, EvalAnd),
                 (orop, 2, opAssoc.LEFT, EvalOr)
             ]
         )
 
-        self.bnf <<= bool_expr | arith_expr
+        self.bnf <<= arith_expr
 
     def get_variable_data(self, *args):
         var = args[-1][0]

@@ -39,7 +39,6 @@ SIZEEQOP = (GREATER_EQUAL, LESS_EQUAL)
 SIZEOP = (GREATER, LESS)
 ANDOP = (LOGICAL_AND, )
 OROP = (LOGICAL_OR, )
-NOTOP = (LOGICAL_NOT, )
 
 # Map operator symbols to arithmetic operations in numpy
 OPERATOR_MAP = {

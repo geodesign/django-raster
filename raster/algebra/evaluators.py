@@ -61,6 +61,14 @@ class EvalMult(EvalBinaryOp):
     initial = [1, '*']
 
 
+class EvalAnd(EvalBinaryOp):
+    initial = [True, '&']
+
+
+class EvalOr(EvalBinaryOp):
+    initial = [False, '|']
+
+
 class EvalExp(EvalBinaryOp):
 
     def assign_tokens(self):
@@ -113,20 +121,6 @@ class EvalUnary(EvalObject):
     def eval(self):
         op, oper = self.tokens.asList()
         return OPERATOR_MAP['unary ' + op](oper.eval())
-
-
-class EvalAnd(EvalBinaryOp):
-    initial = [True, '&']
-
-
-class EvalOr(EvalBinaryOp):
-    initial = [False, '|']
-
-
-class EvalNot(EvalObject):
-
-    def eval(self):
-        return not self.tokens[0][1].eval()
 
 
 class EvalFunction(EvalObject):
