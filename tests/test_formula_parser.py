@@ -7,14 +7,16 @@ from raster.exceptions import RasterAlgebraException
 
 class FormulaParserTests(TestCase):
 
+    def setUp(self):
+        self.parser = FormulaParser()
+
     def assertFormulaResult(self, formula, expVal, data={}):
         # Get data from test object if not passed as an argument
         if hasattr(self, 'data'):
             data = self.data
 
         # Evaluate
-        parser = FormulaParser()
-        val = parser.evaluate(data, formula)
+        val = self.parser.evaluate(data, formula)
 
         # Drop nan values
         if data and any(numpy.isnan(expVal)):
@@ -149,24 +151,35 @@ class FormulaParserTests(TestCase):
         # Formula with Linebreaks and white space
         self.assertFormulaResult("\n x \n + \r y \r +     z", d['x'] + d['y'] + d['z'])
         # Long formulas mixing logical with numerical expressions
+        self.assertFormulaResult('x*(x>1)', d['x'] * (d['x'] > 1))
         self.assertFormulaResult(
             'x*(x>1) + 2*y + 3*z*(z==78)',
             d['x'] * (d['x'] > 1) + 2 * d['y'] + 3 * d['z'] * (d['z'] == 78),
-            d
         )
-        self.assertFormulaResult('x*(x>1)', d['x'] * (d['x'] > 1))
         self.assertFormulaResult('a*(a<=1)+(a>1)', d['a'] * (d['a'] <= 1) + (d['a'] > 1))
 
     def test_formula_parser_with_unknown_vars(self):
         # Unknown variable raises error
-        parser = FormulaParser()
         msg = 'Found an undeclared variable "not_a_var" in formula.'
         with self.assertRaisesMessage(RasterAlgebraException, msg):
-            parser.evaluate({}, "3 * not_a_var")
+            self.parser.evaluate({}, "3 * not_a_var")
 
     def test_formula_parser_without_formula(self):
         # Unknown variable raises error
-        parser = FormulaParser()
         msg = 'Formula not specified.'
         with self.assertRaisesMessage(RasterAlgebraException, msg):
-            parser.evaluate({})
+            self.parser.evaluate({})
+
+    def test_with_null_comparison(self):
+        mask = [True, True, False]
+        self.data = {
+            "masked": numpy.ma.masked_array([1, 2, 3], mask=mask),
+            "unmasked": numpy.array([1, 2, 3]),
+        }
+        self.assertFormulaResult('masked == NULL', mask)
+        self.assertFormulaResult('masked != NULL', [not x for x in mask])
+        self.assertFormulaResult('NULL == masked', mask)
+        self.assertFormulaResult('unmasked == NULL', [False, False, False])
+        msg = 'NULL can only be used with "==" or "!=" operators.'
+        with self.assertRaisesMessage(RasterAlgebraException, msg):
+            self.assertFormulaResult('masked >= NULL', mask)

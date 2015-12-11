@@ -1,37 +1,7 @@
 import numpy
 
-# Map operator symbols to arithmetic operations in numpy
-operator_map = {
-    "+": numpy.add,
-    "-": numpy.subtract,
-    "*": numpy.multiply,
-    "/": numpy.divide,
-    "^": numpy.power,
-    "==": numpy.equal,
-    "!=": numpy.not_equal,
-    ">": numpy.greater,
-    ">=": numpy.greater_equal,
-    "<": numpy.less,
-    "<=": numpy.less_equal,
-    "|": numpy.logical_or,
-    "&": numpy.logical_and,
-    "unary +": numpy.array,
-    "unary -": numpy.negative,
-    "unary !": numpy.logical_not,
-}
-
-# Map function names to numpy functions
-function_map = {
-    "sin": numpy.sin,
-    "cos": numpy.cos,
-    "tan": numpy.tan,
-    "log": numpy.log,
-    "exp": numpy.exp,
-    "abs": numpy.abs,
-    "int": numpy.int,
-    "round": numpy.round,
-    "sign": numpy.sign,
-}
+from raster.algebra.const import EQUOP, FUNCTION_MAP, OPERATOR_MAP
+from raster.exceptions import RasterAlgebraException
 
 
 class EvalObject(object):
@@ -79,7 +49,7 @@ class EvalBinaryOp(EvalObject):
     def eval(self):
         ret = self.ops[0]
         for op, operand in self.by_pairs(self.ops[1:]):
-            ret = operator_map[op](ret, operand.eval())
+            ret = OPERATOR_MAP[op](ret, operand.eval())
         return ret
 
 
@@ -104,18 +74,45 @@ class EvalExp(EvalBinaryOp):
         return ret
 
 
+class EvalNull(EvalObject):
+    def eval(self):
+        return self
+
+
 class EvalComparison(EvalObject):
 
+    @staticmethod
+    def get_mask(data, operator):
+        # Make sure the right operator is used
+        if operator not in EQUOP:
+            raise RasterAlgebraException('NULL can only be used with "==" or "!=" operators.')
+        # Get mask
+        if numpy.ma.is_masked(data):
+            return data.mask
+        else:
+            # If there is no mask, all values are not null
+            return numpy.zeros(data.shape, dtype=numpy.bool)
+
     def eval(self):
+        # Get tokens and evaluate operands
         op1, oper, op2 = self.tokens.asList()
-        return operator_map[oper](op1.eval(), op2.eval())
+        op1 = op1.eval()
+        op2 = op2.eval()
+        # If one of the operands is null, return mask of the other operand
+        if isinstance(op1, EvalNull):
+            op2 = self.get_mask(op2, oper)
+            op1 = True
+        elif isinstance(op2, EvalNull):
+            op1 = self.get_mask(op1, oper)
+            op2 = True
+        return OPERATOR_MAP[oper](op1, op2)
 
 
 class EvalUnary(EvalObject):
 
     def eval(self):
         op, oper = self.tokens.asList()
-        return operator_map['unary ' + op](oper.eval())
+        return OPERATOR_MAP['unary ' + op](oper.eval())
 
 
 class EvalAnd(EvalBinaryOp):
@@ -135,7 +132,7 @@ class EvalNot(EvalObject):
 class EvalFunction(EvalObject):
 
     def assign_tokens(self):
-        self.fn = function_map[self.tokens[0]]
+        self.fn = FUNCTION_MAP[self.tokens[0]]
         self.arg = self.tokens[1]
 
     def eval(self):

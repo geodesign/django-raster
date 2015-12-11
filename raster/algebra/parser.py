@@ -5,9 +5,10 @@ from pyparsing import (
 )
 
 from django.contrib.gis.gdal import GDALRaster
+from raster.algebra import const
 from raster.algebra.evaluators import (
-    EvalAdd, EvalAnd, EvalComparison, EvalConstant, EvalExp, EvalFunction, EvalMult, EvalNot, EvalOr, EvalUnary,
-    EvalVariable
+    EvalAdd, EvalAnd, EvalComparison, EvalConstant, EvalExp, EvalFunction, EvalMult, EvalNot, EvalNull, EvalOr,
+    EvalUnary, EvalVariable
 )
 from raster.const import ALGEBRA_PIXEL_TYPE_GDAL, ALGEBRA_PIXEL_TYPE_NUMPY
 from raster.exceptions import RasterAlgebraException
@@ -24,27 +25,6 @@ class FormulaParser(object):
     This formula parser was inspired by the fourFun pyparsing example and also
     benefited from additional substantial contributions by Paul McGuire.
     """
-
-    # Additive operators
-    addop = ("+", "-")
-
-    # Exponential operator
-    expop = ("^", )
-
-    # Unary operators
-    unop = "+ - !"
-
-    # Multiplicative operators. The order the operators in this list
-    # matters due to "<=" being caught by "<".
-    multop = ("*", "/")
-    eqop = "== != <= >= < >"
-    andop = "&"
-    orop = "|"
-    notop = "!"
-
-    # Euler number and pi
-    euler = 'E'
-    pi = 'PI'
 
     def __init__(self):
         """
@@ -65,15 +45,23 @@ class FormulaParser(object):
         rpar = Literal(")").suppress()
 
         # Expression for mathematical constants: Euler number and Pi
-        e = Keyword(self.euler).setParseAction(replaceWith(numpy.e), EvalConstant)
-        pi = Keyword(self.pi).setParseAction(replaceWith(numpy.pi), EvalConstant)
+        e = Keyword(const.EULER).setParseAction(replaceWith(numpy.e), EvalConstant)
+        pi = Keyword(const.PI).setParseAction(replaceWith(numpy.pi), EvalConstant)
 
         # Prepare operator expressions
-        addop = oneOf(self.addop)
-        multop = oneOf(self.multop)
-        eqop = oneOf(self.eqop)
-        expop = oneOf(self.expop)
-        unary = oneOf(self.unop)
+        addop = oneOf(const.ADDOP)
+        multop = oneOf(const.MULTOP)
+        eqop = oneOf(const.EQUOP)
+        sizeeqop = oneOf(const.SIZEEQOP)
+        sizeop = oneOf(const.SIZEOP)
+        powop = oneOf(const.POWOP)
+        unary = oneOf(const.UNOP)
+        andop = oneOf(const.ANDOP)
+        orop = oneOf(const.OROP)
+        notop = oneOf(const.NOTOP)
+
+        # Expression for null values
+        null = Keyword(const.NULL).setParseAction(EvalNull)
 
         # Expression for floating point numbers, allowing for
         # scientific notation.
@@ -88,33 +76,37 @@ class FormulaParser(object):
         function.setParseAction(EvalFunction)
 
         # True and false keywords
-        true_ = Keyword("TRUE").setParseAction(replaceWith(True), EvalConstant)
-        false_ = Keyword("FALSE").setParseAction(replaceWith(False), EvalConstant)
+        true_exp = Keyword(const.TRUE).setParseAction(replaceWith(True), EvalConstant)
+        false_exp = Keyword(const.FALSE).setParseAction(replaceWith(False), EvalConstant)
 
         # Arithmetic atom - a single element is either a number, function,
         # math constant or variable.
-        arith_atom = number | function | true_ | false_ | pi | e | variable
+        arith_atom = number | function | null | true_exp | false_exp | pi | e | variable
 
         # Arithmetic expression as subelement
+        # The order the operators in this list matters due to "<=" being caught by "<".
         arith_expr = infixNotation(
             arith_atom,
             [
                 (unary, 1, opAssoc.RIGHT, EvalUnary),
-                (expop, 2, opAssoc.LEFT, EvalExp),
+                (powop, 2, opAssoc.LEFT, EvalExp),
                 (multop, 2, opAssoc.LEFT, EvalMult),
                 (addop, 2, opAssoc.LEFT, EvalAdd),
                 (eqop, 2, opAssoc.LEFT, EvalComparison),
+                (sizeeqop, 2, opAssoc.LEFT, EvalComparison),
+                (sizeop, 2, opAssoc.LEFT, EvalComparison),
             ]
         )
 
-        comp_expr = Group(arith_expr + (eqop | self.andop | self.orop) + arith_expr).setParseAction(EvalComparison)
-        bool_term = true_ | false_ | comp_expr
+        # The order of the operators matters, see comment above
+        comp_expr = Group(arith_expr + (eqop | sizeeqop | sizeop | andop | orop) + arith_expr).setParseAction(EvalComparison)
+        bool_term = true_exp | false_exp | comp_expr
         bool_expr = infixNotation(
             bool_term,
             [
-                (self.notop, 1, opAssoc.RIGHT, EvalNot),
-                (self.andop, 2, opAssoc.LEFT, EvalAnd),
-                (self.orop, 2, opAssoc.LEFT, EvalOr)
+                (notop, 1, opAssoc.RIGHT, EvalNot),
+                (andop, 2, opAssoc.LEFT, EvalAnd),
+                (orop, 2, opAssoc.LEFT, EvalOr)
             ]
         )
 
@@ -142,9 +134,12 @@ class FormulaParser(object):
         if not self.formula:
             raise RasterAlgebraException('Formula not specified.')
 
-        # Store dictionary with names and values for variables and convert
-        # to numpy arrays.
-        self.variable_map = {k: numpy.array(v) for k, v in data.items()}
+        # Make sure all data is in numpy format
+        for k, v in data.items():
+            if not isinstance(v, numpy.ndarray):
+                data[k] = numpy.array(v)
+
+        self.variable_map = data
 
         # Populate the expression stack
         parsed = self.bnf.parseString(self.formula, parseAll=True)[0]
