@@ -105,6 +105,7 @@ class FormulaParserTests(TestCase):
             "e": numpy.array([2, 11e3]),
             "aLongVariable": numpy.array([1, 2, 3]),
             "A1A": numpy.array([1, 2, 3]),
+            "a_1_a": numpy.array([1, 2, 3])
         }
         self.assertFormulaResult("-x", -d['x'])
         self.assertFormulaResult("sin(x)", numpy.sin(d['x']))
@@ -150,6 +151,8 @@ class FormulaParserTests(TestCase):
         self.assertFormulaResult("-aLongVariable", -d['aLongVariable'])
         # Alphanumeric variable name
         self.assertFormulaResult("-A1A", -d['A1A'])
+        # Alphanumeric variable name with underscore
+        self.assertFormulaResult("-a_1_a", -d['a_1_a'])
         # Formula with Linebreaks and white space
         self.assertFormulaResult("\n x \n + \r y \r +     z", d['x'] + d['y'] + d['z'])
         # Long formulas mixing logical with numerical expressions
