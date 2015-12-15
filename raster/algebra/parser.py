@@ -2,10 +2,10 @@ import operator
 from functools import reduce
 
 import numpy
-from pyparsing import Forward, Literal, Optional, Regex, Word, ZeroOrMore, alphanums, alphas, nums
+from pyparsing import Forward, Literal, Optional, Regex, Word, ZeroOrMore, alphanums, oneOf
 
 from django.contrib.gis.gdal import GDALRaster
-from raster.algebra.const import ALGEBRA_PIXEL_TYPE_GDAL, ALGEBRA_PIXEL_TYPE_NUMPY
+from raster.algebra import const
 from raster.exceptions import RasterAlgebraException
 
 
@@ -16,60 +16,6 @@ class FormulaParser(object):
 
     Adopted from: http://pyparsing.wikispaces.com/file/view/fourFn.py
     """
-    # Map function names to numpy functions
-    numpy_functions = {
-        "sin": numpy.sin,
-        "cos": numpy.cos,
-        "tan": numpy.tan,
-        "log": numpy.log,
-        "exp": numpy.exp,
-        "abs": numpy.abs,
-        "int": numpy.int,
-        "round": numpy.round,
-        "sign": numpy.sign,
-    }
-
-    # Map operator symbols to arithmetic operations in numpy
-    numpy_operators = {
-        "+": numpy.add,
-        "-": numpy.subtract,
-        "*": numpy.multiply,
-        "/": numpy.divide,
-        "^": numpy.power,
-        "==": numpy.equal,
-        "!=": numpy.not_equal,
-        ">": numpy.greater,
-        ">=": numpy.greater_equal,
-        "<": numpy.less,
-        "<=": numpy.less_equal,
-        "|": numpy.logical_or,
-        "&": numpy.logical_and,
-    }
-
-    numpy_unary_operators = {
-        "unary !": numpy.logical_not,
-        "unary -": numpy.negative,
-    }
-
-    # Additive operators
-    addop = ("+", "-", "==")
-
-    # Exponential operator
-    expop = ("^", )
-
-    # Unary operators
-    unary = {"-": "unary -", "!": "unary !"}
-
-    # Multiplicative operators. The order the operators in this list
-    # matters due to "<=" being caught by "<".
-    multop = ("*", "/", "!=", "<=", ">=", "<", ">", "|", "&")
-
-    # Euler number and pi
-    euler = 'E'
-    pi = 'PI'
-    null = 'NULL'
-    _true = 'TRUE'
-    _false = 'FALSE'
 
     def __init__(self):
         """
@@ -89,31 +35,31 @@ class FormulaParser(object):
 
         # Expression for parenthesis, which are suppressed in the atoms
         # after matching.
-        lpar = Literal("(").suppress()
-        rpar = Literal(")").suppress()
+        lpar = Literal(const.LPAR).suppress()
+        rpar = Literal(const.RPAR).suppress()
 
         # Expression for mathematical constants: Euler number and Pi
-        e = Literal(self.euler)
-        pi = Literal(self.pi)
-        null = Literal(self.null)
-        _true = Literal(self._true)
-        _false = Literal(self._false)
+        e = Literal(const.EULER)
+        pi = Literal(const.PI)
+        null = Literal(const.NULL)
+        _true = Literal(const.TRUE)
+        _false = Literal(const.FALSE)
 
         # Prepare operator expressions
-        addop = reduce(operator.or_, (Literal(x) for x in self.addop))
-        multop = reduce(operator.or_, (Literal(x) for x in self.multop))
-        expop = reduce(operator.or_, (Literal(x) for x in self.expop))
-        unary = reduce(operator.add, (Optional(x) for x in self.unary.keys()))
+        addop = oneOf(const.ADDOP)
+        multop = oneOf(const.MULTOP)
+        powop = oneOf(const.POWOP)
+        unary = reduce(operator.add, (Optional(x) for x in const.UNOP))
 
         # Expression for floating point numbers, allowing for scientific notation.
-        number = Regex(r'[+-]?\d+(\.\d*)?([Ee][+-]?\d+)?')
+        number = Regex(const.NUMBER)
 
         # Variables are alphanumeric strings that represent keys in the input
         # data dictionary.
-        variable = Word(alphanums + '_')
+        variable = Word(alphanums + const.VARIABLE_NAME_SEPARATOR)
 
         # Functional calls
-        function = Word(alphas, alphas + nums + "_$") + lpar + self.bnf + rpar
+        function = Word(alphanums) + lpar + self.bnf + rpar
 
         # Atom core - a single element is either a math constant,
         # a function or a variable.
@@ -131,7 +77,7 @@ class FormulaParser(object):
         # "atom [ ^ atom ]...", we get right-to-left exponents, instead of
         # left-to-right that is, 2^3^2 = 2^(3^2), not (2^3)^2.
         factor = Forward()
-        factor << atom + ZeroOrMore((expop + factor).setParseAction(self.push_first))
+        factor << atom + ZeroOrMore((powop + factor).setParseAction(self.push_first))
 
         term = factor + ZeroOrMore((multop + factor).setParseAction(self.push_first))
         self.bnf << term + ZeroOrMore((addop + term).setParseAction(self.push_first))
@@ -143,8 +89,8 @@ class FormulaParser(object):
         """
         Set custom flag for unary operators.
         """
-        if toks and toks[0] in self.unary:
-            self.expr_stack.append(self.unary[toks[0]])
+        if toks and toks[0] in const.UNARY_REPLACE_MAP:
+            self.expr_stack.append(const.UNARY_REPLACE_MAP[toks[0]])
 
     def evaluate_stack(self, stack):
         """
@@ -152,43 +98,35 @@ class FormulaParser(object):
         """
         op = stack.pop()
 
-        if op in self.numpy_unary_operators:
-            return self.numpy_unary_operators[op](self.evaluate_stack(stack))
-        elif op in self.numpy_operators:
+        if op in const.UNARY_OPERATOR_MAP:
+            return const.UNARY_OPERATOR_MAP[op](self.evaluate_stack(stack))
+        elif op in const.OPERATOR_MAP:
             op2 = self.evaluate_stack(stack)
             op1 = self.evaluate_stack(stack)
             # Handle null case
-            if isinstance(op1, str) and op1 == self.null:
+            if isinstance(op1, str) and op1 == const.NULL:
                 op2 = self.get_mask(op2, op)
                 op1 = True
-            elif isinstance(op2, str) and op2 == self.null:
+            elif isinstance(op2, str) and op2 == const.NULL:
                 op1 = self.get_mask(op1, op)
                 op2 = True
-            return self.numpy_operators[op](op1, op2)
-        elif op in self.numpy_functions:
-            return self.numpy_functions[op](self.evaluate_stack(stack))
-        elif op == self.euler:
-            return numpy.e
-        elif op == self.pi:
-            return numpy.pi
-        elif op == self._true:
-            return True
-        elif op == self._false:
-            return False
-        elif op == self.null:
-            return op
+            return const.OPERATOR_MAP[op](op1, op2)
+        elif op in const.FUNCTION_MAP:
+            return const.FUNCTION_MAP[op](self.evaluate_stack(stack))
+        elif op in const.KEYWORD_MAP:
+            return const.KEYWORD_MAP[op]
         elif op in self.variable_map:
             return self.variable_map[op]
         else:
             try:
-                return numpy.array(op, dtype=ALGEBRA_PIXEL_TYPE_NUMPY)
+                return numpy.array(op, dtype=const.ALGEBRA_PIXEL_TYPE_NUMPY)
             except ValueError:
                 raise RasterAlgebraException('Found an undeclared variable "{0}" in formula.'.format(op))
 
     @staticmethod
     def get_mask(data, operator):
         # Make sure the right operator is used
-        if operator not in ('==', '!='):
+        if operator not in (const.EQUAL, const.NOT_EQUAL):
             raise RasterAlgebraException('NULL can only be used with "==" or "!=" operators.')
         # Get mask
         if numpy.ma.is_masked(data):
@@ -265,11 +203,11 @@ class RasterAlgebraParser(FormulaParser):
         orig_band = orig.bands[0]
 
         # Convert to default number type
-        result = result.astype(ALGEBRA_PIXEL_TYPE_NUMPY)
+        result = result.astype(const.ALGEBRA_PIXEL_TYPE_NUMPY)
 
         # Return GDALRaster holding results
         return GDALRaster({
-            'datatype': ALGEBRA_PIXEL_TYPE_GDAL,
+            'datatype': const.ALGEBRA_PIXEL_TYPE_GDAL,
             'driver': 'MEM',
             'width': orig.width,
             'height': orig.height,
