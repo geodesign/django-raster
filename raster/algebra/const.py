@@ -72,3 +72,7 @@ FUNCTION_MAP = {
     "round": numpy.round,
     "sign": numpy.sign,
 }
+
+ALGEBRA_PIXEL_TYPE_GDAL = 7
+
+ALGEBRA_PIXEL_TYPE_NUMPY = 'Float64'
