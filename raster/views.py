@@ -146,11 +146,9 @@ class AlgebraView(RasterView):
     A view to calculate map algebra on raster layers.
     """
 
-    def __init__(self, *args, **kwargs):
-        super(AlgebraView, self).__init__(*args, **kwargs)
-        self.parser = RasterAlgebraParser()
-
     def get(self, request, masked=False, *args, **kwargs):
+        parser = RasterAlgebraParser()
+
         # Get layer ids
         ids = request.GET.get('layers', '').split(',')
 
@@ -185,7 +183,7 @@ class AlgebraView(RasterView):
         # Evaluate raster algebra expression, return 400 if not successful
         try:
             # Evaluate raster algebra expression
-            result = self.parser.evaluate_raster_algebra(data, formula)
+            result = parser.evaluate_raster_algebra(data, formula)
         except ParseException:
             raise RasterAlgebraException('Failed to evaluate raster algebra.')
 
