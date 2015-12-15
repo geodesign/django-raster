@@ -87,6 +87,8 @@ class FormulaParser(object):
         arith_expr = infixNotation(
             arith_atom,
             [
+                (andop, 2, opAssoc.LEFT, EvalAnd),
+                (orop, 2, opAssoc.LEFT, EvalOr),
                 (unary, 1, opAssoc.RIGHT, EvalUnary),
                 (powop, 2, opAssoc.LEFT, EvalExp),
                 (multop, 2, opAssoc.LEFT, EvalMult),
@@ -94,8 +96,6 @@ class FormulaParser(object):
                 (eqop, 2, opAssoc.LEFT, EvalComparison),
                 (sizeeqop, 2, opAssoc.LEFT, EvalComparison),
                 (sizeop, 2, opAssoc.LEFT, EvalComparison),
-                (andop, 2, opAssoc.LEFT, EvalAnd),
-                (orop, 2, opAssoc.LEFT, EvalOr)
             ]
         )
 

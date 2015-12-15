@@ -2,7 +2,6 @@ import json
 
 import numpy
 from PIL import Image
-from pyparsing import ParseException
 
 from django.conf import settings
 from django.db.models import Q
@@ -184,7 +183,7 @@ class AlgebraView(RasterView):
         try:
             # Evaluate raster algebra expression
             result = parser.evaluate_raster_algebra(data, formula)
-        except ParseException:
+        except:
             raise RasterAlgebraException('Failed to evaluate raster algebra.')
 
         # Get array from algebra result
