@@ -24,12 +24,6 @@ class FormulaParser(object):
         # Set an empty formula attribute
         self.formula = None
 
-        # The data dictionary holds the values on which to evaluate the formula.
-        self.variable_map = {}
-
-        # The list holding parsed expressions used for evaluation of the formula.
-        self.expr_stack = []
-
         # Instantiate blank parser for BNF construction
         self.bnf = Forward()
 
@@ -100,6 +94,7 @@ class FormulaParser(object):
 
         if op in const.UNARY_OPERATOR_MAP:
             return const.UNARY_OPERATOR_MAP[op](self.evaluate_stack(stack))
+
         elif op in const.OPERATOR_MAP:
             op2 = self.evaluate_stack(stack)
             op1 = self.evaluate_stack(stack)
@@ -111,12 +106,16 @@ class FormulaParser(object):
                 op1 = self.get_mask(op1, op)
                 op2 = True
             return const.OPERATOR_MAP[op](op1, op2)
+
         elif op in const.FUNCTION_MAP:
             return const.FUNCTION_MAP[op](self.evaluate_stack(stack))
+
         elif op in const.KEYWORD_MAP:
             return const.KEYWORD_MAP[op]
+
         elif op in self.variable_map:
             return self.variable_map[op]
+
         else:
             try:
                 return numpy.array(op, dtype=const.ALGEBRA_PIXEL_TYPE_NUMPY)
@@ -131,9 +130,8 @@ class FormulaParser(object):
         # Get mask
         if numpy.ma.is_masked(data):
             return data.mask
-        else:
-            # If there is no mask, all values are not null
-            return numpy.zeros(data.shape, dtype=numpy.bool)
+        # If there is no mask, all values are not null
+        return numpy.zeros(data.shape, dtype=numpy.bool)
 
     def set_formula(self, formula):
         """
@@ -142,12 +140,12 @@ class FormulaParser(object):
         # Remove any white space and line breaks from formula.
         self.formula = formula.replace(' ', '').replace('\n', '').replace('\r', '')
 
-        # Reset expression stack
-        self.expr_stack = []
-
     def evaluate(self, data={}, formula=None):
         """
         Evaluate the input data using the current formula expression stack.
+
+        The formula is stored as attribute and can be re-evaluated with several
+        input data sets on an existing parser.
         """
         if formula:
             self.set_formula(formula)
@@ -162,6 +160,9 @@ class FormulaParser(object):
 
         # Store data for variables
         self.variable_map = data
+
+        # Reset expression stack
+        self.expr_stack = []
 
         # Populate the expression stack
         self.bnf.parseString(self.formula)

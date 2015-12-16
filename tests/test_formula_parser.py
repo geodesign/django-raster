@@ -196,3 +196,11 @@ class FormulaParserTests(TestCase):
         msg = 'NULL can only be used with "==" or "!=" operators.'
         with self.assertRaisesMessage(RasterAlgebraException, msg):
             self.assertFormulaResult('masked >= NULL', mask)
+
+    def test_re_evaluation(self):
+        self.parser.set_formula('+x')
+        self.assertEqual(self.parser.evaluate({'x': 1}), 1)
+        self.assertEqual(self.parser.evaluate({'x': 2}), 2)
+        self.parser.set_formula('-x')
+        self.assertEqual(self.parser.evaluate({'x': 3}), -3)
+        self.assertEqual(self.parser.evaluate({'x': 4}), -4)
