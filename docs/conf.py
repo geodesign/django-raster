@@ -54,7 +54,7 @@ source_parsers = {
 master_doc = 'index'
 
 # General information about the project.
-project = u'django-raster'
+project = u'Django Raster'
 copyright = u'2015, Daniel Wiesmann and Mike Flaxman'
 author = u'Daniel Wiesmann and Mike Flaxman'
 
