@@ -172,7 +172,7 @@ class RasterLayerParser(object):
                 'origin': [bounds[0], bounds[3]],
                 'scale': [tilescale, -tilescale],
                 'width': (indexrange[2] - indexrange[0] + 1) * self.tilesize,
-                'height':(indexrange[3] - indexrange[1] + 1) * self.tilesize,
+                'height': (indexrange[3] - indexrange[1] + 1) * self.tilesize,
                 'srid': WEB_MERCATOR_SRID,
             })
 

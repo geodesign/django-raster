@@ -5,4 +5,4 @@ with a PostGIS database backend.
 
 `See the docs for more information`__
 
-__ docs/index.rst
+__ http://django-raster.readthedocs.org/en/latest/
