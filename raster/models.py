@@ -11,7 +11,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.db.models import Max, Min
 from django.db.models.signals import m2m_changed, post_save, pre_save
 from django.dispatch import receiver
-from raster.const import WEB_MERCATOR_SRID
+from raster.tiles.const import WEB_MERCATOR_SRID
 from raster.utils import hex_to_rgba
 from raster.valuecount import ValueCountMixin
 
@@ -213,7 +213,7 @@ def parse_raster_layer_if_log_is_empty(sender, instance, created, **kwargs):
             from raster.tasks import parse_raster_layer_with_celery
             parse_raster_layer_with_celery.delay(instance)
         else:
-            from raster.parser import RasterLayerParser
+            from raster.tiles.parser import RasterLayerParser
             parser = RasterLayerParser(instance)
             parser.parse_raster_layer()
 

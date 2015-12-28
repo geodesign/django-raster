@@ -10,11 +10,12 @@ from django.shortcuts import get_object_or_404
 from django.utils import six
 from django.views.generic import View
 from raster.algebra.parser import RasterAlgebraParser
-from raster.const import WEB_MERCATOR_TILESIZE
+from raster.const import IMG_FORMATS
 from raster.exceptions import RasterAlgebraException
 from raster.models import Legend, RasterLayer, RasterTile
-from raster.tiler import tile_bounds, tile_scale
-from raster.utils import IMG_FORMATS, band_data_to_image, hex_to_rgba
+from raster.tiles.const import WEB_MERCATOR_TILESIZE
+from raster.tiles.utils import tile_bounds, tile_scale
+from raster.utils import band_data_to_image, hex_to_rgba
 
 
 class RasterView(View):

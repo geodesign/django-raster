@@ -2,7 +2,9 @@
 Everything required to create TMS tiles.
 """
 from django.conf import settings
-from raster.const import GLOBAL_MAX_ZOOM_LEVEL, WEB_MERCATOR_TILESHIFT, WEB_MERCATOR_TILESIZE, WEB_MERCATOR_WORLDSIZE
+from raster.tiles.const import (
+    GLOBAL_MAX_ZOOM_LEVEL, QUADRANT_SIZE, WEB_MERCATOR_TILESHIFT, WEB_MERCATOR_TILESIZE, WEB_MERCATOR_WORLDSIZE
+)
 
 
 def tile_index_range(bbox, z):
@@ -67,3 +69,24 @@ def closest_zoomlevel(scale, next_higher=True):
         zoomlevel += 1
 
     return zoomlevel
+
+
+def quadrants(bbox, z):
+    """
+    Create an array of bounding boxes, representing a set of sub-regions
+    defined as tile index ranges that cover the input bounding box. This
+    is used to create tiles on quadrants instead of the entire file at once.
+    """
+    indexrange = tile_index_range(bbox, z)
+    quadrant_list = []
+
+    for tilex in range(indexrange[0], indexrange[2] + 1, QUADRANT_SIZE):
+        for tiley in range(indexrange[1], indexrange[3] + 1, QUADRANT_SIZE):
+            quadrant_list.append((
+                tilex,
+                tiley,
+                min(tilex + QUADRANT_SIZE - 1, indexrange[2]),
+                min(tiley + QUADRANT_SIZE - 1, indexrange[3]),
+            ))
+
+    return quadrant_list

@@ -12,9 +12,9 @@ from django.conf import settings
 from django.contrib.gis.gdal import GDALRaster
 from django.db import connection
 from django.dispatch import Signal
-from raster import tiler
-from raster.const import WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE
 from raster.models import RasterLayerBandMetadata, RasterTile
+from raster.tiles import utils
+from raster.tiles.const import WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE
 
 rasterlayers_parser_ended = Signal(providing_args=['instance'])
 
@@ -96,14 +96,11 @@ class RasterLayerParser(object):
             # Return first one as raster file
             self.rastername = os.path.basename(raster_list[0])
 
-    def open_raster_file(self):
+    def extract_metadata(self):
         """
         Open the raster file as GDALRaster and set nodata-values.
         """
-        self.log('Opening raster file as GDALRaster.')
-
-        # Open raster file
-        self.dataset = GDALRaster(os.path.join(self.tmpdir, self.rastername), write=True)
+        self.log('Extracting metadata from raster.')
 
         # Make sure nodata value is set from input
         self.hist_values = []
@@ -151,79 +148,76 @@ class RasterLayerParser(object):
         """
         # Compute the tile x-y-z index range for the rasterlayer for this zoomlevel
         bbox = self.rasterlayer.extent()
-        indexrange = tiler.tile_index_range(bbox, zoom)
+        indexrange = utils.tile_index_range(bbox, zoom)
+        quadrants = utils.quadrants(bbox, zoom)
 
         # Compute scale of tiles for this zoomlevel
-        tilescale = tiler.tile_scale(zoom)
+        tilescale = utils.tile_scale(zoom)
 
         # Count the number of tiles that are required to cover the raster at this zoomlevel
         nr_of_tiles = (indexrange[2] - indexrange[0] + 1) * (indexrange[3] - indexrange[1] + 1)
 
-        # Create destination raster file
-        self.log('Snapping dataset to zoom level {0}'.format(zoom))
+        self.log('Creating {0} tiles in {1} quadrants at zoom {2}.'.format(nr_of_tiles, len(quadrants), zoom))
 
-        bounds = tiler.tile_bounds(indexrange[0], indexrange[1], zoom)
-        sizex = (indexrange[2] - indexrange[0] + 1) * self.tilesize
-        sizey = (indexrange[3] - indexrange[1] + 1) * self.tilesize
-        dest_file = os.path.join(self.tmpdir, 'djangowarpedraster' + str(zoom) + '.tif')
+        for quadrant_index, indexrange in enumerate(quadrants):
+            self.log('Starting tile creation for quadrant {0} at zoom level {1}'.format(quadrant_index, zoom))
 
-        snapped_dataset = self.dataset.warp({
-            'name': dest_file,
-            'origin': [bounds[0], bounds[3]],
-            'scale': [tilescale, -tilescale],
-            'width': sizex,
-            'height': sizey,
-        })
+            # Compute quadrant bounds and create destination file
+            bounds = utils.tile_bounds(indexrange[0], indexrange[1], zoom)
+            dest_file = tempfile.NamedTemporaryFile(dir=self.tmpdir, suffix='.tif')
 
-        self.log('Creating {0} tiles for zoom {1}.'.format(nr_of_tiles, zoom))
+            # Snap dataset to the quadrant
+            snapped_dataset = self.dataset.warp({
+                'name': dest_file.name,
+                'origin': [bounds[0], bounds[3]],
+                'scale': [tilescale, -tilescale],
+                'width': (indexrange[2] - indexrange[0] + 1) * self.tilesize,
+                'height':(indexrange[3] - indexrange[1] + 1) * self.tilesize,
+                'srid': WEB_MERCATOR_SRID,
+            })
 
-        counter = 0
-        for tilex in range(indexrange[0], indexrange[2] + 1):
-            for tiley in range(indexrange[1], indexrange[3] + 1):
-                # Log progress
-                counter += 1
-                if counter % 250 == 0:
-                    self.log('{0} tiles created at zoom {1}'.format(counter, zoom))
+            # Create all tiles in this quadrant
+            for tilex in range(indexrange[0], indexrange[2] + 1):
+                for tiley in range(indexrange[1], indexrange[3] + 1):
+                    # Calculate raster tile origin
+                    bounds = utils.tile_bounds(tilex, tiley, zoom)
 
-                # Calculate raster tile origin
-                bounds = tiler.tile_bounds(tilex, tiley, zoom)
+                    # Construct band data arrays
+                    pixeloffset = (
+                        (tilex - indexrange[0]) * self.tilesize,
+                        (tiley - indexrange[1]) * self.tilesize
+                    )
 
-                # Construct band data arrays
-                pixeloffset = (
-                    (tilex - indexrange[0]) * self.tilesize,
-                    (tiley - indexrange[1]) * self.tilesize
-                )
+                    band_data = [
+                        {
+                            'data': band.data(offset=pixeloffset, size=(self.tilesize, self.tilesize)),
+                            'nodata_value': band.nodata_value
+                        } for band in snapped_dataset.bands
+                    ]
 
-                band_data = [
-                    {
-                        'data': band.data(offset=pixeloffset, size=(self.tilesize, self.tilesize)),
-                        'nodata_value': band.nodata_value
-                    } for band in snapped_dataset.bands
-                ]
+                    # Add tile data to histogram
+                    if zoom == self.max_zoom:
+                        self.push_histogram(band_data)
 
-                # Add tile data to histogram
-                if zoom == self.max_zoom:
-                    self.push_histogram(band_data)
+                    # Warp source raster into this tile (in memory)
+                    dest = GDALRaster({
+                        'width': self.tilesize,
+                        'height': self.tilesize,
+                        'origin': [bounds[0], bounds[3]],
+                        'scale': [tilescale, -tilescale],
+                        'srid': WEB_MERCATOR_SRID,
+                        'datatype': snapped_dataset.bands[0].datatype(),
+                        'bands': band_data,
+                    })
 
-                # Warp source raster into this tile (in memory)
-                dest = GDALRaster({
-                    'width': self.tilesize,
-                    'height': self.tilesize,
-                    'origin': [bounds[0], bounds[3]],
-                    'scale': [tilescale, -tilescale],
-                    'srid': WEB_MERCATOR_SRID,
-                    'datatype': snapped_dataset.bands[0].datatype(),
-                    'bands': band_data,
-                })
-
-                # Store tile
-                RasterTile.objects.create(
-                    rast=dest,
-                    rasterlayer=self.rasterlayer,
-                    tilex=tilex,
-                    tiley=tiley,
-                    tilez=zoom
-                )
+                    # Store tile
+                    RasterTile.objects.create(
+                        rast=dest,
+                        rasterlayer=self.rasterlayer,
+                        tilex=tilex,
+                        tiley=tiley,
+                        tilez=zoom
+                    )
 
         # Store histogram data
         if zoom == self.max_zoom:
@@ -233,8 +227,7 @@ class RasterLayerParser(object):
                 bandmeta.save()
 
         # Remove snapped dataset
-        self.log('Removing snapped dataset.', zoom=zoom)
-        os.remove(dest_file)
+        self.log('Finished zoom level {0}.'.format(zoom), zoom=zoom)
 
     def push_histogram(self, data):
         """
@@ -282,23 +275,18 @@ class RasterLayerParser(object):
 
             # Download, unzip and open raster file
             self.get_raster_file()
-            self.open_raster_file()
+
+            # Open raster file
+            self.dataset = GDALRaster(os.path.join(self.tmpdir, self.rastername), write=True)
+
+            # Extract metadata
+            self.extract_metadata()
 
             # Remove existing tiles for this layer before loading new ones
             self.rasterlayer.rastertile_set.all().delete()
 
-            # Transform raster to global srid
-            if self.dataset.srs.srid == WEB_MERCATOR_SRID:
-                self.log('Dataset already in SRID {0}, skipping transform'.format(WEB_MERCATOR_SRID))
-            else:
-                self.log(
-                    'Transforming raster to SRID {0}'.format(WEB_MERCATOR_SRID),
-                    status=self.rasterlayer.parsestatus.REPROJECTING_RASTER
-                )
-                self.dataset = self.dataset.transform(WEB_MERCATOR_SRID)
-
             # Compute max zoom at the web mercator projection
-            self.max_zoom = tiler.closest_zoomlevel(
+            self.max_zoom = utils.closest_zoomlevel(
                 abs(self.dataset.scale.x)
             )
 

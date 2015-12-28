@@ -1,6 +1,6 @@
 from celery import task
 
-from raster.parser import RasterLayerParser
+from raster.tiles.parser import RasterLayerParser
 
 
 @task

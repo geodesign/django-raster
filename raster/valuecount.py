@@ -5,9 +5,9 @@ import numpy
 from django.contrib.gis.geos import GEOSGeometry, MultiPolygon, Polygon
 from django.db import connection
 from raster.algebra.parser import FormulaParser, RasterAlgebraParser
-from raster.const import WEB_MERCATOR_SRID
 from raster.rasterize import rasterize
-from raster.tiler import tile_index_range
+from raster.tiles.const import WEB_MERCATOR_SRID
+from raster.tiles.utils import tile_index_range
 
 
 CLIPPED_VALUE_COUNT_SQL = """

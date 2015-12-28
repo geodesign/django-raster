@@ -72,8 +72,14 @@ class RasterTestCase(TestCase):
 
         # Setup query urls for tests
         self.tile = self.rasterlayer.rastertile_set.get(tilez=11, tilex=552, tiley=858)
-        self.tile_url = reverse('tms', kwargs={'z': self.tile.tilez, 'y': self.tile.tiley, 'x': self.tile.tilex, 'layer': self.rasterlayer.id, 'format': '.png'})
-        self.algebra_tile_url = reverse('algebra', kwargs={'z': self.tile.tilez, 'y': self.tile.tiley, 'x': self.tile.tilex, 'format': '.png'})
+        self.tile_url = reverse('tms', kwargs={
+            'z': self.tile.tilez, 'y': self.tile.tiley, 'x': self.tile.tilex,
+            'layer': self.rasterlayer.id, 'format': '.png'
+        })
+        self.algebra_tile_url = reverse('algebra', kwargs={
+            'z': self.tile.tilez, 'y': self.tile.tiley,
+            'x': self.tile.tilex, 'format': '.png'
+        })
 
         # Precompute expected totals from value count
         expected = {}
@@ -91,13 +97,13 @@ class RasterTestCase(TestCase):
         self.expected_totals = expected
 
         self.continuous_expected_histogram = {
-            '(0.0, 0.90000000000000002)': 21741,
-            '(8.0999999999999996, 9.0)': 2977,
-            '(1.8, 2.7000000000000002)': 56,
-            '(0.90000000000000002, 1.8)': 695,
-            '(2.7000000000000002, 3.6000000000000001)': 4131,
-            '(7.2000000000000002, 8.0999999999999996)': 1350,
-            '(3.6000000000000001, 4.5)': 31490
+            '(0.0, 0.90000000000000002)': 21592,
+            '(8.0999999999999996, 9.0)': 2955,
+            '(1.8, 2.7000000000000002)': 61,
+            '(0.90000000000000002, 1.8)': 676,
+            '(2.7000000000000002, 3.6000000000000001)': 4188,
+            '(7.2000000000000002, 8.0999999999999996)': 1367,
+            '(3.6000000000000001, 4.5)': 31485
         }
 
         # Instantiate test client
