@@ -4,8 +4,6 @@ from PIL import Image
 from raster.algebra.parser import FormulaParser
 from raster.exceptions import RasterException
 
-IMG_FORMATS = {'.png': 'PNG', '.jpg': 'JPEG'}
-
 
 def hex_to_rgba(value, alpha=255):
     """

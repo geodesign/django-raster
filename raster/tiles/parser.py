@@ -1,5 +1,5 @@
 import datetime
-import glob
+import fnmatch
 import os
 import shutil
 import tempfile
@@ -10,9 +10,10 @@ import numpy
 
 from django.conf import settings
 from django.contrib.gis.gdal import GDALRaster
+from django.core.files import File
 from django.db import connection
 from django.dispatch import Signal
-from raster.models import RasterLayerBandMetadata, RasterTile
+from raster.models import RasterLayerBandMetadata, RasterLayerReprojected, RasterTile
 from raster.tiles import utils
 from raster.tiles.const import WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE
 
@@ -25,11 +26,13 @@ class RasterLayerParser(object):
     """
     def __init__(self, rasterlayer):
         self.rasterlayer = rasterlayer
-        self.rastername = os.path.basename(rasterlayer.rasterfile.name)
 
         # Set raster tilesize
         self.tilesize = int(getattr(settings, 'RASTER_TILESIZE', WEB_MERCATOR_TILESIZE))
         self.zoomdown = getattr(settings, 'RASTER_ZOOM_NEXT_HIGHER', True)
+
+        self.hist_values = []
+        self.hist_bins = []
 
     def log(self, msg, reset=False, status=None, zoom=None):
         """
@@ -64,17 +67,25 @@ class RasterLayerParser(object):
         raster_workdir = getattr(settings, 'RASTER_WORKDIR', None)
         self.tmpdir = tempfile.mkdtemp(dir=raster_workdir)
 
+        rprj, created = RasterLayerReprojected.objects.get_or_create(rasterlayer=self.rasterlayer)
+
+        if not rprj.rasterfile:
+            rasterfile_source = self.rasterlayer.rasterfile
+        else:
+            rasterfile_source = rprj.rasterfile
+
+        self.rastername = os.path.basename(rasterfile_source.name)
+
         # Access rasterfile and store in a temp folder
         rasterfile = open(os.path.join(self.tmpdir, self.rastername), 'wb')
-        for chunk in self.rasterlayer.rasterfile.chunks():
+        for chunk in rasterfile_source.chunks():
             rasterfile.write(chunk)
         rasterfile.close()
 
         # If the raster file is compressed, decompress it
-        fileName, fileExtension = os.path.splitext(self.rastername)
+        file_name, file_extension = os.path.splitext(self.rastername)
 
-        if fileExtension == '.zip':
-
+        if file_extension == '.zip':
             # Open and extract zipfile
             zf = zipfile.ZipFile(os.path.join(self.tmpdir, self.rastername))
             zf.extractall(self.tmpdir)
@@ -83,10 +94,13 @@ class RasterLayerParser(object):
             os.remove(os.path.join(self.tmpdir, self.rastername))
 
             # Get filelist from directory
-            raster_list = glob.glob(os.path.join(self.tmpdir, "*.*"))
+            matches = []
+            for root, dirnames, filenames in os.walk(self.tmpdir):
+                for filename in fnmatch.filter(filenames, '*.*'):
+                    matches.append(os.path.join(root, filename))
 
             # Check if only one file is found in zipfile
-            if len(raster_list) > 1:
+            if len(matches) > 1:
                 self.log(
                     'WARNING: Found more than one file in zipfile '
                     'using only first file found. This might lead '
@@ -94,7 +108,32 @@ class RasterLayerParser(object):
                 )
 
             # Return first one as raster file
-            self.rastername = os.path.basename(raster_list[0])
+            self.rastername = os.path.basename(matches[0])
+
+        # Open raster file
+        self.dataset = GDALRaster(matches[0], write=True)
+
+        # Extract metadata
+        if created:
+            self.extract_metadata()
+
+        if not self.dataset.srs.srid == WEB_MERCATOR_SRID:
+            self.log(
+                'Transforming raster to SRID {0}'.format(WEB_MERCATOR_SRID),
+                status=self.rasterlayer.parsestatus.REPROJECTING_RASTER
+            )
+            # Reproject the dataset
+            self.dataset = self.dataset.transform(WEB_MERCATOR_SRID)
+
+            # Zip reprojected raster file
+            dest = tempfile.NamedTemporaryFile(dir=self.tmpdir, suffix='.zip')
+            dest_zip = zipfile.ZipFile(dest.name, mode='w')
+            dest_zip.write(self.dataset.name)
+            dest_zip.close()
+
+            # Store zip file in reprojected raster model
+            rprj.rasterfile = File(open(dest_zip.filename, 'rb'))
+            rprj.save()
 
     def extract_metadata(self):
         """
@@ -103,8 +142,6 @@ class RasterLayerParser(object):
         self.log('Extracting metadata from raster.')
 
         # Make sure nodata value is set from input
-        self.hist_values = []
-        self.hist_bins = []
         for i, band in enumerate(self.dataset.bands):
             if self.rasterlayer.nodata not in ('', None):
                 band.nodata_value = float(self.rasterlayer.nodata)
@@ -173,7 +210,6 @@ class RasterLayerParser(object):
                 'scale': [tilescale, -tilescale],
                 'width': (indexrange[2] - indexrange[0] + 1) * self.tilesize,
                 'height': (indexrange[3] - indexrange[1] + 1) * self.tilesize,
-                'srid': WEB_MERCATOR_SRID,
             })
 
             # Create all tiles in this quadrant
@@ -220,7 +256,7 @@ class RasterLayerParser(object):
                     )
 
         # Store histogram data
-        if zoom == self.max_zoom:
+        if zoom == self.max_zoom and len(self.hist_values):
             bandmetas = RasterLayerBandMetadata.objects.filter(rasterlayer=self.rasterlayer)
             for bandmeta in bandmetas:
                 bandmeta.hist_values = self.hist_values[bandmeta.band].tolist()
@@ -233,6 +269,9 @@ class RasterLayerParser(object):
         """
         Add data to band level histogram histogram.
         """
+        if not len(self.hist_bins) or not len(self.hist_values):
+            return
+
         # Loop through bands of this tile
         for i, dat in enumerate(data):
             # Create histogram for new data with the same bins
@@ -272,15 +311,8 @@ class RasterLayerParser(object):
                 reset=True,
                 status=self.rasterlayer.parsestatus.DOWNLOADING_FILE
             )
-
             # Download, unzip and open raster file
             self.get_raster_file()
-
-            # Open raster file
-            self.dataset = GDALRaster(os.path.join(self.tmpdir, self.rastername), write=True)
-
-            # Extract metadata
-            self.extract_metadata()
 
             # Remove existing tiles for this layer before loading new ones
             self.rasterlayer.rastertile_set.all().delete()

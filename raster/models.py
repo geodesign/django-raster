@@ -218,6 +218,23 @@ def parse_raster_layer_if_log_is_empty(sender, instance, created, **kwargs):
             parser.parse_raster_layer()
 
 
+class RasterLayerReprojected(models.Model):
+    """
+    Stores reprojected version of raster.
+    """
+    rasterlayer = models.OneToOneField(RasterLayer, related_name='reprojected')
+    rasterfile = models.FileField(upload_to='rasters/reprojected', null=True, blank=True)
+
+    def __str__(self):
+        return self.rasterlayer.name
+
+    def get_file(self):
+        if self.rasterfile:
+            return self.rasterfile
+        else:
+            return self.rasterlayer.rasterfile
+
+
 class RasterLayerMetadata(models.Model):
     """
     Stores meta data for a raster layer

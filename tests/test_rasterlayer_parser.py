@@ -44,14 +44,15 @@ class RasterLayerParserWithoutCeleryTests(RasterTestCase):
         self.assertEqual(self.rasterlayer.parsestatus.tile_level, 12)
 
     def test_parse_nodata_none(self):
-        tile = self.rasterlayer.rastertile_set.first()
-        self.assertEqual(tile.rast.bands[0].nodata_value, 255)
-        self.rasterlayer.nodata = ''
-        self.rasterlayer.parsestatus.log = ''
-        self.rasterlayer.parsestatus.save()
-        self.rasterlayer.save()
-        tile = self.rasterlayer.rastertile_set.first()
-        self.assertEqual(tile.rast.bands[0].nodata_value, 15)
+        with self.settings(MEDIA_ROOT=self.media_root):
+            tile = self.rasterlayer.rastertile_set.first()
+            self.assertEqual(tile.rast.bands[0].nodata_value, 255)
+            self.rasterlayer.nodata = ''
+            self.rasterlayer.parsestatus.log = ''
+            self.rasterlayer.parsestatus.save()
+            self.rasterlayer.save()
+            tile = self.rasterlayer.rastertile_set.first()
+            self.assertEqual(tile.rast.bands[0].nodata_value, 15)
 
 
 @override_settings(CELERY_ALWAYS_EAGER=True,

@@ -18,12 +18,13 @@ class RasterTestCase(TestCase):
         self.pwd = os.path.dirname(os.path.abspath(
             inspect.getfile(inspect.currentframe())
         ))
-        rasterfile = File(open(os.path.join(self.pwd, 'raster.tif.zip'), 'rb'))
+
         # Create legend semantics
         sem1 = LegendSemantics.objects.create(name='Earth')
         sem2 = LegendSemantics.objects.create(name='Wind')
         sem3 = LegendSemantics.objects.create(name='Water')
         sem4 = LegendSemantics.objects.create(name='Fire')
+
         # Create legend entries (semantics with colors and expressions)
         ent1 = LegendEntry.objects.create(semantics=sem1, expression='4', color='#123456')
         ent2 = LegendEntry.objects.create(semantics=sem1, expression='10', color='#123456')
@@ -32,6 +33,7 @@ class RasterTestCase(TestCase):
         ent5 = LegendEntry.objects.create(semantics=sem4, expression='4', color='#654321')
         ent6 = LegendEntry.objects.create(semantics=sem4, expression='5', color='#123456')
         ent7 = LegendEntry.objects.create(semantics=sem4, expression='(x >= 2) & (x < 5)', color='#123456')
+
         # Create legends
         leg = Legend.objects.create(title='MyLegend')
         leg.entries.add(ent1)
@@ -50,6 +52,7 @@ class RasterTestCase(TestCase):
         self.legend_with_expression = leg_expression
 
         # Create test raster layer
+        rasterfile = File(open(os.path.join(self.pwd, 'raster.tif.zip'), 'rb'))
         self.media_root = tempfile.mkdtemp()
         with self.settings(MEDIA_ROOT=self.media_root):
             self.rasterlayer = RasterLayer.objects.create(
@@ -97,13 +100,13 @@ class RasterTestCase(TestCase):
         self.expected_totals = expected
 
         self.continuous_expected_histogram = {
-            '(0.0, 0.90000000000000002)': 21592,
-            '(8.0999999999999996, 9.0)': 2955,
-            '(1.8, 2.7000000000000002)': 61,
-            '(0.90000000000000002, 1.8)': 676,
-            '(2.7000000000000002, 3.6000000000000001)': 4188,
-            '(7.2000000000000002, 8.0999999999999996)': 1367,
-            '(3.6000000000000001, 4.5)': 31485
+            '(0.0, 0.90000000000000002)': 21741,
+            '(8.0999999999999996, 9.0)': 2977,
+            '(1.8, 2.7000000000000002)': 56,
+            '(0.90000000000000002, 1.8)': 695,
+            '(2.7000000000000002, 3.6000000000000001)': 4131,
+            '(7.2000000000000002, 8.0999999999999996)': 1350,
+            '(3.6000000000000001, 4.5)': 31490,
         }
 
         # Instantiate test client
