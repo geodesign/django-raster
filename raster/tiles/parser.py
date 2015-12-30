@@ -15,7 +15,7 @@ from django.db import connection
 from django.dispatch import Signal
 from raster.models import RasterLayerBandMetadata, RasterLayerReprojected, RasterTile
 from raster.tiles import utils
-from raster.tiles.const import WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE
+from raster.tiles.const import WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE, QUADRANT_SIZE
 
 rasterlayers_parser_ended = Signal(providing_args=['instance'])
 
@@ -59,39 +59,44 @@ class RasterLayerParser(object):
 
     def get_raster_file(self):
         """
-        Make local copy of rasterfile, which is needed if files are stored on
-        remote storage, and unzip it if necessary.
+        Get raster source file to extract tiles from.
+
+        This makes a local copy of rasterfile, unzips the raster and reprojects
+        it into web mercator if necessary. The reprojected raster is stored for
+        reuse such that reprojection does only happen once.
+
+        The local copy of the raster is needed if files are stored on remote
+        storages.
         """
         self.log('Getting raster file from storage')
 
         raster_workdir = getattr(settings, 'RASTER_WORKDIR', None)
         self.tmpdir = tempfile.mkdtemp(dir=raster_workdir)
 
-        rprj, created = RasterLayerReprojected.objects.get_or_create(rasterlayer=self.rasterlayer)
+        reproj, created = RasterLayerReprojected.objects.get_or_create(rasterlayer=self.rasterlayer)
 
-        if not rprj.rasterfile:
+        # Choose source for raster data, use the reprojected version if it exists.
+        if not reproj.rasterfile:
             rasterfile_source = self.rasterlayer.rasterfile
         else:
-            rasterfile_source = rprj.rasterfile
+            rasterfile_source = reproj.rasterfile
 
-        self.rastername = os.path.basename(rasterfile_source.name)
-
-        # Access rasterfile and store in a temp folder
-        rasterfile = open(os.path.join(self.tmpdir, self.rastername), 'wb')
+        # Copy raster file source to local folder
+        filepath = os.path.join(self.tmpdir, os.path.basename(rasterfile_source.name))
+        rasterfile = open(filepath, 'wb')
         for chunk in rasterfile_source.chunks():
             rasterfile.write(chunk)
         rasterfile.close()
 
-        # If the raster file is compressed, decompress it
-        file_name, file_extension = os.path.splitext(self.rastername)
-
-        if file_extension == '.zip':
+        # If the raster file is compressed, decompress it, otherwise try to
+        # open the source file directly.
+        if os.path.splitext(rasterfile.name)[1].lower() == '.zip':
             # Open and extract zipfile
-            zf = zipfile.ZipFile(os.path.join(self.tmpdir, self.rastername))
+            zf = zipfile.ZipFile(rasterfile.name)
             zf.extractall(self.tmpdir)
 
             # Remove zipfile
-            os.remove(os.path.join(self.tmpdir, self.rastername))
+            os.remove(rasterfile.name)
 
             # Get filelist from directory
             matches = []
@@ -107,21 +112,18 @@ class RasterLayerParser(object):
                     'to problems if its not a raster file.'
                 )
 
-            # Return first one as raster file
-            self.rastername = os.path.basename(matches[0])
+            # Open raster file
+            self.dataset = GDALRaster(matches[0], write=True)
+        else:
+            self.dataset = GDALRaster(rasterfile.name)
 
-        # Open raster file
-        self.dataset = GDALRaster(matches[0], write=True)
-
-        # Extract metadata
-        if created:
-            self.extract_metadata()
-
+        # Reproject raster into web mercator if necessary
         if not self.dataset.srs.srid == WEB_MERCATOR_SRID:
             self.log(
                 'Transforming raster to SRID {0}'.format(WEB_MERCATOR_SRID),
                 status=self.rasterlayer.parsestatus.REPROJECTING_RASTER
             )
+
             # Reproject the dataset
             self.dataset = self.dataset.transform(WEB_MERCATOR_SRID)
 
@@ -132,20 +134,40 @@ class RasterLayerParser(object):
             dest_zip.close()
 
             # Store zip file in reprojected raster model
-            rprj.rasterfile = File(open(dest_zip.filename, 'rb'))
-            rprj.save()
+            reproj.rasterfile = File(open(dest_zip.filename, 'rb'))
+            reproj.save()
+
+        # Make sure nodata value is set from input on all bands
+        if self.rasterlayer.nodata not in ('', None):
+            for band in self.dataset.bands:
+                band.nodata_value = float(self.rasterlayer.nodata)
+
+        # Extract metadata
+        self.extract_metadata()
 
     def extract_metadata(self):
         """
-        Open the raster file as GDALRaster and set nodata-values.
+        Extract and store metadata for the raster and its bands.
         """
         self.log('Extracting metadata from raster.')
 
-        # Make sure nodata value is set from input
-        for i, band in enumerate(self.dataset.bands):
-            if self.rasterlayer.nodata not in ('', None):
-                band.nodata_value = float(self.rasterlayer.nodata)
+        # Extract global raster metadata
+        meta = self.rasterlayer.metadata
+        meta.uperleftx = self.dataset.origin.x
+        meta.uperlefty = self.dataset.origin.y
+        meta.width = self.dataset.width
+        meta.height = self.dataset.height
+        meta.scalex = self.dataset.scale.x
+        meta.scaley = self.dataset.scale.y
+        meta.skewx = self.dataset.skew.x
+        meta.skewy = self.dataset.skew.y
+        meta.numbands = len(self.dataset.bands)
+        meta.srs_wkt = self.dataset.srs.wkt
+        meta.srid = self.dataset.srs.srid
+        meta.save()
 
+        # Extract band metadata
+        for i, band in enumerate(self.dataset.bands):
             bandmeta = RasterLayerBandMetadata.objects.filter(rasterlayer=self.rasterlayer, band=i).first()
             if not bandmeta:
                 bandmeta = RasterLayerBandMetadata(rasterlayer=self.rasterlayer, band=i)
@@ -159,23 +181,6 @@ class RasterLayerParser(object):
             self.hist_values.append(numpy.array(bandmeta.hist_values))
             self.hist_bins.append(numpy.array(bandmeta.hist_bins))
 
-        # Store original metadata for this raster
-        meta = self.rasterlayer.metadata
-
-        meta.uperleftx = self.dataset.origin.x
-        meta.uperlefty = self.dataset.origin.y
-        meta.width = self.dataset.width
-        meta.height = self.dataset.height
-        meta.scalex = self.dataset.scale.x
-        meta.scaley = self.dataset.scale.y
-        meta.skewx = self.dataset.skew.x
-        meta.skewy = self.dataset.skew.y
-        meta.numbands = len(self.dataset.bands)
-        meta.srs_wkt = self.dataset.srs.wkt
-        meta.srid = self.dataset.srs.srid
-
-        meta.save()
-
     def create_tiles(self, zoom):
         """
         Create tiles for this raster at the given zoomlevel.
@@ -185,16 +190,12 @@ class RasterLayerParser(object):
         """
         # Compute the tile x-y-z index range for the rasterlayer for this zoomlevel
         bbox = self.rasterlayer.extent()
-        indexrange = utils.tile_index_range(bbox, zoom)
         quadrants = utils.quadrants(bbox, zoom)
 
         # Compute scale of tiles for this zoomlevel
         tilescale = utils.tile_scale(zoom)
 
-        # Count the number of tiles that are required to cover the raster at this zoomlevel
-        nr_of_tiles = (indexrange[2] - indexrange[0] + 1) * (indexrange[3] - indexrange[1] + 1)
-
-        self.log('Creating {0} tiles in {1} quadrants at zoom {2}.'.format(nr_of_tiles, len(quadrants), zoom))
+        self.log('Creating {0} tiles in {1} quadrants at zoom {2}.'.format(len(quadrants) * QUADRANT_SIZE ^ 2, len(quadrants), zoom))
 
         for quadrant_index, indexrange in enumerate(quadrants):
             self.log('Starting tile creation for quadrant {0} at zoom level {1}'.format(quadrant_index, zoom))
@@ -262,12 +263,11 @@ class RasterLayerParser(object):
                 bandmeta.hist_values = self.hist_values[bandmeta.band].tolist()
                 bandmeta.save()
 
-        # Remove snapped dataset
-        self.log('Finished zoom level {0}.'.format(zoom), zoom=zoom)
+        self.log('Finished parsing at zoom level {0}.'.format(zoom), zoom=zoom)
 
     def push_histogram(self, data):
         """
-        Add data to band level histogram histogram.
+        Add data to band level histogram.
         """
         if not len(self.hist_bins) or not len(self.hist_values):
             return

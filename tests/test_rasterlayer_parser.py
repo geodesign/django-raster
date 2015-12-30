@@ -36,7 +36,7 @@ class RasterLayerParserWithoutCeleryTests(RasterTestCase):
         self.assertEqual(self.rasterlayer.rastertile_set.count(), 9 + 4 + 6 * 1)
 
     def test_layermeta_creation(self):
-        self.assertEqual(self.rasterlayer.metadata.width, 163)
+        self.assertEqual(self.rasterlayer.metadata.width, 165)
         self.assertEqual(self.rasterlayer.metadata.max_zoom, 12)
 
     def test_parsestatus_creation(self):
