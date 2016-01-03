@@ -210,8 +210,8 @@ def parse_raster_layer_if_log_is_empty(sender, instance, created, **kwargs):
 
     if instance.rasterfile.name and instance.parsestatus.log == '':
         if hasattr(settings, 'RASTER_USE_CELERY') and settings.RASTER_USE_CELERY:
-            from raster.tasks import parse_raster_layer_with_celery
-            parse_raster_layer_with_celery.delay(instance)
+            from raster.tiles.tasks import parse_raster_layer
+            parse_raster_layer.delay(instance)
         else:
             from raster.tiles.parser import RasterLayerParser
             parser = RasterLayerParser(instance)

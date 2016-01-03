@@ -15,7 +15,7 @@ from django.db import connection
 from django.dispatch import Signal
 from raster.models import RasterLayerBandMetadata, RasterLayerReprojected, RasterTile
 from raster.tiles import utils
-from raster.tiles.const import WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE, QUADRANT_SIZE
+from raster.tiles.const import QUADRANT_SIZE, WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE
 
 rasterlayers_parser_ended = Signal(providing_args=['instance'])
 
@@ -188,6 +188,10 @@ class RasterLayerParser(object):
         This routine first snaps the raster to the grid of the zoomlevel,
         then creates  the tiles from the snapped raster.
         """
+        # Abort if zoom level is above resolution of the raster layer
+        if zoom > self.max_zoom:
+            return
+
         # Compute the tile x-y-z index range for the rasterlayer for this zoomlevel
         bbox = self.rasterlayer.extent()
         quadrants = utils.quadrants(bbox, zoom)
@@ -299,6 +303,29 @@ class RasterLayerParser(object):
         cursor = connection.cursor()
         cursor.execute(sql)
 
+    def compute_max_zoom(self):
+        """
+        Set max zoom property based on rasterlayer metadata.
+        """
+        # Compute max zoom at the web mercator projection
+        self.max_zoom = utils.closest_zoomlevel(
+            abs(self.dataset.scale.x)
+        )
+
+        # Store max zoom level in metadata
+        self.rasterlayer.metadata.max_zoom = self.max_zoom
+        self.rasterlayer.metadata.save()
+
+        # Reduce max zoom by one if zoomdown flag was disabled
+        if not self.zoomdown:
+            self.max_zoom -= 1
+
+    def drop_all_tiles(self):
+        """
+        Delete all existing tiles for this parser's rasterlayer.
+        """
+        self.rasterlayer.rastertile_set.all().delete()
+
     def parse_raster_layer(self):
         """
         This function pushes the raster data from the Raster Layer into the
@@ -317,18 +344,8 @@ class RasterLayerParser(object):
             # Remove existing tiles for this layer before loading new ones
             self.rasterlayer.rastertile_set.all().delete()
 
-            # Compute max zoom at the web mercator projection
-            self.max_zoom = utils.closest_zoomlevel(
-                abs(self.dataset.scale.x)
-            )
-
-            # Store max zoom level in metadata
-            self.rasterlayer.metadata.max_zoom = self.max_zoom
-            self.rasterlayer.metadata.save()
-
-            # Reduce max zoom by one if zoomdown flag was disabled
-            if not self.zoomdown:
-                self.max_zoom -= 1
+            # Compute and set max zoom property
+            self.compute_max_zoom()
 
             self.log(
                 'Started creating tiles',
@@ -355,6 +372,5 @@ class RasterLayerParser(object):
                 traceback.format_exc(),
                 status=self.rasterlayer.parsestatus.FAILED
             )
-            raise
         finally:
             shutil.rmtree(self.tmpdir)
