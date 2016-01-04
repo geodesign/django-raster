@@ -126,7 +126,7 @@ class RasterLayerParser(object):
 
             # Reproject the dataset, use in-file compression if possible. The
             # infile compression option is not yet part of an official Django
-            # release.
+            # release, a zipfile is used as alternative.
             try:
                 self.dataset = self.dataset.transform(WEB_MERCATOR_SRID, compress='DEFLATE')
                 compressed = self.dataset.name
@@ -134,14 +134,12 @@ class RasterLayerParser(object):
                 self.dataset = self.dataset.transform(WEB_MERCATOR_SRID)
                 # Zip reprojected raster file
                 dest = tempfile.NamedTemporaryFile(dir=self.tmpdir, suffix='.zip')
-                dest_zip = zipfile.ZipFile(
-                    dest.name,
-                    os.path.basename(dest.name),
-                    mode='w',
-                    allowZip64=True,
-                    compress_type=zipfile.ZIP_DEFLATED
+                dest_zip = zipfile.ZipFile(dest.name, 'w', allowZip64=True)
+                dest_zip.write(
+                    filename=self.dataset.name,
+                    arcname=os.path.basename(self.dataset.name),
+                    compress_type=zipfile.ZIP_DEFLATED,
                 )
-                dest_zip.write(self.dataset.name)
                 dest_zip.close()
                 compressed = dest_zip.filename
 
