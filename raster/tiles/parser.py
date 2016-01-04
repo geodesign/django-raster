@@ -5,6 +5,8 @@ import tempfile
 import zipfile
 
 import numpy
+from celery import current_app, group
+from celery.contrib.methods import task_method
 
 from django.conf import settings
 from django.contrib.gis.gdal import GDALRaster
@@ -13,7 +15,7 @@ from django.db import connection
 from django.dispatch import Signal
 from raster.models import RasterLayerBandMetadata, RasterLayerReprojected, RasterTile
 from raster.tiles import utils
-from raster.tiles.const import QUADRANT_SIZE, WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE
+from raster.tiles.const import WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE
 
 rasterlayers_parser_ended = Signal(providing_args=['instance'])
 
@@ -29,35 +31,33 @@ class RasterLayerParser(object):
         self.tilesize = int(getattr(settings, 'RASTER_TILESIZE', WEB_MERCATOR_TILESIZE))
         self.zoomdown = getattr(settings, 'RASTER_ZOOM_NEXT_HIGHER', True)
 
-        self.hist_values = []
-        self.hist_bins = []
+        # Create workdir
+        raster_workdir = getattr(settings, 'RASTER_WORKDIR', None)
+        self.tmpdir = tempfile.mkdtemp(dir=raster_workdir)
 
-    def log(self, msg, reset=False, status=None, zoom=None):
+    def log(self, msg, status=None, zoom=None):
         """
         Write a message to the parse log of the rasterlayer instance and update
         the parse status object.
         """
-        self.rasterlayer.parsestatus.refresh_from_db()
+        parsestatus = self.rasterlayer.parsestatus
+        parsestatus.refresh_from_db()
 
         if status is not None:
-            self.rasterlayer.parsestatus.status = status
+            parsestatus.status = status
 
-        if zoom is not None and zoom not in self.rasterlayer.parsestatus.tile_levels:
-            self.rasterlayer.parsestatus.tile_levels.append(zoom)
-            self.rasterlayer.parsestatus.tile_levels.sort()
+        if zoom is not None and zoom not in parsestatus.tile_levels:
+            parsestatus.tile_levels.append(zoom)
+            parsestatus.tile_levels.sort()
 
         # Prepare datetime stamp for log
         now = '[{0}] '.format(datetime.datetime.now().strftime('%Y-%m-%d %T'))
 
-        # Reset log and tile levels if requested
-        if reset:
-            self.rasterlayer.parsestatus.log = now + msg
-            self.rasterlayer.parsestatus.tile_levels = []
-        else:
-            self.rasterlayer.parsestatus.log += '\n' + now + msg
+        if parsestatus.log:
+            now = '\n' + now
 
-        self.rasterlayer.save()
-        self.rasterlayer.parsestatus.save()
+        parsestatus.log += now + msg
+        parsestatus.save()
 
     def open_raster_file(self):
         """
@@ -70,9 +70,6 @@ class RasterLayerParser(object):
         The local copy of the raster is needed if files are stored on remote
         storages.
         """
-        raster_workdir = getattr(settings, 'RASTER_WORKDIR', None)
-        self.tmpdir = tempfile.mkdtemp(dir=raster_workdir)
-
         reproj, created = RasterLayerReprojected.objects.get_or_create(rasterlayer=self.rasterlayer)
 
         # Choose source for raster data, use the reprojected version if it exists.
@@ -117,6 +114,10 @@ class RasterLayerParser(object):
         else:
             self.dataset = GDALRaster(rasterfile.name, write=True)
 
+        # Extract metadata
+        if created:
+            self.extract_metadata()
+
         # Reproject raster into web mercator if necessary
         if not self.dataset.srs.srid == WEB_MERCATOR_SRID:
             self.log(
@@ -124,27 +125,21 @@ class RasterLayerParser(object):
                 status=self.rasterlayer.parsestatus.REPROJECTING_RASTER
             )
 
-            # Reproject the dataset, use in-file compression if possible. The
-            # infile compression option is not yet part of an official Django
-            # release, a zipfile is used as alternative.
-            try:
-                self.dataset = self.dataset.transform(WEB_MERCATOR_SRID, compress='DEFLATE')
-                compressed = self.dataset.name
-            except TypeError:
-                self.dataset = self.dataset.transform(WEB_MERCATOR_SRID)
-                # Zip reprojected raster file
-                dest = tempfile.NamedTemporaryFile(dir=self.tmpdir, suffix='.zip')
-                dest_zip = zipfile.ZipFile(dest.name, 'w', allowZip64=True)
-                dest_zip.write(
-                    filename=self.dataset.name,
-                    arcname=os.path.basename(self.dataset.name),
-                    compress_type=zipfile.ZIP_DEFLATED,
-                )
-                dest_zip.close()
-                compressed = dest_zip.filename
+            # Reproject the dataset
+            self.dataset = self.dataset.transform(WEB_MERCATOR_SRID)
+
+            # Compress reprojected raster file and store it
+            dest = tempfile.NamedTemporaryFile(dir=self.tmpdir, suffix='.zip')
+            dest_zip = zipfile.ZipFile(dest.name, 'w', allowZip64=True)
+            dest_zip.write(
+                filename=self.dataset.name,
+                arcname=os.path.basename(self.dataset.name),
+                compress_type=zipfile.ZIP_DEFLATED,
+            )
+            dest_zip.close()
 
             # Store zip file in reprojected raster model
-            reproj.rasterfile = File(open(compressed, 'rb'))
+            reproj.rasterfile = File(open(dest_zip.filename, 'rb'))
             reproj.save()
             self.log('Finished transforming raster.')
 
@@ -153,8 +148,17 @@ class RasterLayerParser(object):
             for band in self.dataset.bands:
                 band.nodata_value = float(self.rasterlayer.nodata)
 
-        # Extract metadata
-        self.extract_metadata()
+    def create_initial_histogram_buckets(self):
+        """
+        Gets the empty histogram arrays for statistics collection.
+        """
+        self.hist_values = []
+        self.hist_bins = []
+
+        for i, band in enumerate(self.dataset.bands):
+            bandmeta = RasterLayerBandMetadata.objects.filter(rasterlayer=self.rasterlayer, band=i).first()
+            self.hist_values.append(numpy.array(bandmeta.hist_values))
+            self.hist_bins.append(numpy.array(bandmeta.hist_bins))
 
     def extract_metadata(self):
         """
@@ -188,10 +192,6 @@ class RasterLayerParser(object):
             bandmeta.max = band.max
             bandmeta.save()
 
-            # Prepare numpy hist values and bins
-            self.hist_values.append(numpy.array(bandmeta.hist_values))
-            self.hist_bins.append(numpy.array(bandmeta.hist_bins))
-
         self.log('Finished extracting metadata from raster.')
 
     def create_tiles(self, zoom_levels):
@@ -214,77 +214,21 @@ class RasterLayerParser(object):
         # Abort if zoom level is above resolution of the raster layer
         if zoom > self.max_zoom:
             return
+        elif zoom == self.max_zoom:
+            self.create_initial_histogram_buckets()
 
         # Compute the tile x-y-z index range for the rasterlayer for this zoomlevel
         bbox = self.rasterlayer.extent()
         quadrants = utils.quadrants(bbox, zoom)
 
-        # Compute scale of tiles for this zoomlevel
-        tilescale = utils.tile_scale(zoom)
+        self.log('Creating {0} tiles in {1} quadrants at zoom {2}.'.format(self.nr_of_tiles(zoom), len(quadrants), zoom))
 
-        self.log('Creating {0} tiles in {1} quadrants at zoom {2}.'.format(len(quadrants) * QUADRANT_SIZE ^ 2, len(quadrants), zoom))
-
-        for quadrant_index, indexrange in enumerate(quadrants):
-            self.log('Starting tile creation for quadrant {0} at zoom level {1}'.format(quadrant_index, zoom))
-
-            # Compute quadrant bounds and create destination file
-            bounds = utils.tile_bounds(indexrange[0], indexrange[1], zoom)
-            dest_file = tempfile.NamedTemporaryFile(dir=self.tmpdir, suffix='.tif')
-
-            # Snap dataset to the quadrant
-            snapped_dataset = self.dataset.warp({
-                'name': dest_file.name,
-                'origin': [bounds[0], bounds[3]],
-                'scale': [tilescale, -tilescale],
-                'width': (indexrange[2] - indexrange[0] + 1) * self.tilesize,
-                'height': (indexrange[3] - indexrange[1] + 1) * self.tilesize,
-            })
-
-            # Create all tiles in this quadrant
-            for tilex in range(indexrange[0], indexrange[2] + 1):
-                for tiley in range(indexrange[1], indexrange[3] + 1):
-                    # Calculate raster tile origin
-                    bounds = utils.tile_bounds(tilex, tiley, zoom)
-
-                    # Construct band data arrays
-                    pixeloffset = (
-                        (tilex - indexrange[0]) * self.tilesize,
-                        (tiley - indexrange[1]) * self.tilesize
-                    )
-
-                    band_data = [
-                        {
-                            'data': band.data(offset=pixeloffset, size=(self.tilesize, self.tilesize)),
-                            'nodata_value': band.nodata_value
-                        } for band in snapped_dataset.bands
-                    ]
-
-                    # Add tile data to histogram
-                    if zoom == self.max_zoom:
-                        self.push_histogram(band_data)
-
-                    # Warp source raster into this tile (in memory)
-                    dest = GDALRaster({
-                        'width': self.tilesize,
-                        'height': self.tilesize,
-                        'origin': [bounds[0], bounds[3]],
-                        'scale': [tilescale, -tilescale],
-                        'srid': WEB_MERCATOR_SRID,
-                        'datatype': snapped_dataset.bands[0].datatype(),
-                        'bands': band_data,
-                    })
-
-                    # Store tile
-                    RasterTile.objects.create(
-                        rast=dest,
-                        rasterlayer=self.rasterlayer,
-                        tilex=tilex,
-                        tiley=tiley,
-                        tilez=zoom
-                    )
+        # Process quadrants in parallell
+        quadrant_task_group = group(self.process_quadrant.si(indexrange, zoom) for indexrange in quadrants)
+        quadrant_task_group.apply()
 
         # Store histogram data
-        if zoom == self.max_zoom and len(self.hist_values):
+        if zoom == self.max_zoom:
             bandmetas = RasterLayerBandMetadata.objects.filter(rasterlayer=self.rasterlayer)
             for bandmeta in bandmetas:
                 bandmeta.hist_values = self.hist_values[bandmeta.band].tolist()
@@ -292,13 +236,80 @@ class RasterLayerParser(object):
 
         self.log('Finished parsing at zoom level {0}.'.format(zoom), zoom=zoom)
 
+    _quadrant_count = 0
+
+    @current_app.task(filter=task_method)
+    def process_quadrant(self, indexrange, zoom):
+        """
+        Create raster tiles for a quadrant of tiles defined by a x-y-z index
+        range and a zoom level.
+        """
+        self._quadrant_count += 1
+        self.log('Starting tile creation for quadrant {0} at zoom level {1}'.format(self._quadrant_count, zoom))
+
+        # Compute scale of tiles for this zoomlevel
+        tilescale = utils.tile_scale(zoom)
+
+        # Compute quadrant bounds and create destination file
+        bounds = utils.tile_bounds(indexrange[0], indexrange[1], zoom)
+        dest_file = tempfile.NamedTemporaryFile(dir=self.tmpdir, suffix='.tif')
+
+        # Snap dataset to the quadrant
+        snapped_dataset = self.dataset.warp({
+            'name': dest_file.name,
+            'origin': [bounds[0], bounds[3]],
+            'scale': [tilescale, -tilescale],
+            'width': (indexrange[2] - indexrange[0] + 1) * self.tilesize,
+            'height': (indexrange[3] - indexrange[1] + 1) * self.tilesize,
+        })
+
+        # Create all tiles in this quadrant
+        for tilex in range(indexrange[0], indexrange[2] + 1):
+            for tiley in range(indexrange[1], indexrange[3] + 1):
+                # Calculate raster tile origin
+                bounds = utils.tile_bounds(tilex, tiley, zoom)
+
+                # Construct band data arrays
+                pixeloffset = (
+                    (tilex - indexrange[0]) * self.tilesize,
+                    (tiley - indexrange[1]) * self.tilesize
+                )
+
+                band_data = [
+                    {
+                        'data': band.data(offset=pixeloffset, size=(self.tilesize, self.tilesize)),
+                        'nodata_value': band.nodata_value
+                    } for band in snapped_dataset.bands
+                ]
+
+                # Add tile data to histogram
+                if zoom == self.max_zoom:
+                    self.push_histogram(band_data)
+
+                # Warp source raster into this tile (in memory)
+                dest = GDALRaster({
+                    'width': self.tilesize,
+                    'height': self.tilesize,
+                    'origin': [bounds[0], bounds[3]],
+                    'scale': [tilescale, -tilescale],
+                    'srid': WEB_MERCATOR_SRID,
+                    'datatype': snapped_dataset.bands[0].datatype(),
+                    'bands': band_data,
+                })
+
+                # Store tile
+                RasterTile.objects.create(
+                    rast=dest,
+                    rasterlayer=self.rasterlayer,
+                    tilex=tilex,
+                    tiley=tiley,
+                    tilez=zoom
+                )
+
     def push_histogram(self, data):
         """
         Add data to band level histogram.
         """
-        if not len(self.hist_bins) or not len(self.hist_values):
-            return
-
         # Loop through bands of this tile
         for i, dat in enumerate(data):
             # Create histogram for new data with the same bins
@@ -348,3 +359,11 @@ class RasterLayerParser(object):
         # Reduce max zoom by one if zoomdown flag was disabled
         if not self.zoomdown:
             self.max_zoom -= 1
+
+    def nr_of_tiles(self, zoom):
+        """
+        Compute the number of tiles for the rasterlayer on a given zoom level.
+        """
+        bbox = self.rasterlayer.extent()
+        indexrange = utils.tile_index_range(bbox, zoom)
+        return (indexrange[2] - indexrange[0] + 1) * (indexrange[3] - indexrange[1] + 1)

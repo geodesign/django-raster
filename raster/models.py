@@ -199,15 +199,15 @@ def reset_parse_log_if_data_changed(sender, instance, **kwargs):
         pass
     else:
         if obj.rasterfile.name != instance.rasterfile.name:
-            instance.parsestatus.log = ''
+            instance.parsestatus.reset(save=False)
 
 
 @receiver(post_save, sender=RasterLayer)
-def parse_raster_layer_if_log_is_empty(sender, instance, created, **kwargs):
+def parse_raster_layer_if_status_is_unparsed(sender, instance, created, **kwargs):
     RasterLayerParseStatus.objects.get_or_create(rasterlayer=instance)
     RasterLayerMetadata.objects.get_or_create(rasterlayer=instance)
 
-    if instance.rasterfile.name and instance.parsestatus.log == '':
+    if instance.parsestatus.status == instance.parsestatus.UNPARSED:
         from raster.tasks import parse_raster_layer
         parse_raster_layer(instance, getattr(settings, 'RASTER_USE_CELERY', False))
 
@@ -279,6 +279,13 @@ class RasterLayerParseStatus(models.Model):
 
     def __str__(self):
         return '{0} - {1}'.format(self.rasterlayer.name, self.get_status_display())
+
+    def reset(self, save=True):
+        self.tile_levels = []
+        self.log = ''
+        self.status = self.UNPARSED
+        if save:
+            self.save()
 
 
 class RasterLayerBandMetadata(models.Model):

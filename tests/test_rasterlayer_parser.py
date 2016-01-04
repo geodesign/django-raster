@@ -2,8 +2,7 @@ import os
 
 from django.core.files import File
 from django.test.utils import override_settings
-
-from .raster_testcase import RasterTestCase
+from tests.raster_testcase import RasterTestCase
 
 
 @override_settings(RASTER_TILESIZE=100)
@@ -36,7 +35,7 @@ class RasterLayerParserWithoutCeleryTests(RasterTestCase):
         self.assertEqual(self.rasterlayer.rastertile_set.count(), 9 + 4 + 6 * 1)
 
     def test_layermeta_creation(self):
-        self.assertEqual(self.rasterlayer.metadata.width, 165)
+        self.assertEqual(self.rasterlayer.metadata.width, 163)
         self.assertEqual(self.rasterlayer.metadata.max_zoom, 12)
 
     def test_parsestatus_creation(self):
@@ -48,7 +47,7 @@ class RasterLayerParserWithoutCeleryTests(RasterTestCase):
             tile = self.rasterlayer.rastertile_set.first()
             self.assertEqual(tile.rast.bands[0].nodata_value, 255)
             self.rasterlayer.nodata = ''
-            self.rasterlayer.parsestatus.log = ''
+            self.rasterlayer.parsestatus.status = self.rasterlayer.parsestatus.UNPARSED
             self.rasterlayer.parsestatus.save()
             self.rasterlayer.save()
             tile = self.rasterlayer.rastertile_set.first()

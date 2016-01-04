@@ -54,14 +54,13 @@ def send_success_signal(rasterlayer):
     """
     Send parse end succes signal and log success to rasterlayer.
     """
-    rasterlayers_parser_ended.send(sender=rasterlayer.__class__, instance=rasterlayer)
-
     # Log success of parsing
     parser = RasterLayerParser(rasterlayer)
     parser.log(
         'Successfully finished parsing raster',
         status=rasterlayer.parsestatus.FINISHED
     )
+    rasterlayers_parser_ended.send(sender=rasterlayer.__class__, instance=rasterlayer)
 
 
 @task
@@ -74,7 +73,6 @@ def open_and_reproject_raster(rasterlayer, reset=False):
         if reset:
             parser.log(
                 'Started parsing raster file',
-                reset=True,
                 status=rasterlayer.parsestatus.DOWNLOADING_FILE
             )
         parser.open_raster_file()
@@ -93,30 +91,40 @@ def parse_raster_layer(rasterlayer, async=True):
     """
     Parse input raster layer through a asynchronous task chain.
     """
-    if async:
-        # Grouped parsing: the first is a single task for the first five zoom
-        # levels, as download time might be bigger than parsing time for lower
-        # zoom levels. The middle is a group of the next five zoom levels,
-        # being parsed in parallel but, the rest is parsed in parallel at the
-        # after the middle is finished.
-        first = create_tiles.si(rasterlayer, range(GLOBAL_MAX_ZOOM_LEVEL + 1)[:5])
-        middle = group(create_tiles.si(rasterlayer, zoom) for zoom in range(GLOBAL_MAX_ZOOM_LEVEL + 1)[5:10])
-        last = group(create_tiles.si(rasterlayer, zoom) for zoom in range(GLOBAL_MAX_ZOOM_LEVEL + 1)[10:])
+    zoom_range = range(GLOBAL_MAX_ZOOM_LEVEL + 1)
 
+    if async:
+        # Bundle the first five raster layers to one task, downloading is
+        # more costly than the parsing itself.
+        high_level_bundle = create_tiles.si(rasterlayer, zoom_range[:5])
+
+        # Create a group of tasks with the middle level zoom levels that should
+        # be prioritized.
+        middle_level_group = group(
+            create_tiles.si(rasterlayer, zoom) for zoom in zoom_range[5:10]
+        )
+        # Combine bundle and middle levels to priority group
+        priority_group = group(high_level_bundle, middle_level_group)
+
+        # Create a task group for high zoom levels
+        high_level_group = group(create_tiles.si(rasterlayer, zoom) for zoom in zoom_range[10:])
+
+        # Setup the parser logic as parsing chain
         parsing_task_chain = (
             open_and_reproject_raster.si(rasterlayer) |
             clear_tiles.si(rasterlayer) |
-            first |
-            middle |
-            last |
+            priority_group |
+            high_level_group |
             drop_empty_tiles.si(rasterlayer) |
             send_success_signal.si(rasterlayer)
         )
+
+        # Apply the parsing chain
         parsing_task_chain.apply_async()
     else:
         open_and_reproject_raster(rasterlayer)
         clear_tiles(rasterlayer)
-        for zoom in range(GLOBAL_MAX_ZOOM_LEVEL + 1):
+        for zoom in zoom_range:
             create_tiles(rasterlayer, zoom)
         drop_empty_tiles(rasterlayer)
         send_success_signal(rasterlayer)

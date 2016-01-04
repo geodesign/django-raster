@@ -93,7 +93,7 @@ class RasterLayerModelAdmin(admin.ModelAdmin):
         Admin action to re-parse a set of rasterlayers.
         """
         for rasterlayer in queryset:
-            rasterlayer.parsestatus.log = ''
+            rasterlayer.parsestatus.reset()
             rasterlayer.save()
 
         msg = 'Parsing Rasters, check parse logs for progress'

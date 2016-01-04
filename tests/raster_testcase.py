@@ -7,11 +7,11 @@ import numpy
 
 from django.core.files import File
 from django.core.urlresolvers import reverse
-from django.test import Client, TestCase
+from django.test import Client, TransactionTestCase
 from raster.models import Legend, LegendEntry, LegendSemantics, RasterLayer
 
 
-class RasterTestCase(TestCase):
+class RasterTestCase(TransactionTestCase):
 
     def setUp(self):
         # Instantiate Django file instance for rasterlayer generation
@@ -98,15 +98,13 @@ class RasterTestCase(TestCase):
         expected.pop(255)
 
         self.expected_totals = expected
-
         self.continuous_expected_histogram = {
-            '(0.0, 0.90000000000000002)': 21741,
-            '(8.0999999999999996, 9.0)': 2977,
-            '(1.8, 2.7000000000000002)': 56,
-            '(0.90000000000000002, 1.8)': 695,
-            '(2.7000000000000002, 3.6000000000000001)': 4131,
-            '(7.2000000000000002, 8.0999999999999996)': 1350,
-            '(3.6000000000000001, 4.5)': 31490,
+            '(0.0, 1.5)': 22436,
+            '(1.5, 3.0)': 56,
+            '(13.5, 15.0)': 1244,
+            '(3.0, 4.5)': 35621,
+            '(7.5, 9.0)': 1350,
+            '(9.0, 10.5)': 2977
         }
 
         # Instantiate test client
