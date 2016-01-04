@@ -5,7 +5,7 @@ from django.shortcuts import render
 
 from .models import (
     Legend, LegendEntry, LegendSemantics, RasterLayer, RasterLayerBandMetadata, RasterLayerMetadata,
-    RasterLayerParseStatus, RasterTile
+    RasterLayerParseStatus, RasterLayerReprojected, RasterTile
 )
 
 
@@ -36,7 +36,7 @@ class RasterLayerMetadataInline(admin.TabularInline):
 class RasterLayerParseStatusInline(admin.TabularInline):
     model = RasterLayerParseStatus
     extra = 0
-    readonly_fields = ('status', 'tile_level', 'log', )
+    readonly_fields = ('status', 'tile_levels', 'log', )
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -60,6 +60,17 @@ class RasterLayerBandMetadataInline(admin.TabularInline):
         return False
 
 
+class RasterLayerReprojectedInline(admin.TabularInline):
+    model = RasterLayerReprojected
+    readonly_fields = (
+        'rasterlayer', 'rasterfile',
+    )
+    extra = 0
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
 class RasterLayerModelAdmin(admin.ModelAdmin):
     """
     Admin action to update filepaths only. Files can be uploadded to the
@@ -74,6 +85,7 @@ class RasterLayerModelAdmin(admin.ModelAdmin):
         RasterLayerParseStatusInline,
         RasterLayerMetadataInline,
         RasterLayerBandMetadataInline,
+        RasterLayerReprojectedInline,
     )
 
     def reparse_rasters(self, request, queryset):

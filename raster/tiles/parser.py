@@ -1,9 +1,7 @@
 import datetime
 import fnmatch
 import os
-import shutil
 import tempfile
-import traceback
 import zipfile
 
 import numpy
@@ -39,25 +37,29 @@ class RasterLayerParser(object):
         Write a message to the parse log of the rasterlayer instance and update
         the parse status object.
         """
+        self.rasterlayer.parsestatus.refresh_from_db()
+
         if status is not None:
             self.rasterlayer.parsestatus.status = status
 
-        if zoom is not None:
-            self.rasterlayer.parsestatus.tile_level = zoom
+        if zoom is not None and zoom not in self.rasterlayer.parsestatus.tile_levels:
+            self.rasterlayer.parsestatus.tile_levels.append(zoom)
+            self.rasterlayer.parsestatus.tile_levels.sort()
 
         # Prepare datetime stamp for log
         now = '[{0}] '.format(datetime.datetime.now().strftime('%Y-%m-%d %T'))
 
-        # Write log, reset if requested
+        # Reset log and tile levels if requested
         if reset:
             self.rasterlayer.parsestatus.log = now + msg
+            self.rasterlayer.parsestatus.tile_levels = []
         else:
             self.rasterlayer.parsestatus.log += '\n' + now + msg
 
         self.rasterlayer.save()
         self.rasterlayer.parsestatus.save()
 
-    def get_raster_file(self):
+    def open_raster_file(self):
         """
         Get raster source file to extract tiles from.
 
@@ -68,8 +70,6 @@ class RasterLayerParser(object):
         The local copy of the raster is needed if files are stored on remote
         storages.
         """
-        self.log('Getting raster file from storage')
-
         raster_workdir = getattr(settings, 'RASTER_WORKDIR', None)
         self.tmpdir = tempfile.mkdtemp(dir=raster_workdir)
 
@@ -115,7 +115,7 @@ class RasterLayerParser(object):
             # Open raster file
             self.dataset = GDALRaster(matches[0], write=True)
         else:
-            self.dataset = GDALRaster(rasterfile.name)
+            self.dataset = GDALRaster(rasterfile.name, write=True)
 
         # Reproject raster into web mercator if necessary
         if not self.dataset.srs.srid == WEB_MERCATOR_SRID:
@@ -124,18 +124,31 @@ class RasterLayerParser(object):
                 status=self.rasterlayer.parsestatus.REPROJECTING_RASTER
             )
 
-            # Reproject the dataset
-            self.dataset = self.dataset.transform(WEB_MERCATOR_SRID)
-
-            # Zip reprojected raster file
-            dest = tempfile.NamedTemporaryFile(dir=self.tmpdir, suffix='.zip')
-            dest_zip = zipfile.ZipFile(dest.name, mode='w')
-            dest_zip.write(self.dataset.name)
-            dest_zip.close()
+            # Reproject the dataset, use in-file compression if possible. The
+            # infile compression option is not yet part of an official Django
+            # release.
+            try:
+                self.dataset = self.dataset.transform(WEB_MERCATOR_SRID, compress='DEFLATE')
+                compressed = self.dataset.name
+            except TypeError:
+                self.dataset = self.dataset.transform(WEB_MERCATOR_SRID)
+                # Zip reprojected raster file
+                dest = tempfile.NamedTemporaryFile(dir=self.tmpdir, suffix='.zip')
+                dest_zip = zipfile.ZipFile(
+                    dest.name,
+                    os.path.basename(dest.name),
+                    mode='w',
+                    allowZip64=True,
+                    compress_type=zipfile.ZIP_DEFLATED
+                )
+                dest_zip.write(self.dataset.name)
+                dest_zip.close()
+                compressed = dest_zip.filename
 
             # Store zip file in reprojected raster model
-            reproj.rasterfile = File(open(dest_zip.filename, 'rb'))
+            reproj.rasterfile = File(open(compressed, 'rb'))
             reproj.save()
+            self.log('Finished transforming raster.')
 
         # Make sure nodata value is set from input on all bands
         if self.rasterlayer.nodata not in ('', None):
@@ -181,7 +194,19 @@ class RasterLayerParser(object):
             self.hist_values.append(numpy.array(bandmeta.hist_values))
             self.hist_bins.append(numpy.array(bandmeta.hist_bins))
 
-    def create_tiles(self, zoom):
+        self.log('Finished extracting metadata from raster.')
+
+    def create_tiles(self, zoom_levels):
+        """
+        Create tiles for input zoom levels, either a list or an integer.
+        """
+        if isinstance(zoom_levels, (list, tuple)):
+            for zoom in zoom_levels:
+                self.populate_tile_level(zoom)
+        else:
+            self.populate_tile_level(zoom_levels)
+
+    def populate_tile_level(self, zoom):
         """
         Create tiles for this raster at the given zoomlevel.
 
@@ -283,7 +308,13 @@ class RasterLayerParser(object):
             # Add counts of this tile to band metadata histogram
             self.hist_values[i] += new_hist[0]
 
-    def drop_empty_rasters(self):
+    def drop_all_tiles(self):
+        """
+        Delete all existing tiles for this parser's rasterlayer.
+        """
+        self.rasterlayer.rastertile_set.all().delete()
+
+    def drop_empty_tiles(self):
         """
         Remove rasters that are only no-data from the current rasterlayer.
         """
@@ -319,58 +350,3 @@ class RasterLayerParser(object):
         # Reduce max zoom by one if zoomdown flag was disabled
         if not self.zoomdown:
             self.max_zoom -= 1
-
-    def drop_all_tiles(self):
-        """
-        Delete all existing tiles for this parser's rasterlayer.
-        """
-        self.rasterlayer.rastertile_set.all().delete()
-
-    def parse_raster_layer(self):
-        """
-        This function pushes the raster data from the Raster Layer into the
-        RasterTile table.
-        """
-        try:
-            # Clean previous parse log
-            self.log(
-                'Started parsing raster file',
-                reset=True,
-                status=self.rasterlayer.parsestatus.DOWNLOADING_FILE
-            )
-            # Download, unzip and open raster file
-            self.get_raster_file()
-
-            # Remove existing tiles for this layer before loading new ones
-            self.rasterlayer.rastertile_set.all().delete()
-
-            # Compute and set max zoom property
-            self.compute_max_zoom()
-
-            self.log(
-                'Started creating tiles',
-                status=self.rasterlayer.parsestatus.CREATING_TILES
-            )
-
-            # Loop through all lower zoom levels and create tiles to
-            # setup TMS aligned tiles in world mercator
-            for iz in range(self.max_zoom + 1):
-                self.create_tiles(iz)
-
-            self.drop_empty_rasters()
-
-            # Send signal for end of parsing
-            rasterlayers_parser_ended.send(sender=self.rasterlayer.__class__, instance=self.rasterlayer)
-
-            # Log success of parsing
-            self.log(
-                'Successfully finished parsing raster',
-                status=self.rasterlayer.parsestatus.FINISHED
-            )
-        except:
-            self.log(
-                traceback.format_exc(),
-                status=self.rasterlayer.parsestatus.FAILED
-            )
-        finally:
-            shutil.rmtree(self.tmpdir)

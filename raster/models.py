@@ -204,18 +204,12 @@ def reset_parse_log_if_data_changed(sender, instance, **kwargs):
 
 @receiver(post_save, sender=RasterLayer)
 def parse_raster_layer_if_log_is_empty(sender, instance, created, **kwargs):
-    if created:
-        RasterLayerParseStatus.objects.create(rasterlayer=instance)
-        RasterLayerMetadata.objects.create(rasterlayer=instance)
+    RasterLayerParseStatus.objects.get_or_create(rasterlayer=instance)
+    RasterLayerMetadata.objects.get_or_create(rasterlayer=instance)
 
     if instance.rasterfile.name and instance.parsestatus.log == '':
-        if hasattr(settings, 'RASTER_USE_CELERY') and settings.RASTER_USE_CELERY:
-            from raster.tiles.tasks import parse_raster_layer
-            parse_raster_layer.delay(instance)
-        else:
-            from raster.tiles.parser import RasterLayerParser
-            parser = RasterLayerParser(instance)
-            parser.parse_raster_layer()
+        from raster.tasks import parse_raster_layer
+        parse_raster_layer(instance, getattr(settings, 'RASTER_USE_CELERY', False))
 
 
 class RasterLayerReprojected(models.Model):
@@ -280,8 +274,8 @@ class RasterLayerParseStatus(models.Model):
     )
     rasterlayer = models.OneToOneField(RasterLayer, related_name='parsestatus')
     status = models.IntegerField(choices=STATUS_CHOICES, default=UNPARSED)
-    tile_level = models.IntegerField(null=True, blank=True)
     log = models.TextField(default='', editable=False)
+    tile_levels = ArrayField(models.PositiveIntegerField(), default=[])
 
     def __str__(self):
         return '{0} - {1}'.format(self.rasterlayer.name, self.get_status_display())
