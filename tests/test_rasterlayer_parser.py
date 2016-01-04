@@ -40,7 +40,7 @@ class RasterLayerParserWithoutCeleryTests(RasterTestCase):
 
     def test_parsestatus_creation(self):
         self.assertEqual(self.rasterlayer.parsestatus.status, self.rasterlayer.parsestatus.FINISHED)
-        self.assertEqual(self.rasterlayer.parsestatus.tile_levels, range(13))
+        self.assertEqual(self.rasterlayer.parsestatus.tile_levels, list(range(13)))
 
     def test_parse_nodata_none(self):
         with self.settings(MEDIA_ROOT=self.media_root):

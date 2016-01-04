@@ -198,11 +198,11 @@ class RasterLayerParser(object):
         """
         Create tiles for input zoom levels, either a list or an integer.
         """
-        if isinstance(zoom_levels, (list, tuple)):
+        if isinstance(zoom_levels, int):
+            self.populate_tile_level(zoom_levels)
+        else:
             for zoom in zoom_levels:
                 self.populate_tile_level(zoom)
-        else:
-            self.populate_tile_level(zoom_levels)
 
     def populate_tile_level(self, zoom):
         """
