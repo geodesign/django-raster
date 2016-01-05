@@ -10,9 +10,11 @@ from celery.contrib.methods import task_method
 
 from django.conf import settings
 from django.contrib.gis.gdal import GDALRaster
+from django.contrib.gis.gdal.error import GDALException
 from django.core.files import File
 from django.db import connection
 from django.dispatch import Signal
+from raster.exceptions import RasterException
 from raster.models import RasterLayerBandMetadata, RasterLayerReprojected, RasterTile
 from raster.tiles import utils
 from raster.tiles.const import WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE
@@ -109,8 +111,18 @@ class RasterLayerParser(object):
                     'to problems if its not a raster file.'
                 )
 
-            # Open raster file
-            self.dataset = GDALRaster(matches[0], write=True)
+            # Open the first raster file found in the matched files.
+            self.dataset = None
+            for match in matches:
+                try:
+                    self.dataset = GDALRaster(match, write=True)
+                    break
+                except GDALException:
+                    pass
+
+            # Raise exception if no file could be opened by gdal.
+            if not self.dataset:
+                raise RasterException('Could not open rasterfile.')
         else:
             self.dataset = GDALRaster(rasterfile.name, write=True)
 
