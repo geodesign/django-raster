@@ -3,11 +3,8 @@ import traceback
 
 from celery import group, task
 
-from django.dispatch import Signal
 from raster.tiles.const import GLOBAL_MAX_ZOOM_LEVEL
 from raster.tiles.parser import RasterLayerParser
-
-rasterlayers_parser_ended = Signal(providing_args=['instance'])
 
 
 @task
@@ -27,8 +24,7 @@ def create_tiles(rasterlayer, zoom):
         )
         raise
     finally:
-        if hasattr(parser, 'tmpdir'):
-            shutil.rmtree(parser.tmpdir)
+        shutil.rmtree(parser.tmpdir)
 
 
 @task
@@ -41,40 +37,22 @@ def clear_tiles(rasterlayer):
 
 
 @task
-def drop_empty_tiles(rasterlayer):
+def send_success_signal(rasterlayer):
     """
-    Drop empty tiles of a raster layer.
+    Drop empty tiles of a raster layer and send parse succes signal.
     """
     parser = RasterLayerParser(rasterlayer)
     parser.drop_empty_tiles()
+    parser.send_success_signal()
 
 
 @task
-def send_success_signal(rasterlayer):
-    """
-    Send parse end succes signal and log success to rasterlayer.
-    """
-    # Log success of parsing
-    parser = RasterLayerParser(rasterlayer)
-    parser.log(
-        'Successfully finished parsing raster',
-        status=rasterlayer.parsestatus.FINISHED
-    )
-    rasterlayers_parser_ended.send(sender=rasterlayer.__class__, instance=rasterlayer)
-
-
-@task
-def open_and_reproject_raster(rasterlayer, reset=False):
+def open_and_reproject_raster(rasterlayer):
     """
     Initializes parser, creates reprojected raster copy if necessary.
     """
     try:
         parser = RasterLayerParser(rasterlayer)
-        if reset:
-            parser.log(
-                'Started parsing raster file',
-                status=rasterlayer.parsestatus.DOWNLOADING_FILE
-            )
         parser.open_raster_file()
     except:
         parser.log(
@@ -83,14 +61,16 @@ def open_and_reproject_raster(rasterlayer, reset=False):
         )
         raise
     finally:
-        if hasattr(parser, 'tmpdir'):
-            shutil.rmtree(parser.tmpdir)
+        shutil.rmtree(parser.tmpdir)
 
 
 def parse_raster_layer(rasterlayer, async=True):
     """
     Parse input raster layer through a asynchronous task chain.
     """
+    parser = RasterLayerParser(rasterlayer)
+    parser.log('Started parsing raster.')
+
     zoom_range = range(GLOBAL_MAX_ZOOM_LEVEL + 1)
 
     if async:
@@ -115,7 +95,6 @@ def parse_raster_layer(rasterlayer, async=True):
             clear_tiles.si(rasterlayer) |
             priority_group |
             high_level_group |
-            drop_empty_tiles.si(rasterlayer) |
             send_success_signal.si(rasterlayer)
         )
 
@@ -126,5 +105,4 @@ def parse_raster_layer(rasterlayer, async=True):
         clear_tiles(rasterlayer)
         for zoom in zoom_range:
             create_tiles(rasterlayer, zoom)
-        drop_empty_tiles(rasterlayer)
         send_success_signal(rasterlayer)

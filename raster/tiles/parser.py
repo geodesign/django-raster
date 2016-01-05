@@ -31,10 +31,6 @@ class RasterLayerParser(object):
         self.tilesize = int(getattr(settings, 'RASTER_TILESIZE', WEB_MERCATOR_TILESIZE))
         self.zoomdown = getattr(settings, 'RASTER_ZOOM_NEXT_HIGHER', True)
 
-        # Create workdir
-        raster_workdir = getattr(settings, 'RASTER_WORKDIR', None)
-        self.tmpdir = tempfile.mkdtemp(dir=raster_workdir)
-
     def log(self, msg, status=None, zoom=None):
         """
         Write a message to the parse log of the rasterlayer instance and update
@@ -77,6 +73,10 @@ class RasterLayerParser(object):
             rasterfile_source = self.rasterlayer.rasterfile
         else:
             rasterfile_source = reproj.rasterfile
+
+        # Create workdir
+        raster_workdir = getattr(settings, 'RASTER_WORKDIR', None)
+        self.tmpdir = tempfile.mkdtemp(dir=raster_workdir)
 
         # Copy raster file source to local folder
         filepath = os.path.join(self.tmpdir, os.path.basename(rasterfile_source.name))
@@ -245,7 +245,10 @@ class RasterLayerParser(object):
         range and a zoom level.
         """
         self._quadrant_count += 1
-        self.log('Starting tile creation for quadrant {0} at zoom level {1}'.format(self._quadrant_count, zoom))
+        self.log(
+            'Starting tile creation for quadrant {0} at zoom level {1}'.format(self._quadrant_count, zoom),
+            status=self.rasterlayer.parsestatus.CREATING_TILES
+        )
 
         # Compute scale of tiles for this zoomlevel
         tilescale = utils.tile_scale(zoom)
@@ -342,6 +345,17 @@ class RasterLayerParser(object):
         # Run SQL to drop empty tiles
         cursor = connection.cursor()
         cursor.execute(sql)
+        self.log('Finished dropping empty raster tiles.')
+
+    def send_success_signal(self):
+        """
+        Send parser end signal for other dependencies to be handling new tiles.
+        """
+        self.log(
+            'Successfully finished parsing raster',
+            status=self.rasterlayer.parsestatus.FINISHED
+        )
+        rasterlayers_parser_ended.send(sender=self.rasterlayer.__class__, instance=self.rasterlayer)
 
     def compute_max_zoom(self):
         """
