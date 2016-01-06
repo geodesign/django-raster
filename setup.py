@@ -13,6 +13,7 @@ setup(
     install_requires=[
         'Django>=1.9',
         'numpy>=1.9.1',
+        'celery>=3.1.19',
         'Pillow>=2.7.0',
         'django-colorful>=1.0.1',
         'pyparsing>=2.0.3',
