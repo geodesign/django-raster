@@ -90,6 +90,9 @@ class FormulaParserTests(TestCase):
         self.assertFormulaResult("2 * 3 * 4 * 5", 2 * 3 * 4 * 5)
         self.assertFormulaResult("2 + 3 + 4 + 5", 2 + 3 + 4 + 5)
         self.assertFormulaResult("(2 + 3 * 6) * ((2 + 3 * (3 * 4 + 1)) + 4 + 5)", 1000)
+        self.assertFormulaResult("INF > 0", True)
+        self.assertFormulaResult("INF < 0", False)
+        self.assertFormulaResult("-INF > 0", False)
 
     def test_formula_parser_with_vars(self):
         d = self.data = {
@@ -116,6 +119,7 @@ class FormulaParserTests(TestCase):
         self.assertFormulaResult("round(x)", numpy.round(d['x']))
         self.assertFormulaResult("sign(x)", numpy.sign(d['x']))
         self.assertFormulaResult("x == 0", [0, 1, 0])
+        self.assertFormulaResult("INF < x", [False, False, False])
         self.assertFormulaResult("x > 0", [1, 0, 0])
         self.assertFormulaResult("x < 0", [0, 0, 1])
         self.assertFormulaResult("x >= 1.0", [1, 0, 0])

@@ -19,6 +19,7 @@ PI = "PI"
 TRUE = "TRUE"
 FALSE = "FALSE"
 NULL = "NULL"
+INFINITE = "INF"
 
 KEYWORD_MAP = {
     EULER: numpy.e,
@@ -26,6 +27,7 @@ KEYWORD_MAP = {
     TRUE: True,
     FALSE: False,
     NULL: NULL,
+    INFINITE: numpy.inf,
 }
 
 # Operator strings
