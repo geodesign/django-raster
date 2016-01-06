@@ -47,12 +47,14 @@ def send_success_signal(rasterlayer):
 
 
 @task
-def open_and_reproject_raster(rasterlayer):
+def open_and_reproject_raster(rasterlayer, initial=False):
     """
     Initializes parser, creates reprojected raster copy if necessary.
     """
     try:
         parser = RasterLayerParser(rasterlayer)
+        if initial:
+            parser.log('Started parsing raster.')
         parser.open_raster_file()
     except:
         parser.log(
@@ -68,9 +70,6 @@ def parse_raster_layer(rasterlayer, async=True):
     """
     Parse input raster layer through a asynchronous task chain.
     """
-    parser = RasterLayerParser(rasterlayer)
-    parser.log('Started parsing raster.')
-
     zoom_range = range(GLOBAL_MAX_ZOOM_LEVEL + 1)
 
     if async:
@@ -91,7 +90,7 @@ def parse_raster_layer(rasterlayer, async=True):
 
         # Setup the parser logic as parsing chain
         parsing_task_chain = (
-            open_and_reproject_raster.si(rasterlayer) |
+            open_and_reproject_raster.si(rasterlayer, initial=True) |
             clear_tiles.si(rasterlayer) |
             priority_group |
             high_level_group |
@@ -100,8 +99,11 @@ def parse_raster_layer(rasterlayer, async=True):
 
         # Apply the parsing chain
         parsing_task_chain.apply_async()
+
+        parser = RasterLayerParser(rasterlayer)
+        parser.log('Parse task queued, waiting for worker availability.')
     else:
-        open_and_reproject_raster(rasterlayer)
+        open_and_reproject_raster(rasterlayer, initial=True)
         clear_tiles(rasterlayer)
         for zoom in zoom_range:
             create_tiles(rasterlayer, zoom)
