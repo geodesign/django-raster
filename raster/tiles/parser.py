@@ -90,6 +90,8 @@ class RasterLayerParser(object):
         # If the raster file is compressed, decompress it, otherwise try to
         # open the source file directly.
         if os.path.splitext(rasterfile.name)[1].lower() == '.zip':
+            self.log('Unzipping raster.')
+
             # Open and extract zipfile
             zf = zipfile.ZipFile(rasterfile.name)
             zf.extractall(self.tmpdir)
@@ -103,14 +105,6 @@ class RasterLayerParser(object):
                 for filename in fnmatch.filter(filenames, '*.*'):
                     matches.append(os.path.join(root, filename))
 
-            # Check if only one file is found in zipfile
-            if len(matches) > 1:
-                self.log(
-                    'WARNING: Found more than one file in zipfile '
-                    'using only first file found. This might lead '
-                    'to problems if its not a raster file.'
-                )
-
             # Open the first raster file found in the matched files.
             self.dataset = None
             for match in matches:
@@ -123,6 +117,8 @@ class RasterLayerParser(object):
             # Raise exception if no file could be opened by gdal.
             if not self.dataset:
                 raise RasterException('Could not open rasterfile.')
+
+            self.log('Finished unzipping raster.')
         else:
             self.dataset = GDALRaster(rasterfile.name, write=True)
 
