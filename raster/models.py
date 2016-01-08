@@ -277,12 +277,6 @@ class RasterLayerReprojected(models.Model):
     def __str__(self):
         return self.rasterlayer.name
 
-    def get_file(self):
-        if self.rasterfile:
-            return self.rasterfile
-        else:
-            return self.rasterlayer.rasterfile
-
 
 class RasterLayerMetadata(models.Model):
     """
