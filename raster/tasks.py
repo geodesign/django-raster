@@ -1,9 +1,8 @@
 import shutil
 import traceback
 
-from celery import group, task
+from celery import task
 
-from raster.tiles.const import GLOBAL_MAX_ZOOM_LEVEL
 from raster.tiles.parser import RasterLayerParser
 
 
@@ -64,47 +63,3 @@ def open_and_reproject_raster(rasterlayer, initial=False):
         raise
     finally:
         shutil.rmtree(parser.tmpdir)
-
-
-def parse_raster_layer(rasterlayer, async=True):
-    """
-    Parse input raster layer through a asynchronous task chain.
-    """
-    zoom_range = range(GLOBAL_MAX_ZOOM_LEVEL + 1)
-
-    if async:
-        # Bundle the first five raster layers to one task, downloading is
-        # more costly than the parsing itself.
-        high_level_bundle = create_tiles.si(rasterlayer, zoom_range[:5])
-
-        # Create a group of tasks with the middle level zoom levels that should
-        # be prioritized.
-        middle_level_group = group(
-            create_tiles.si(rasterlayer, zoom) for zoom in zoom_range[5:10]
-        )
-        # Combine bundle and middle levels to priority group
-        priority_group = group(high_level_bundle, middle_level_group)
-
-        # Create a task group for high zoom levels
-        high_level_group = group(create_tiles.si(rasterlayer, zoom) for zoom in zoom_range[10:])
-
-        # Setup the parser logic as parsing chain
-        parsing_task_chain = (
-            open_and_reproject_raster.si(rasterlayer, initial=True) |
-            clear_tiles.si(rasterlayer) |
-            priority_group |
-            high_level_group |
-            send_success_signal.si(rasterlayer)
-        )
-
-        # Apply the parsing chain
-        parsing_task_chain.apply_async()
-
-        parser = RasterLayerParser(rasterlayer)
-        parser.log('Parse task queued, waiting for worker availability.')
-    else:
-        open_and_reproject_raster(rasterlayer, initial=True)
-        clear_tiles(rasterlayer)
-        for zoom in zoom_range:
-            create_tiles(rasterlayer, zoom)
-        send_success_signal(rasterlayer)

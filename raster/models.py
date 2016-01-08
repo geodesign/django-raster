@@ -2,6 +2,7 @@ import json
 import math
 
 import numpy
+from celery import group
 from colorful.fields import RGBColorField
 
 from django.conf import settings
@@ -11,7 +12,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.db.models import Max, Min
 from django.db.models.signals import m2m_changed, post_save, pre_save
 from django.dispatch import receiver
-from raster.tiles.const import WEB_MERCATOR_SRID
+from raster.tiles.const import GLOBAL_MAX_ZOOM_LEVEL, WEB_MERCATOR_SRID
 from raster.utils import hex_to_rgba
 from raster.valuecount import ValueCountMixin
 
@@ -184,11 +185,61 @@ class RasterLayer(models.Model, ValueCountMixin):
 
     def index_range(self, zoom):
         """
-        Returns the index range for
+        Compute the index range for this rasterlayer at a given zoom leve.
         """
         return self.rastertile_set.filter(tilez=zoom).aggregate(
             Min('tilex'), Max('tilex'), Min('tiley'), Max('tiley')
         )
+
+    def parse(self):
+        """
+        Parse raster layer to extract metadata and create tiles.
+        """
+        from raster.tasks import open_and_reproject_raster, create_tiles, clear_tiles, send_success_signal
+        from raster.tiles.parser import RasterLayerParser
+
+        # Check if parsing should happen asynchronously
+        async = getattr(settings, 'RASTER_USE_CELERY', False)
+
+        # Create array of all allowed zoom levels
+        zoom_range = range(GLOBAL_MAX_ZOOM_LEVEL + 1)
+
+        if async:
+            # Bundle the first five raster layers to one task, downloading is
+            # more costly than the parsing itself.
+            high_level_bundle = create_tiles.si(self, zoom_range[:5])
+
+            # Create a group of tasks with the middle level zoom levels that should
+            # be prioritized.
+            middle_level_group = group(
+                create_tiles.si(self, zoom) for zoom in zoom_range[5:10]
+            )
+            # Combine bundle and middle levels to priority group
+            priority_group = group(high_level_bundle, middle_level_group)
+
+            # Create a task group for high zoom levels
+            high_level_group = group(create_tiles.si(self, zoom) for zoom in zoom_range[10:])
+
+            # Setup the parser logic as parsing chain
+            parsing_task_chain = (
+                open_and_reproject_raster.si(self, initial=True) |
+                clear_tiles.si(self) |
+                priority_group |
+                high_level_group |
+                send_success_signal.si(self)
+            )
+
+            # Apply the parsing chain
+            parsing_task_chain.apply_async()
+
+            parser = RasterLayerParser(self)
+            parser.log('Parse task queued, waiting for worker availability.')
+        else:
+            open_and_reproject_raster(self, initial=True)
+            clear_tiles(self)
+            for zoom in zoom_range:
+                create_tiles(self, zoom)
+            send_success_signal(self)
 
 
 @receiver(pre_save, sender=RasterLayer)
@@ -198,8 +249,13 @@ def reset_parse_log_if_data_changed(sender, instance, **kwargs):
     except RasterLayer.DoesNotExist:
         pass
     else:
+        # If filename has changed, clear parse status to trigger re-parsing.
+        # Also remove the reprojected copy of the previous file if it exists.
         if obj.rasterfile.name != instance.rasterfile.name:
             instance.parsestatus.reset(save=False)
+            if hasattr(instance, 'reprojected'):
+                reproj = instance.reprojected
+                reproj.delete()
 
 
 @receiver(post_save, sender=RasterLayer)
@@ -207,9 +263,8 @@ def parse_raster_layer_if_status_is_unparsed(sender, instance, created, **kwargs
     RasterLayerParseStatus.objects.get_or_create(rasterlayer=instance)
     RasterLayerMetadata.objects.get_or_create(rasterlayer=instance)
 
-    if instance.parsestatus.status == instance.parsestatus.UNPARSED:
-        from raster.tasks import parse_raster_layer
-        parse_raster_layer(instance, getattr(settings, 'RASTER_USE_CELERY', False))
+    if instance.rasterfile.name and instance.parsestatus.status == instance.parsestatus.UNPARSED:
+        instance.parse()
 
 
 class RasterLayerReprojected(models.Model):
