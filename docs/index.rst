@@ -2,9 +2,7 @@
 Django Raster
 =============
 
-**Currently under construction**
-
-django-raster provides raster data integration for Django projects with a
+django-raster provides raster data functionality for Django projects with a
 PostGIS database backend. It is based on the Django internal raster data type
 `RasterField`__ and GDAL bindings through `GDALRaster`__.
 
@@ -19,7 +17,7 @@ Contents
 --------
 
 .. toctree::
-    :maxdepth: 3
+    :maxdepth: 1
 
     installation
     introduction

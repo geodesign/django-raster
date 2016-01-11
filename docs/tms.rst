@@ -1,4 +1,5 @@
-TMS Endpoint
-============
+===============
+Rendering tiles
+===============
 
-Description of TMS.
+Description of TMS functionality.

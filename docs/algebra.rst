@@ -1,4 +1,4 @@
-Raster Algebra Endpoint
-=======================
+Raster calculator
+=================
 
-Description of raster algebra.
+Description of raster algebra endpoint.
