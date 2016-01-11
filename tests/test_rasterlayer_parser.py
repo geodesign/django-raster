@@ -38,6 +38,13 @@ class RasterLayerParserWithoutCeleryTests(RasterTestCase):
         self.assertEqual(self.rasterlayer.metadata.width, 163)
         self.assertEqual(self.rasterlayer.metadata.max_zoom, 12)
 
+    def test_bandmeta_creation(self):
+        self.assertEqual(self.rasterlayer.rasterlayerbandmetadata_set.count(), 1)
+        meta = self.rasterlayer.rasterlayerbandmetadata_set.first()
+        self.assertEqual(meta.min, 0)
+        if meta.std is not None:
+            self.assertAlmostEqual(meta.std, 2.4260526986669)
+
     def test_parsestatus_creation(self):
         self.assertEqual(self.rasterlayer.parsestatus.status, self.rasterlayer.parsestatus.FINISHED)
         self.assertEqual(self.rasterlayer.parsestatus.tile_levels, list(range(13)))
