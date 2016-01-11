@@ -108,7 +108,7 @@ class FormulaParserTests(TestCase):
             "e": numpy.array([2, 11e3]),
             "aLongVariable": numpy.array([1, 2, 3]),
             "A1A": numpy.array([1, 2, 3]),
-            "a_1_a": numpy.array([1, 2, 3])
+            "a_1_a": numpy.array([1, 2, 3]),
         }
         self.assertFormulaResult("-x", -d['x'])
         self.assertFormulaResult("sin(x)", numpy.sin(d['x']))
@@ -200,6 +200,20 @@ class FormulaParserTests(TestCase):
         msg = 'NULL can only be used with "==" or "!=" operators.'
         with self.assertRaisesMessage(RasterAlgebraException, msg):
             self.assertFormulaResult('masked >= NULL', mask)
+        # Null value propagation in formula
+        self.assertFormulaResult("unmasked * (masked != NULL) + 99 * (masked == NULL)", [99, 99, 3])
+
+    def test_masked_array_result(self):
+        data = {
+            'x': numpy.ma.masked_array([1, 2, 3], mask=[True, False, False], fill_value=99),
+            'y': numpy.ma.masked_array([1, 2, 3], mask=[False, True, False], fill_value=100),
+        }
+        result = self.parser.evaluate(data, 'x + y')
+        self.assertTrue(numpy.ma.is_masked(result))
+        self.assertEqual(
+            result.compressed().tolist(),
+            (data['x'] + data['y']).compressed().tolist()
+        )
 
     def test_re_evaluation(self):
         self.parser.set_formula('+x')

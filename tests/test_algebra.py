@@ -41,6 +41,11 @@ class RasterAlgebraParserTests(TestCase):
         result = parser.evaluate_raster_algebra(self.data, 'x*(x>11) + 2*y + 3*z*(z==30)', check_aligned=True)
         self.assertEqual(result.bands[0].data().ravel().tolist(), [10, 10, 14, 15])
 
+    def test_algebra_parser_nodata_propagation(self):
+        parser = RasterAlgebraParser()
+        result = parser.evaluate_raster_algebra(self.data, 'x * (z != NULL) + 99 * (z == NULL)')
+        self.assertEqual(result.bands[0].data().ravel().tolist(), [10, 99, 12, 13])
+
 
 @override_settings(RASTER_TILE_CACHE_TIMEOUT=0)
 class RasterAlgebraViewTests(RasterTestCase):
