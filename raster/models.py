@@ -348,7 +348,7 @@ class RasterLayerBandMetadata(models.Model):
     max = models.FloatField()
     mean = models.FloatField(null=True)
     std = models.FloatField(null=True)
-    hist_values = ArrayField(models.FloatField(), size=HISTOGRAM_BINS)
+    hist_values = ArrayField(models.BigIntegerField(), size=HISTOGRAM_BINS)
     hist_bins = ArrayField(models.FloatField(), size=HISTOGRAM_BINS + 1)
 
     def __str__(self):
