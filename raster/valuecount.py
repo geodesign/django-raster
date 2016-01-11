@@ -156,10 +156,10 @@ def aggregator(layer_dict, zoom=None, geom=None, formula=None, acres=True, group
             # Evaluate algebra on tiles
             result = algebra_parser.evaluate_raster_algebra(data, formula)
 
-            # Get resulting array masked with na values
+            # Convert band data to masked array
             result_data = numpy.ma.masked_values(
                 result.bands[0].data(),
-                result.bands[0].nodata_value
+                result.bands[0].nodata_value,
             )
 
             # Apply rasterized geometry as mask if clip geometry was provided
@@ -180,7 +180,7 @@ def aggregator(layer_dict, zoom=None, geom=None, formula=None, acres=True, group
                 values = dict(zip(unique_counts[0], unique_counts[1]))
 
             elif grouping == 'continuous':
-                # Handle continuous case - compute histogram on masked (compresed) data
+                # Handle continuous case - compute histogram on masked (compressed) data
                 counts, bins = numpy.histogram(result_data.compressed())
 
                 # Create dictionary with bins as keys and histogram counts as values
@@ -189,6 +189,8 @@ def aggregator(layer_dict, zoom=None, geom=None, formula=None, acres=True, group
                     values[(bins[i], bins[i + 1])] = counts[i]
 
             elif isinstance(grouping, int):
+                # Fill masked array with mask values
+                result_data = result_data.filled()
                 # Use legend to compute value counts
                 formula_parser = FormulaParser()
                 legend = Legend.objects.get(id=grouping)

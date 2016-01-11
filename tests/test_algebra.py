@@ -31,6 +31,7 @@ class RasterAlgebraParserTests(TestCase):
         rast2 = GDALRaster(base)
 
         base['bands'][0]['data'] = [30, 31, 32, 33]
+        base['bands'][0]['nodata_value'] = 31
         rast3 = GDALRaster(base)
 
         self.data = dict(zip(['x', 'y', 'z'], [rast1, rast2, rast3]))
@@ -38,7 +39,7 @@ class RasterAlgebraParserTests(TestCase):
     def test_algebra_parser(self):
         parser = RasterAlgebraParser()
         result = parser.evaluate_raster_algebra(self.data, 'x*(x>11) + 2*y + 3*z*(z==30)', check_aligned=True)
-        self.assertEqual(result.bands[0].data().ravel().tolist(), [92, 2, 14, 15])
+        self.assertEqual(result.bands[0].data().ravel().tolist(), [10, 10, 14, 15])
 
 
 @override_settings(RASTER_TILE_CACHE_TIMEOUT=0)

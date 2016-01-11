@@ -201,7 +201,15 @@ class RasterAlgebraParser(FormulaParser):
 
         # Reference first original raster for constructing result
         orig = list(data.values())[0]
-        orig_band = orig.bands[0]
+
+        # Get nodata value from mask or from original band data
+        if numpy.ma.is_masked(result):
+            # Get mask fill value
+            nodata = float(result.fill_value)
+            # Overwrite result with mask values filled in
+            result = result.filled()
+        else:
+            nodata = orig.bands[0].nodata_value
 
         # Convert to default number type
         result = result.astype(const.ALGEBRA_PIXEL_TYPE_NUMPY)
@@ -218,8 +226,8 @@ class RasterAlgebraParser(FormulaParser):
             'scale': orig.scale,
             'skew': orig.skew,
             'bands': [{
-                'nodata_value': orig_band.nodata_value,
-                'data': result
+                'nodata_value': nodata,
+                'data': result,
             }],
         })
 
