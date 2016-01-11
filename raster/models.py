@@ -344,8 +344,10 @@ class RasterLayerBandMetadata(models.Model):
     rasterlayer = models.ForeignKey(RasterLayer)
     band = models.PositiveIntegerField()
     nodata_value = models.FloatField(null=True)
-    max = models.FloatField()
     min = models.FloatField()
+    max = models.FloatField()
+    mean = models.FloatField(null=True)
+    std = models.FloatField(null=True)
     hist_values = ArrayField(models.FloatField(), size=HISTOGRAM_BINS)
     hist_bins = ArrayField(models.FloatField(), size=HISTOGRAM_BINS + 1)
 

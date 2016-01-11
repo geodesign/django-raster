@@ -90,8 +90,6 @@ class RasterLayerParser(object):
         # If the raster file is compressed, decompress it, otherwise try to
         # open the source file directly.
         if os.path.splitext(rasterfile.name)[1].lower() == '.zip':
-            self.log('Unzipping raster.')
-
             # Open and extract zipfile
             zf = zipfile.ZipFile(rasterfile.name)
             zf.extractall(self.tmpdir)
@@ -117,8 +115,6 @@ class RasterLayerParser(object):
             # Raise exception if no file could be opened by gdal.
             if not self.dataset:
                 raise RasterException('Could not open rasterfile.')
-
-            self.log('Finished unzipping raster.')
         else:
             self.dataset = GDALRaster(rasterfile.name, write=True)
 
@@ -198,6 +194,11 @@ class RasterLayerParser(object):
             bandmeta.nodata_value = band.nodata_value
             bandmeta.min = band.min
             bandmeta.max = band.max
+            # Depending on Django version, the band statistics include std and mean.
+            if hasattr(band, 'std'):
+                bandmeta.std = band.std
+            if hasattr(band, 'mean'):
+                bandmeta.mean = band.mean
             bandmeta.save()
 
         self.log('Finished extracting metadata from raster.')
