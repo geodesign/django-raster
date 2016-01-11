@@ -20,7 +20,7 @@ setup(
     ],
     keywords=['django', 'raster', 'gis', 'gdal', 'celery', 'geo', 'spatial'],
     classifiers=[
-        'Development Status :: 4 - Beta',
+        'Development Status :: 3 - Alpha',
         'Framework :: Django',
         'Framework :: Django :: 1.9',
         'Environment :: Web Environment',
