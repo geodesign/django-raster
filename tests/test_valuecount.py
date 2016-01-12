@@ -183,9 +183,19 @@ class RasterAggregatorTests(RasterTestCase):
         )
 
     def test_valuecount_exception(self):
-        with self.assertRaises(RasterAggregationException):
+        # Invalid input type
+        msg = 'Invalid grouping value found for valuecount.'
+        with self.assertRaisesMessage(RasterAggregationException, msg):
             aggregator(
                 layer_dict={'a': self.rasterlayer.id},
                 formula='a',
                 grouping='unknown'
+            )
+        # Invalid legend ID
+        msg = 'Invalid legend ID found in grouping value for valuecount.'
+        with self.assertRaisesMessage(RasterAggregationException, msg):
+            aggregator(
+                layer_dict={'a': self.rasterlayer.id},
+                formula='a',
+                grouping='99999'
             )

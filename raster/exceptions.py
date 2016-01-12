@@ -7,3 +7,7 @@ class RasterException(SuspiciousOperation):
 
 class RasterAlgebraException(SuspiciousOperation):
     """Raster Algebra Evaluation Failed."""
+
+
+class RasterAggregationException(Exception):
+    pass

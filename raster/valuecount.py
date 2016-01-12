@@ -3,8 +3,10 @@ from collections import Counter
 import numpy
 
 from django.contrib.gis.geos import GEOSGeometry, MultiPolygon, Polygon
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import connection
 from raster.algebra.parser import FormulaParser, RasterAlgebraParser
+from raster.exceptions import RasterAggregationException
 from raster.rasterize import rasterize
 from raster.tiles.const import WEB_MERCATOR_SRID
 from raster.tiles.utils import tile_index_range
@@ -50,10 +52,6 @@ SELECT MAX(tilez)
 FROM raster_rastertile
 WHERE rasterlayer_id={rasterlayer_id}
 """
-
-
-class RasterAggregationException(Exception):
-    pass
 
 
 def aggregator(layer_dict, zoom=None, geom=None, formula=None, acres=True, grouping='auto'):
@@ -124,9 +122,15 @@ def aggregator(layer_dict, zoom=None, geom=None, formula=None, acres=True, group
         # Try converting the grouping input to int
         try:
             grouping = int(grouping)
-        except:
+        except ValueError:
             raise RasterAggregationException(
                 'Invalid grouping value found for valuecount.'
+            )
+        try:
+            grouping = Legend.objects.get(id=grouping)
+        except ObjectDoesNotExist:
+            raise RasterAggregationException(
+                'Invalid legend ID found in grouping value for valuecount.'
             )
 
     # Loop through tiles and evaluate raster algebra for each tile
@@ -188,14 +192,13 @@ def aggregator(layer_dict, zoom=None, geom=None, formula=None, acres=True, group
                 for i in range(len(bins) - 1):
                     values[(bins[i], bins[i + 1])] = counts[i]
 
-            elif isinstance(grouping, int):
+            elif isinstance(grouping, Legend):
                 # Fill masked array with mask values
                 result_data = result_data.filled()
                 # Use legend to compute value counts
                 formula_parser = FormulaParser()
-                legend = Legend.objects.get(id=grouping)
                 values = {}
-                for key, color in legend.colormap.items():
+                for key, color in grouping.colormap.items():
                     try:
                         # Try to use the key as number directly
                         selector = result_data == float(key)
