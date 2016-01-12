@@ -182,6 +182,18 @@ class RasterAggregatorTests(RasterTestCase):
             {'(x >= 2) & (x < 5)': self.expected_totals[2] + self.expected_totals[3] + self.expected_totals[4]}
         )
 
+    def test_layer_with_json_grouping(self):
+        # Use a legend with simple int expression
+        result = aggregator(
+            layer_dict={'a': self.rasterlayer.id},
+            formula='a',
+            grouping=self.legend.json
+        )
+        self.assertDictEqual(
+            result,
+            {'2': self.expected_totals[2]}
+        )
+
     def test_valuecount_exception(self):
         # Invalid input type
         msg = 'Invalid grouping value found for valuecount.'

@@ -119,15 +119,11 @@ def aggregator(layer_dict, zoom=None, geom=None, formula=None, acres=True, group
     elif grouping in ('discrete', 'continuous'):
         pass
     else:
-        # Try converting the grouping input to int
         try:
-            grouping = int(grouping)
+            legend_id = int(grouping)
+            grouping = Legend.objects.get(id=legend_id)
         except ValueError:
-            raise RasterAggregationException(
-                'Invalid grouping value found for valuecount.'
-            )
-        try:
-            grouping = Legend.objects.get(id=grouping)
+            pass
         except ObjectDoesNotExist:
             raise RasterAggregationException(
                 'Invalid legend ID found in grouping value for valuecount.'
@@ -192,11 +188,23 @@ def aggregator(layer_dict, zoom=None, geom=None, formula=None, acres=True, group
                 for i in range(len(bins) - 1):
                     values[(bins[i], bins[i + 1])] = counts[i]
 
-            elif isinstance(grouping, Legend):
-                # Use legend to compute value counts
+            else:
+                # If input is not a legend, interpret input as legend json data
+                if not isinstance(grouping, Legend):
+                    grouping = Legend(json=grouping)
+
+                # Try getting a colormap from the input
+                try:
+                    colormap = grouping.colormap
+                except:
+                    raise RasterAggregationException(
+                        'Invalid grouping value found for valuecount.'
+                    )
+
+                # Use colormap to compute value counts
                 formula_parser = FormulaParser()
                 values = {}
-                for key, color in grouping.colormap.items():
+                for key, color in colormap.items():
                     try:
                         # Try to use the key as number directly
                         selector = result_data == float(key)
