@@ -231,7 +231,7 @@ class TmsView(RasterView):
         if tile and colormap:
             data = numpy.ma.masked_values(
                 tile.bands[0].data(),
-                tile.bands[0].nodata_value
+                tile.bands[0].nodata_value,
             )
             # Render tile using the legend data
             img, stats = band_data_to_image(data, colormap)

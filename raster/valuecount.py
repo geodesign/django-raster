@@ -207,7 +207,7 @@ def aggregator(layer_dict, zoom=None, geom=None, formula=None, acres=True, group
                 for key, color in colormap.items():
                     try:
                         # Try to use the key as number directly
-                        selector = result_data == float(key)
+                        selector = result_data.compressed() == float(key)
                     except ValueError:
                         # Otherwise use it as numpy expression directly
                         selector = formula_parser.evaluate({'x': result_data}, key)

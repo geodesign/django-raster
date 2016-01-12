@@ -41,12 +41,21 @@ def band_data_to_image(band_data, colormap):
             # Try to use the key as number directly
             key = float(key)
             selector = dat == key
-            rgba[selector] = color
         except ValueError:
             # Otherwise use it as numpy expression directly
             parser = FormulaParser()
             selector = parser.evaluate({'x': dat}, key)
+
+        # If masked, use mask to filter values additional to formula values
+        if numpy.ma.is_masked(selector):
+            selector.fill_value = False
+            rgba[selector.filled() == 1] = color
+            # Compress for getting statistics
+            selector.compressed()
+        else:
             rgba[selector] = color
+
+        # Track pixel statistics for this tile
         stats[orig_key] = int(numpy.sum(selector))
 
     # Reshape array to image size
