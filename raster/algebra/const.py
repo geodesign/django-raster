@@ -45,14 +45,16 @@ LESS_EQUAL = "<="
 LOGICAL_OR = "|"
 LOGICAL_AND = "&"
 LOGICAL_NOT = "!"
+FILL = "~"
 UNARY_AND = "unary +"
 UNARY_LESS = "unary -"
 UNARY_NOT = "unary !"
+UNARY_FILL = "unary ~"
 
 # Operator groups
 ADDOP = (ADD, SUBTRACT, )
 POWOP = (POWER, )
-UNOP = (ADD, SUBTRACT, LOGICAL_NOT)
+UNOP = (ADD, SUBTRACT, LOGICAL_NOT, FILL)
 # The order the operators in this group matters due to "<=" being caught by "<".
 MULTOP = (
     MULTIPLY,
@@ -88,12 +90,14 @@ UNARY_OPERATOR_MAP = {
     UNARY_AND: numpy.array,
     UNARY_LESS: numpy.negative,
     UNARY_NOT: numpy.logical_not,
+    UNARY_FILL: numpy.ma.filled,
 }
 
 UNARY_REPLACE_MAP = {
     ADD: UNARY_AND,
     SUBTRACT: UNARY_LESS,
     LOGICAL_NOT: UNARY_NOT,
+    FILL: UNARY_FILL,
 }
 
 # Map function names to numpy functions

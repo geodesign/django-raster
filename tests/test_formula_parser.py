@@ -93,6 +93,7 @@ class FormulaParserTests(TestCase):
         self.assertFormulaResult("INF > 0", True)
         self.assertFormulaResult("INF < 0", False)
         self.assertFormulaResult("-INF > 0", False)
+        self.assertFormulaResult("~300", 300)
 
     def test_formula_parser_with_vars(self):
         d = self.data = {
@@ -174,6 +175,7 @@ class FormulaParserTests(TestCase):
             d['x'] * (d['x'] > 1) + 2 * d['y'] + 3 * d['z'] * (d['z'] == 78),
         )
         self.assertFormulaResult('a*(a<=1)+(a>1)', d['a'] * (d['a'] <= 1) + (d['a'] > 1))
+        self.assertFormulaResult("~a", d['a'])
 
     def test_formula_parser_with_unknown_vars(self):
         # Unknown variable raises error
@@ -202,6 +204,8 @@ class FormulaParserTests(TestCase):
             self.assertFormulaResult('masked >= NULL', mask)
         # Null value propagation in formula
         self.assertFormulaResult("unmasked * (masked != NULL) + 99 * (masked == NULL)", [99, 99, 3])
+        # Fill operator removes null values
+        self.assertFormulaResult("~masked == NULL", [False, False, False])
 
     def test_masked_array_result(self):
         data = {
@@ -213,6 +217,27 @@ class FormulaParserTests(TestCase):
         self.assertEqual(
             result.compressed().tolist(),
             (data['x'] + data['y']).compressed().tolist()
+        )
+
+    def test_fill_operator_result(self):
+        data = {
+            'x': numpy.ma.masked_array([1, 2, 3], mask=[True, False, False], fill_value=99),
+            'y': numpy.ma.masked_array([1, 2, 3], mask=[False, True, False], fill_value=100),
+        }
+        result = self.parser.evaluate(data, '~x + y')
+        self.assertEqual(
+            result.compressed().tolist(),
+            (data['x'].filled() + data['y']).compressed().tolist()
+        )
+        result = self.parser.evaluate(data, '~x + ~y')
+        self.assertEqual(
+            result.tolist(),
+            (data['x'].filled() + data['y'].filled()).tolist()
+        )
+        result = self.parser.evaluate(data, '~x + (~y == NULL)')
+        self.assertEqual(
+            result.tolist(),
+            (data['x'].filled()).tolist()
         )
 
     def test_re_evaluation(self):
