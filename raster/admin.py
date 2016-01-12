@@ -49,7 +49,7 @@ class RasterLayerBandMetadataInline(admin.TabularInline):
     model = RasterLayerBandMetadata
     extra = 0
     readonly_fields = (
-        'band', 'nodata_value', 'max', 'min',
+        'band', 'nodata_value', 'max', 'min', 'std', 'mean',
         'hist_values', 'hist_bins',
     )
 
