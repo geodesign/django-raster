@@ -146,7 +146,7 @@ class AlgebraView(RasterView):
     A view to calculate map algebra on raster layers.
     """
 
-    def get(self, request, masked=False, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         parser = RasterAlgebraParser()
 
         # Get layer ids
@@ -229,15 +229,10 @@ class TmsView(RasterView):
 
         # Render tile
         if tile and colormap:
-            if kwargs.get('masked', ''):
-                # Mask values
-                data = numpy.ma.masked_values(
-                    tile.bands[0].data(),
-                    tile.bands[0].nodata_value
-                )
-            else:
-                data = tile.bands[0].data()
-
+            data = numpy.ma.masked_values(
+                tile.bands[0].data(),
+                tile.bands[0].nodata_value
+            )
             # Render tile using the legend data
             img, stats = band_data_to_image(data, colormap)
         else:
