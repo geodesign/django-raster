@@ -27,8 +27,6 @@ def band_data_to_image(band_data, colormap):
     Creates an python image from pixel values of a GDALRaster.
     The input is a dictionary that maps pixel values to RGBA UInt8 colors.
     """
-    parser = FormulaParser()
-
     # Get data as 1D array
     dat = band_data.ravel()
 
@@ -46,6 +44,7 @@ def band_data_to_image(band_data, colormap):
             rgba[selector] = color
         except ValueError:
             # Otherwise use it as numpy expression directly
+            parser = FormulaParser()
             selector = parser.evaluate({'x': dat}, key)
             rgba[selector] = color
         stats[orig_key] = int(numpy.sum(selector))
