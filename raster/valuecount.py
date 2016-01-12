@@ -193,8 +193,6 @@ def aggregator(layer_dict, zoom=None, geom=None, formula=None, acres=True, group
                     values[(bins[i], bins[i + 1])] = counts[i]
 
             elif isinstance(grouping, Legend):
-                # Fill masked array with mask values
-                result_data = result_data.filled()
                 # Use legend to compute value counts
                 formula_parser = FormulaParser()
                 values = {}
