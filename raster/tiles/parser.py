@@ -17,7 +17,7 @@ from django.dispatch import Signal
 from raster.exceptions import RasterException
 from raster.models import RasterLayerBandMetadata, RasterLayerReprojected, RasterTile
 from raster.tiles import utils
-from raster.tiles.const import WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE
+from raster.tiles.const import BATCH_STEP_SIZE, WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE
 
 rasterlayers_parser_ended = Signal(providing_args=['instance'])
 
@@ -275,7 +275,8 @@ class RasterLayerParser(object):
             'height': (indexrange[3] - indexrange[1] + 1) * self.tilesize,
         })
 
-        # Create all tiles in this quadrant
+        # Create all tiles in this quadrant in batches
+        batch = []
         for tilex in range(indexrange[0], indexrange[2] + 1):
             for tiley in range(indexrange[1], indexrange[3] + 1):
                 # Calculate raster tile origin
@@ -309,14 +310,25 @@ class RasterLayerParser(object):
                     'bands': band_data,
                 })
 
-                # Store tile
-                RasterTile.objects.create(
-                    rast=dest,
-                    rasterlayer=self.rasterlayer,
-                    tilex=tilex,
-                    tiley=tiley,
-                    tilez=zoom
+                # Store tile in batch array
+                batch.append(
+                    RasterTile(
+                        rast=dest,
+                        rasterlayer_id=self.rasterlayer.id,
+                        tilex=tilex,
+                        tiley=tiley,
+                        tilez=zoom
+                    )
                 )
+
+                # Commit batch to database and reset it
+                if len(batch) == BATCH_STEP_SIZE:
+                    RasterTile.objects.bulk_create(batch)
+                    batch = []
+
+        # Commit remaining objects
+        if len(batch):
+            RasterTile.objects.bulk_create(batch)
 
     def push_histogram(self, data):
         """
