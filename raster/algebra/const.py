@@ -111,4 +111,9 @@ FUNCTION_MAP = {
     "int": numpy.int,
     "round": numpy.round,
     "sign": numpy.sign,
+    "min": numpy.min,
+    "max": numpy.max,
+    "mean": numpy.mean,
+    "median": numpy.median,
+    "std": numpy.std,
 }

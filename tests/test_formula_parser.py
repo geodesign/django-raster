@@ -19,7 +19,7 @@ class FormulaParserTests(TestCase):
         val = self.parser.evaluate(data, formula)
 
         # Drop nan values
-        if data and any(numpy.isnan(expVal)):
+        if data and isinstance(expVal, (list, tuple, numpy.ndarray)) and any(numpy.array(numpy.isnan(expVal))):
             val = val[numpy.logical_not(numpy.isnan(val))]
             expVal = expVal[numpy.logical_not(numpy.isnan(expVal))]
 
@@ -247,3 +247,12 @@ class FormulaParserTests(TestCase):
         self.parser.set_formula('-x')
         self.assertEqual(self.parser.evaluate({'x': 3}), -3)
         self.assertEqual(self.parser.evaluate({'x': 4}), -4)
+
+    def test_statistics_functions(self):
+        d = self.data = {'x': numpy.random.rand(10), 'y': range(3)}
+        self.assertFormulaResult('min(x)', numpy.min(d['x']))
+        self.assertFormulaResult('max(x)', numpy.max(d['x']))
+        self.assertFormulaResult('mean(x)', numpy.mean(d['x']))
+        self.assertFormulaResult('median(x)', numpy.median(d['x']))
+        self.assertFormulaResult('std(x)', numpy.std(d['x']))
+        self.assertFormulaResult('y * min(x)', numpy.arange(3) * numpy.min(d['x']))
