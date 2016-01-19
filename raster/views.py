@@ -43,7 +43,7 @@ class RasterView(View):
             else:
                 legend = Legend.objects.filter(title__iexact=legend_input).first()
             colormap = legend.colormap
-        elif layer:
+        elif layer and hasattr(layer.legend, 'colormap'):
             colormap = layer.legend.colormap
         else:
             return

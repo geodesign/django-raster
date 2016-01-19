@@ -1,9 +1,13 @@
+from unittest import skipIf
+
 import numpy
 
 from django.contrib.gis.geos import Polygon
 from django.test.utils import override_settings
+from django.utils import version
+from raster.exceptions import RasterAggregationException
 from raster.tiles.const import WEB_MERCATOR_SRID
-from raster.valuecount import RasterAggregationException, aggregator
+from raster.valuecount import Aggregator
 
 from .raster_testcase import RasterTestCase
 
@@ -132,81 +136,98 @@ class RasterValueCountTests(RasterTestCase):
 class RasterAggregatorTests(RasterTestCase):
 
     def test_layer_with_no_tiles(self):
-        result = aggregator(
+        agg = Aggregator(
             layer_dict={'a': self.rasterlayer.id, 'b': self.empty_rasterlayer.id},
             formula='a*b'
         )
-        self.assertDictEqual(result, {})
+        self.assertDictEqual(agg.value_count(), {})
 
     def test_layer_discrete_grouping(self):
-        result = aggregator(
+        agg = Aggregator(
             layer_dict={'a': self.rasterlayer.id},
             formula='a',
             grouping='discrete'
         )
         self.assertDictEqual(
-            result,
+            agg.value_count(),
             {str(k): v for k, v in self.expected_totals.items()}
         )
 
     def test_layer_continuous_grouping(self):
-        result = aggregator(
+        agg = Aggregator(
             layer_dict={'a': self.rasterlayer.id},
             formula='a',
             grouping='continuous'
         )
         self.assertDictEqual(
-            result,
+            agg.value_count(),
             self.continuous_expected_histogram
         )
 
     def test_layer_with_legend_grouping(self):
         # Use a legend with simple int expression
-        result = aggregator(
+        agg = Aggregator(
             layer_dict={'a': self.rasterlayer.id},
             formula='a',
             grouping=self.legend.id
         )
         self.assertDictEqual(
-            result,
+            agg.value_count(),
             {'2': self.expected_totals[2]}
         )
         # Use a legend with formula expression
-        result = aggregator(
+        agg = Aggregator(
             layer_dict={'a': self.rasterlayer.id},
             formula='a',
             grouping=self.legend_with_expression.id
         )
         self.assertDictEqual(
-            result,
+            agg.value_count(),
             {'(x >= 2) & (x < 5)': self.expected_totals[2] + self.expected_totals[3] + self.expected_totals[4]}
         )
 
     def test_layer_with_json_grouping(self):
         # Use a legend with simple int expression
-        result = aggregator(
+        agg = Aggregator(
             layer_dict={'a': self.rasterlayer.id},
             formula='a',
             grouping=self.legend.json
         )
         self.assertDictEqual(
-            result,
+            agg.value_count(),
             {'2': self.expected_totals[2]}
         )
+
+    @skipIf(version.get_version() >= '1.9', 'Fails on current release -- Refs #25734.')
+    def test_layer_stats(self):
+        # Use a legend with simple int expression
+        agg = Aggregator(
+            layer_dict={'a': self.rasterlayer.id},
+            formula='a',
+        )
+        # Get original band metadata
+        meta = self.rasterlayer.rasterlayerbandmetadata_set.first()
+        # The comparison here is loose, as one is computed on tiles and the other
+        # other value are the original band values. So there are differences from
+        # rescaling.
+        for dat in zip(agg.statistics(), meta.statistics()):
+            self.assertAlmostEqual(dat[0], dat[1], 1)
 
     def test_valuecount_exception(self):
         # Invalid input type
         msg = 'Invalid grouping value found for valuecount.'
         with self.assertRaisesMessage(RasterAggregationException, msg):
-            aggregator(
+            agg = Aggregator(
                 layer_dict={'a': self.rasterlayer.id},
                 formula='a',
                 grouping='unknown'
             )
+            agg.value_count()
+
         # Invalid legend ID
         msg = 'Invalid legend ID found in grouping value for valuecount.'
         with self.assertRaisesMessage(RasterAggregationException, msg):
-            aggregator(
+            agg = Aggregator(
                 layer_dict={'a': self.rasterlayer.id},
                 formula='a',
                 grouping='99999'

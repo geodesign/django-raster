@@ -61,7 +61,7 @@ class RasterTestCase(TransactionTestCase):
                 datatype='ca',
                 nodata='255',
                 rasterfile=rasterfile,
-                legend=leg
+                legend=leg,
             )
             # Create another layer with no tiles
             self.empty_rasterlayer = RasterLayer.objects.create(
@@ -69,7 +69,7 @@ class RasterTestCase(TransactionTestCase):
                 description='Small raster for testing',
                 datatype='ca',
                 nodata='255',
-                rasterfile=rasterfile
+                rasterfile=rasterfile,
             )
             self.empty_rasterlayer.rastertile_set.all().delete()
 
@@ -99,14 +99,14 @@ class RasterTestCase(TransactionTestCase):
 
         self.expected_totals = expected
         self.continuous_expected_histogram = {
-            '(0.0, 1.5)': 22436,
-            '(1.5, 3.0)': 56,
-            '(13.5, 15.0)': 1244,
-            '(3.0, 4.5)': 35621,
-            '(7.5, 9.0)': 1350,
-            '(9.0, 10.5)': 2977
+            '(0.0, 0.90000000000000002)': 21741,
+            '(0.90000000000000002, 1.8)': 695,
+            '(1.8, 2.7000000000000002)': 56,
+            '(2.7000000000000002, 3.6000000000000001)': 4131,
+            '(3.6000000000000001, 4.5)': 31490,
+            '(7.2000000000000002, 8.0999999999999996)': 1350,
+            '(8.0999999999999996, 9.0)': 2977,
         }
-
         # Instantiate test client
         self.client = Client()
 

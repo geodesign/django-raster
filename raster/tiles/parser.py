@@ -118,6 +118,11 @@ class RasterLayerParser(object):
         else:
             self.dataset = GDALRaster(rasterfile.name, write=True)
 
+        # Make sure nodata value is set from input on all bands
+        if self.rasterlayer.nodata not in ('', None):
+            for band in self.dataset.bands:
+                band.nodata_value = float(self.rasterlayer.nodata)
+
         # Extract metadata
         if created:
             self.extract_metadata()
@@ -146,11 +151,6 @@ class RasterLayerParser(object):
             reproj.rasterfile = File(open(dest_zip.filename, 'rb'))
             reproj.save()
             self.log('Finished transforming raster.')
-
-        # Make sure nodata value is set from input on all bands
-        if self.rasterlayer.nodata not in ('', None):
-            for band in self.dataset.bands:
-                band.nodata_value = float(self.rasterlayer.nodata)
 
     def create_initial_histogram_buckets(self):
         """

@@ -12,9 +12,9 @@ from django.contrib.postgres.fields import ArrayField
 from django.db.models import Max, Min
 from django.db.models.signals import m2m_changed, post_save, pre_save
 from django.dispatch import receiver
+from raster.mixins import ValueCountMixin
 from raster.tiles.const import GLOBAL_MAX_ZOOM_LEVEL, WEB_MERCATOR_SRID
 from raster.utils import hex_to_rgba
-from raster.valuecount import ValueCountMixin
 
 
 class LegendSemantics(models.Model):
@@ -249,9 +249,10 @@ def reset_parse_log_if_data_changed(sender, instance, **kwargs):
     except RasterLayer.DoesNotExist:
         pass
     else:
-        # If filename has changed, clear parse status to trigger re-parsing.
-        # Also remove the reprojected copy of the previous file if it exists.
-        if obj.rasterfile.name != instance.rasterfile.name:
+        # If filename or nodata value has changed, clear parse status to
+        # trigger re-parsing. Also remove the reprojected copy of the previous
+        # file if it exists.
+        if obj.rasterfile.name != instance.rasterfile.name or obj.nodata != instance.nodata:
             instance.parsestatus.reset(save=False)
             if hasattr(instance, 'reprojected'):
                 reproj = instance.reprojected
@@ -351,6 +352,9 @@ class RasterLayerBandMetadata(models.Model):
     hist_values = ArrayField(models.BigIntegerField(), size=HISTOGRAM_BINS)
     hist_bins = ArrayField(models.FloatField(), size=HISTOGRAM_BINS + 1)
 
+    class Meta:
+        unique_together = ('rasterlayer', 'band')
+
     def __str__(self):
         return '{} - Min {} - Max {}'.format(self.rasterlayer.name, self.min, self.max)
 
@@ -368,8 +372,8 @@ class RasterLayerBandMetadata(models.Model):
 
         super(RasterLayerBandMetadata, self).save(*args, **kwargs)
 
-    class Meta:
-        unique_together = ('rasterlayer', 'band')
+    def statistics(self):
+        return (self.min, self.max, self.mean, self.std)
 
 
 class RasterTile(models.Model):

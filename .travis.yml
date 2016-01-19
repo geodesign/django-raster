@@ -14,7 +14,7 @@ before_script:
   - psql -c 'create extension postgis' -U postgres -d raster_test
 
 install: 
-  - pip install Django==1.9
+  - pip install Django==1.9.1
   - pip install psycopg2==2.5.3
   - pip install celery==3.1.19
   - pip install numpy

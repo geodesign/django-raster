@@ -116,4 +116,5 @@ FUNCTION_MAP = {
     "mean": numpy.mean,
     "median": numpy.median,
     "std": numpy.std,
+    "sum": numpy.sum,
 }
