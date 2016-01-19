@@ -143,6 +143,10 @@ class Aggregator(object):
             if numpy.ma.is_masked(data):
                 data = data.compressed()
 
+            # Stop if entire data was masked
+            if data.size == 0:
+                continue
+
             # Compute incremental statistics
             t0 += data.size
             t1 += numpy.sum(data)
