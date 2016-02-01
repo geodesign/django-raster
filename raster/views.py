@@ -188,7 +188,10 @@ class AlgebraView(RasterView):
             raise RasterAlgebraException('Failed to evaluate raster algebra.')
 
         # Get array from algebra result
-        result = result.bands[0].data()
+        result = numpy.ma.masked_values(
+            result.bands[0].data(),
+            result.bands[0].nodata_value,
+        )
 
         # Render tile
         colormap = self.get_colormap()

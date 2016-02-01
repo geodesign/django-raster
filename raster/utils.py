@@ -51,7 +51,7 @@ def band_data_to_image(band_data, colormap):
             selector.fill_value = False
             rgba[selector.filled() == 1] = color
             # Compress for getting statistics
-            selector.compressed()
+            selector = selector.compressed()
         else:
             rgba[selector] = color
 
