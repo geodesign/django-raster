@@ -25,7 +25,7 @@ urls to your main urlconf::
 
     urlpatterns = patterns('',
         ...
-        url(r'raster/', include('raster.urls')),
+        url(r'^raster/', include('raster.urls')),
     )
 
 Finally, migrate your database to create the tables required by django-raster::
