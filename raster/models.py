@@ -133,8 +133,15 @@ class RasterLayer(models.Model, ValueCountMixin):
     datatype = models.CharField(max_length=2, choices=DATATYPES, default='co')
     rasterfile = models.FileField(upload_to='rasters', null=True, blank=True)
     nodata = models.CharField(max_length=100, null=True, blank=True,
-        help_text='Leave blank to keep the internal band nodata values. If a nodata'
+        help_text='Leave blank to keep the internal band nodata values. If a nodata '
                   'value is specified here, it will be used for all bands of this raster.')
+    srid = models.IntegerField(null=True, blank=True,
+        help_text='Leave blank to use the internal raster srid. If a srid is '
+                  'specified here, it will be used for all calculations.')
+    max_zoom = models.IntegerField(null=True, blank=True,
+        help_text='Leave blank to automatically determine the max zoom level '
+                  'from the raster scale. Otherwise the raster parsed up to '
+                  'the zoom level specified here.')
     legend = models.ForeignKey(Legend, blank=True, null=True)
     modified = models.DateTimeField(auto_now=True)
 
@@ -252,8 +259,11 @@ def reset_parse_log_if_data_changed(sender, instance, **kwargs):
         # If filename or nodata value has changed, clear parse status to
         # trigger re-parsing. Also remove the reprojected copy of the previous
         # file if it exists.
-        if obj.rasterfile.name != instance.rasterfile.name or obj.nodata != instance.nodata:
-            instance.parsestatus.reset(save=False)
+        if (obj.rasterfile.name != instance.rasterfile.name or
+                obj.nodata != instance.nodata or
+                obj.max_zoom != instance.max_zoom or
+                obj.srid != instance.srid):
+            instance.parsestatus.reset()
             if hasattr(instance, 'reprojected'):
                 reproj = instance.reprojected
                 reproj.delete()
@@ -261,10 +271,10 @@ def reset_parse_log_if_data_changed(sender, instance, **kwargs):
 
 @receiver(post_save, sender=RasterLayer)
 def parse_raster_layer_if_status_is_unparsed(sender, instance, created, **kwargs):
-    RasterLayerParseStatus.objects.get_or_create(rasterlayer=instance)
     RasterLayerMetadata.objects.get_or_create(rasterlayer=instance)
+    status, created = RasterLayerParseStatus.objects.get_or_create(rasterlayer=instance)
 
-    if instance.rasterfile.name and instance.parsestatus.status == instance.parsestatus.UNPARSED:
+    if instance.rasterfile.name and status.status == status.UNPARSED:
         instance.parse()
 
 
@@ -330,12 +340,11 @@ class RasterLayerParseStatus(models.Model):
     def __str__(self):
         return '{0} - {1}'.format(self.rasterlayer.name, self.get_status_display())
 
-    def reset(self, save=True):
+    def reset(self):
         self.tile_levels = []
         self.log = ''
         self.status = self.UNPARSED
-        if save:
-            self.save()
+        self.save()
 
 
 class RasterLayerBandMetadata(models.Model):

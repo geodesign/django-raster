@@ -2,6 +2,7 @@ import os
 
 from django.core.files import File
 from django.test.utils import override_settings
+from raster.exceptions import RasterException
 from tests.raster_testcase import RasterTestCase
 
 
@@ -59,6 +60,12 @@ class RasterLayerParserWithoutCeleryTests(RasterTestCase):
             self.rasterlayer.save()
             tile = self.rasterlayer.rastertile_set.first()
             self.assertEqual(tile.rast.bands[0].nodata_value, 15)
+
+    def test_parse_with_wrong_srid(self):
+        self.rasterlayer.srid = 4326
+        msg = 'Failed to compute max zoom. Check the SRID of the raster.'
+        with self.assertRaisesMessage(RasterException, msg):
+            self.rasterlayer.save()
 
 
 @override_settings(CELERY_ALWAYS_EAGER=True,

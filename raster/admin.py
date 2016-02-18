@@ -23,7 +23,7 @@ class RasterLayerMetadataInline(admin.TabularInline):
     readonly_fields = (
         'srid', 'uperleftx', 'uperlefty', 'width', 'height',
         'scalex', 'scaley', 'skewx', 'skewy', 'numbands',
-        'srs_wkt',
+        'max_zoom', 'srs_wkt',
     )
 
     def has_add_permission(self, request, obj=None):

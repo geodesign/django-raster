@@ -71,11 +71,14 @@ class RasterLayerParser(object):
         """
         reproj, created = RasterLayerReprojected.objects.get_or_create(rasterlayer=self.rasterlayer)
 
+        # Check if the raster has already been reprojected
+        is_reprojected = reproj.rasterfile.name is not None
+
         # Choose source for raster data, use the reprojected version if it exists.
-        if not reproj.rasterfile:
-            rasterfile_source = self.rasterlayer.rasterfile
-        else:
+        if is_reprojected:
             rasterfile_source = reproj.rasterfile
+        else:
+            rasterfile_source = self.rasterlayer.rasterfile
 
         # Create workdir
         raster_workdir = getattr(settings, 'RASTER_WORKDIR', None)
@@ -119,14 +122,18 @@ class RasterLayerParser(object):
         else:
             self.dataset = GDALRaster(rasterfile.name, write=True)
 
-        # Make sure nodata value is set from input on all bands
+        # Override nodata value if specified manually
         if self.rasterlayer.nodata not in ('', None):
             for band in self.dataset.bands:
                 band.nodata_value = float(self.rasterlayer.nodata)
 
+        # Override file internal srid if specified manually
+        if self.rasterlayer.srid and not is_reprojected:
+            self.dataset.srid = self.rasterlayer.srid
+
         # Store metadata only when the reprojected object is first created,
-        # otherwise assume it has already been extracted previously.
-        if created:
+        # otherwise assume it has already been extracted.
+        if not is_reprojected:
             self.extract_metadata()
 
         # Reproject raster into web mercator if necessary
@@ -172,6 +179,12 @@ class RasterLayerParser(object):
         """
         self.log('Extracting metadata from raster.')
 
+        # Try to compute max zoom
+        try:
+            max_zoom = self.compute_max_zoom()
+        except GDALException:
+            raise RasterException('Failed to compute max zoom. Check the SRID of the raster.')
+
         # Extract global raster metadata
         meta = self.rasterlayer.metadata
         meta.uperleftx = self.dataset.origin.x
@@ -185,7 +198,7 @@ class RasterLayerParser(object):
         meta.numbands = len(self.dataset.bands)
         meta.srs_wkt = self.dataset.srs.wkt
         meta.srid = self.dataset.srs.srid
-        meta.max_zoom = self.compute_max_zoom()
+        meta.max_zoom = max_zoom
         meta.save()
 
         # Extract band metadata
@@ -387,14 +400,18 @@ class RasterLayerParser(object):
         """
         Set max zoom property based on rasterlayer metadata.
         """
+        # Return manual override value if provided
+        if self.rasterlayer.max_zoom is not None:
+            return self.rasterlayer.max_zoom
+
         if self.dataset.srs.srid == WEB_MERCATOR_SRID:
             # For rasters in web mercator, use the scale directly
             scale = abs(self.dataset.scale.x)
         else:
             # Compute the scale in meters at the center of the raster in the web
             # mercator projection.
-            xcenter = self.dataset.extent[2] - self.dataset.extent[0]
-            ycenter = self.dataset.extent[3] - self.dataset.extent[1]
+            xcenter = self.dataset.extent[0] + (self.dataset.extent[2] - self.dataset.extent[0]) / 2
+            ycenter = self.dataset.extent[1] + (self.dataset.extent[3] - self.dataset.extent[1]) / 2
             line = LineString(
                 [
                     (xcenter, ycenter),
@@ -409,6 +426,10 @@ class RasterLayerParser(object):
 
     @property
     def max_zoom(self):
+        # Return manual override value if provided
+        if self.rasterlayer.max_zoom is not None:
+            return self.rasterlayer.max_zoom
+
         # Get max zoom from metadata
         max_zoom = self.rasterlayer.metadata.max_zoom
 
