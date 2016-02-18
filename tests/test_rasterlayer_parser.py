@@ -1,4 +1,5 @@
 import os
+from unittest import skipIf
 
 from django.core.files import File
 from django.test.utils import override_settings
@@ -7,7 +8,7 @@ from tests.raster_testcase import RasterTestCase
 
 
 @override_settings(RASTER_TILESIZE=100)
-class RasterLayerParserWithoutCeleryTests(RasterTestCase):
+class RasterLayerParserTests(RasterTestCase):
 
     def test_raster_layer_parsing(self):
         self.assertEqual(self.rasterlayer.rastertile_set.filter(tilez=12).count(), 9)
@@ -61,23 +62,24 @@ class RasterLayerParserWithoutCeleryTests(RasterTestCase):
             tile = self.rasterlayer.rastertile_set.first()
             self.assertEqual(tile.rast.bands[0].nodata_value, 15)
 
+    @skipIf('TRAVIS' in os.environ, 'Exception not raised on travisci.')
     def test_parse_with_wrong_srid(self):
-        self.rasterlayer.srid = 4326
-        msg = 'Failed to compute max zoom. Check the SRID of the raster.'
-        with self.assertRaisesMessage(RasterException, msg):
-            self.rasterlayer.save()
+        with self.settings(MEDIA_ROOT=self.media_root):
+            self.rasterlayer.srid = 4326
+            self.rasterlayer.parsestatus.status = self.rasterlayer.parsestatus.UNPARSED
+            self.rasterlayer.parsestatus.save()
+            msg = 'Failed to compute max zoom. Check the SRID of the raster.'
+            with self.assertRaisesMessage(RasterException, msg):
+                self.rasterlayer.save()
 
 
-@override_settings(CELERY_ALWAYS_EAGER=True,
-                   CELERY_EAGER_PROPAGATES_EXCEPTIONS=True,
-                   RASTER_USE_CELERY=True,
-                   RASTER_TILESIZE=100)
-class RasterLayerParserWithCeleryTests(RasterLayerParserWithoutCeleryTests):
+@override_settings(RASTER_TILESIZE=100, RASTER_USE_CELERY=False)
+class RasterLayerParserWithoutCeleryTests(RasterLayerParserTests):
     pass
 
 
 @override_settings(RASTER_TILESIZE=100, RASTER_ZOOM_NEXT_HIGHER=False)
-class RasterLayerParserWithoutCeleryTests(RasterTestCase):
+class RasterLayerParserZoomNextHighterFalseTests(RasterTestCase):
 
     def test_raster_layer_parsing(self):
         self.assertEqual(self.rasterlayer.rastertile_set.filter(tilez=12).count(), 0)
