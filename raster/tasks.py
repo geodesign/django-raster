@@ -14,7 +14,6 @@ def create_tiles(rasterlayer, zoom):
     try:
         parser = RasterLayerParser(rasterlayer)
         parser.open_raster_file()
-        parser.compute_max_zoom()
         parser.create_tiles(zoom)
     except:
         parser.log(
@@ -46,14 +45,13 @@ def send_success_signal(rasterlayer):
 
 
 @task
-def open_and_reproject_raster(rasterlayer, initial=False):
+def open_and_reproject_raster(rasterlayer):
     """
     Initializes parser, creates reprojected raster copy if necessary.
     """
     try:
         parser = RasterLayerParser(rasterlayer)
-        if initial:
-            parser.log('Started parsing raster.')
+        parser.log('Started parsing raster.')
         parser.open_raster_file()
     except:
         parser.log(

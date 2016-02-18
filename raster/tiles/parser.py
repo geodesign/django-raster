@@ -11,6 +11,7 @@ from celery.contrib.methods import task_method
 from django.conf import settings
 from django.contrib.gis.gdal import GDALRaster
 from django.contrib.gis.gdal.error import GDALException
+from django.contrib.gis.geos import LineString
 from django.core.files import File
 from django.db import connection
 from django.dispatch import Signal
@@ -123,7 +124,8 @@ class RasterLayerParser(object):
             for band in self.dataset.bands:
                 band.nodata_value = float(self.rasterlayer.nodata)
 
-        # Extract metadata
+        # Store metadata only when the reprojected object is first created,
+        # otherwise assume it has already been extracted previously.
         if created:
             self.extract_metadata()
 
@@ -183,6 +185,7 @@ class RasterLayerParser(object):
         meta.numbands = len(self.dataset.bands)
         meta.srs_wkt = self.dataset.srs.wkt
         meta.srid = self.dataset.srs.srid
+        meta.max_zoom = self.compute_max_zoom()
         meta.save()
 
         # Extract band metadata
@@ -384,18 +387,36 @@ class RasterLayerParser(object):
         """
         Set max zoom property based on rasterlayer metadata.
         """
-        # Compute max zoom at the web mercator projection
-        self.max_zoom = utils.closest_zoomlevel(
-            abs(self.dataset.scale.x)
-        )
+        if self.dataset.srs.srid == WEB_MERCATOR_SRID:
+            # For rasters in web mercator, use the scale directly
+            scale = abs(self.dataset.scale.x)
+        else:
+            # Compute the scale in meters at the center of the raster in the web
+            # mercator projection.
+            xcenter = self.dataset.extent[2] - self.dataset.extent[0]
+            ycenter = self.dataset.extent[3] - self.dataset.extent[1]
+            line = LineString(
+                [
+                    (xcenter, ycenter),
+                    (xcenter + self.dataset.scale.x, ycenter),
+                ],
+                srid=self.dataset.srs.srid
+            )
+            line.transform(WEB_MERCATOR_SRID)
+            scale = line.length
 
-        # Store max zoom level in metadata
-        self.rasterlayer.metadata.max_zoom = self.max_zoom
-        self.rasterlayer.metadata.save()
+        return utils.closest_zoomlevel(scale)
+
+    @property
+    def max_zoom(self):
+        # Get max zoom from metadata
+        max_zoom = self.rasterlayer.metadata.max_zoom
 
         # Reduce max zoom by one if zoomdown flag was disabled
         if not self.zoomdown:
-            self.max_zoom -= 1
+            max_zoom -= 1
+
+        return max_zoom
 
     def nr_of_tiles(self, zoom):
         """

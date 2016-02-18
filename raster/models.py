@@ -222,7 +222,7 @@ class RasterLayer(models.Model, ValueCountMixin):
 
             # Setup the parser logic as parsing chain
             parsing_task_chain = (
-                open_and_reproject_raster.si(self, initial=True) |
+                open_and_reproject_raster.si(self) |
                 clear_tiles.si(self) |
                 priority_group |
                 high_level_group |
@@ -235,7 +235,7 @@ class RasterLayer(models.Model, ValueCountMixin):
             parser = RasterLayerParser(self)
             parser.log('Parse task queued, waiting for worker availability.')
         else:
-            open_and_reproject_raster(self, initial=True)
+            open_and_reproject_raster(self)
             clear_tiles(self)
             for zoom in zoom_range:
                 create_tiles(self, zoom)
