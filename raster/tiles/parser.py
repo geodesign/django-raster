@@ -243,7 +243,7 @@ class RasterLayerParser(object):
             self.create_initial_histogram_buckets()
 
         # Compute the tile x-y-z index range for the rasterlayer for this zoomlevel
-        bbox = self.rasterlayer.extent()
+        bbox = self.dataset.extent
         quadrants = utils.quadrants(bbox, zoom)
 
         self.log('Creating {0} tiles in {1} quadrants at zoom {2}.'.format(self.nr_of_tiles(zoom), len(quadrants), zoom))
@@ -443,6 +443,6 @@ class RasterLayerParser(object):
         """
         Compute the number of tiles for the rasterlayer on a given zoom level.
         """
-        bbox = self.rasterlayer.extent()
+        bbox = self.dataset.extent
         indexrange = utils.tile_index_range(bbox, zoom)
         return (indexrange[2] - indexrange[0] + 1) * (indexrange[3] - indexrange[1] + 1)
