@@ -50,10 +50,11 @@ class Aggregator(object):
 
             # Abort if there is no spatial overlay
             if max_extent.empty:
-                return {}
-
-            # Compute tile index range for geometry and given zoom level
-            self.tilerange = tile_index_range(max_extent.extent, zoom)
+                self.tilerange = None
+                return
+            else:
+                # Compute tile index range for geometry and given zoom level
+                self.tilerange = tile_index_range(max_extent.extent, zoom)
         else:
             # Get index range set for the input layers
             index_ranges = [tile_index_range(lyr.extent(), zoom) for lyr in self.layers]
@@ -89,6 +90,10 @@ class Aggregator(object):
         Generator that yields an algebra-ready data dictionary for each tile in
         the aggregator's tile range.
         """
+        # Check if any tiles have been matched
+        if not self.tilerange:
+            return
+
         algebra_parser = RasterAlgebraParser()
 
         for tilex in range(self.tilerange[0], self.tilerange[2] + 1):

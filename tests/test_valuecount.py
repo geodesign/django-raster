@@ -132,6 +132,11 @@ class RasterValueCountTests(RasterTestCase):
             self.continuous_expected_histogram
         )
 
+    def test_value_count_with_geom_not_covering_anything(self):
+        bbox = Polygon.from_bbox((0, 0, 1, 1))
+        bbox.srid = WEB_MERCATOR_SRID
+        self.assertEqual(self.rasterlayer.value_count(bbox), {})
+
 
 class RasterAggregatorTests(RasterTestCase):
 
