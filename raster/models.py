@@ -156,12 +156,13 @@ class RasterLayer(models.Model, ValueCountMixin):
         return self.datatype in (self.CATEGORICAL, self.MASK, self.RANK_ORDERED)
 
     _bbox = None
+    _bbox_srid = None
 
     def extent(self, srid=WEB_MERCATOR_SRID):
         """
         Returns bbox for layer.
         """
-        if not self._bbox:
+        if not self._bbox or self._bbox_srid != srid:
             # Get bbox for raster in original coordinates
             meta = self.metadata
             xmin = meta.uperleftx
@@ -188,6 +189,7 @@ class RasterLayer(models.Model, ValueCountMixin):
 
             # Set bbox
             self._bbox = (min(xvals), min(yvals), max(xvals), max(yvals))
+            self._bbox_srid = srid
         return self._bbox
 
     def index_range(self, zoom):
