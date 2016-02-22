@@ -204,7 +204,7 @@ class RasterLayer(models.Model, ValueCountMixin):
         """
         Parse raster layer to extract metadata and create tiles.
         """
-        from raster.tasks import open_and_reproject_raster, create_tiles, clear_tiles, send_success_signal
+        from raster.tasks import prepare_raster, create_tiles, clear_tiles, send_success_signal
         from raster.tiles.parser import RasterLayerParser
 
         # Check if parsing should happen asynchronously
@@ -231,7 +231,7 @@ class RasterLayer(models.Model, ValueCountMixin):
 
             # Setup the parser logic as parsing chain
             parsing_task_chain = (
-                open_and_reproject_raster.si(self) |
+                prepare_raster.si(self) |
                 clear_tiles.si(self) |
                 priority_group |
                 high_level_group |
@@ -244,7 +244,7 @@ class RasterLayer(models.Model, ValueCountMixin):
             parser = RasterLayerParser(self)
             parser.log('Parse task queued, waiting for worker availability.')
         else:
-            open_and_reproject_raster(self)
+            prepare_raster(self)
             clear_tiles(self)
             for zoom in zoom_range:
                 create_tiles(self, zoom)
@@ -265,17 +265,15 @@ def reset_parse_log_if_data_changed(sender, instance, **kwargs):
                 obj.nodata != instance.nodata or
                 obj.max_zoom != instance.max_zoom or
                 obj.srid != instance.srid):
-            instance.parsestatus.reset()
             if hasattr(instance, 'reprojected'):
-                reproj = instance.reprojected
-                reproj.delete()
+                instance.reprojected.delete()
+            instance.parsestatus.reset()
 
 
 @receiver(post_save, sender=RasterLayer)
 def parse_raster_layer_if_status_is_unparsed(sender, instance, created, **kwargs):
     RasterLayerMetadata.objects.get_or_create(rasterlayer=instance)
     status, created = RasterLayerParseStatus.objects.get_or_create(rasterlayer=instance)
-
     if instance.rasterfile.name and status.status == status.UNPARSED:
         instance.parse()
 

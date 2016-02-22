@@ -71,10 +71,10 @@ class RasterLayerParser(object):
         reproj, created = RasterLayerReprojected.objects.get_or_create(rasterlayer=self.rasterlayer)
 
         # Check if the raster has already been reprojected
-        is_reprojected = reproj.rasterfile.name not in (None, '')
+        has_reprojected = reproj.rasterfile.name not in (None, '')
 
         # Choose source for raster data, use the reprojected version if it exists.
-        if is_reprojected:
+        if has_reprojected:
             rasterfile_source = reproj.rasterfile
         else:
             rasterfile_source = self.rasterlayer.rasterfile
@@ -121,44 +121,47 @@ class RasterLayerParser(object):
         else:
             self.dataset = GDALRaster(rasterfile.name, write=True)
 
-        # Override nodata value if specified manually
-        if self.rasterlayer.nodata not in ('', None):
-            for band in self.dataset.bands:
-                band.nodata_value = float(self.rasterlayer.nodata)
+        # Set manual overrides
+        if not has_reprojected:
+            # Override nodata value if specified manually
+            if self.rasterlayer.nodata not in ('', None):
+                for band in self.dataset.bands:
+                    band.nodata_value = float(self.rasterlayer.nodata)
 
-        # Override file internal srid if specified manually
-        if self.rasterlayer.srid and not is_reprojected:
-            self.dataset.srid = self.rasterlayer.srid
+            # Override file internal srid if specified manually
+            if self.rasterlayer.srid:
+                self.dataset.srid = self.rasterlayer.srid
 
-        # Store metadata only when the reprojected object is first created,
-        # otherwise assume it has already been extracted.
-        if not is_reprojected:
-            self.extract_metadata()
+    def reproject_rasterfile(self):
+        """
+        Reproject the rasterfile into web mercator.
+        """
+        # Do nothing if the raser already has the right projection
+        if self.dataset.srs.srid == WEB_MERCATOR_SRID:
+            return
 
-        # Reproject raster into web mercator if necessary
-        if not self.dataset.srs.srid == WEB_MERCATOR_SRID:
-            self.log(
-                'Transforming raster to SRID {0}'.format(WEB_MERCATOR_SRID),
-                status=self.rasterlayer.parsestatus.REPROJECTING_RASTER
-            )
+        self.log(
+            'Transforming raster to SRID {0}'.format(WEB_MERCATOR_SRID),
+            status=self.rasterlayer.parsestatus.REPROJECTING_RASTER
+        )
 
-            # Reproject the dataset
-            self.dataset = self.dataset.transform(WEB_MERCATOR_SRID)
+        # Reproject the dataset
+        self.dataset = self.dataset.transform(WEB_MERCATOR_SRID)
 
-            # Compress reprojected raster file and store it
-            dest = tempfile.NamedTemporaryFile(dir=self.tmpdir, suffix='.zip')
-            dest_zip = zipfile.ZipFile(dest.name, 'w', allowZip64=True)
-            dest_zip.write(
-                filename=self.dataset.name,
-                arcname=os.path.basename(self.dataset.name),
-                compress_type=zipfile.ZIP_DEFLATED,
-            )
-            dest_zip.close()
+        # Compress reprojected raster file and store it
+        dest = tempfile.NamedTemporaryFile(dir=self.tmpdir, suffix='.zip')
+        dest_zip = zipfile.ZipFile(dest.name, 'w', allowZip64=True)
+        dest_zip.write(
+            filename=self.dataset.name,
+            arcname=os.path.basename(self.dataset.name),
+            compress_type=zipfile.ZIP_DEFLATED,
+        )
+        dest_zip.close()
 
-            # Store zip file in reprojected raster model
-            reproj.rasterfile = File(open(dest_zip.filename, 'rb'))
-            reproj.save()
-            self.log('Finished transforming raster.')
+        # Store zip file in reprojected raster model
+        self.rasterlayer.reprojected.rasterfile = File(open(dest_zip.filename, 'rb'))
+        self.rasterlayer.reprojected.save()
+        self.log('Finished transforming raster.')
 
     def create_initial_histogram_buckets(self):
         """

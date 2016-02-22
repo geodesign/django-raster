@@ -45,7 +45,7 @@ def send_success_signal(rasterlayer):
 
 
 @task
-def open_and_reproject_raster(rasterlayer):
+def prepare_raster(rasterlayer):
     """
     Initializes parser, creates reprojected raster copy if necessary.
     """
@@ -53,6 +53,8 @@ def open_and_reproject_raster(rasterlayer):
         parser = RasterLayerParser(rasterlayer)
         parser.log('Started parsing raster.')
         parser.open_raster_file()
+        parser.extract_metadata()
+        parser.reproject_rasterfile()
     except:
         parser.log(
             traceback.format_exc(),
