@@ -9,9 +9,8 @@ from celery import current_app, group
 from celery.contrib.methods import task_method
 
 from django.conf import settings
-from django.contrib.gis.gdal import GDALRaster
+from django.contrib.gis.gdal import GDALRaster, OGRGeometry
 from django.contrib.gis.gdal.error import GDALException
-from django.contrib.gis.geos import LineString
 from django.core.files import File
 from django.db import connection
 from django.dispatch import Signal
@@ -408,19 +407,20 @@ class RasterLayerParser(object):
             # For rasters in web mercator, use the scale directly
             scale = abs(self.dataset.scale.x)
         else:
-            # Compute the scale in meters at the center of the raster in the web
-            # mercator projection.
+            # Create a line from the center of the raster to a point that is
+            # one pixel width away from the center.
             xcenter = self.dataset.extent[0] + (self.dataset.extent[2] - self.dataset.extent[0]) / 2
             ycenter = self.dataset.extent[1] + (self.dataset.extent[3] - self.dataset.extent[1]) / 2
-            line = LineString(
-                [
-                    (xcenter, ycenter),
-                    (xcenter + self.dataset.scale.x, ycenter),
-                ],
-                srid=self.dataset.srs.srid
+            linestring = 'LINESTRING({} {}, {} {})'.format(
+                xcenter, ycenter, xcenter + self.dataset.scale.x, ycenter
             )
+            line = OGRGeometry(linestring, srs=self.dataset.srs)
+
+            # Tansform the line into web mercator.
             line.transform(WEB_MERCATOR_SRID)
-            scale = line.length
+
+            # Use the lenght of the transformed line as scale.
+            scale = line.geos.length
 
         return utils.closest_zoomlevel(scale)
 
