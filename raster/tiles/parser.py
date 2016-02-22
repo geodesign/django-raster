@@ -72,7 +72,7 @@ class RasterLayerParser(object):
         reproj, created = RasterLayerReprojected.objects.get_or_create(rasterlayer=self.rasterlayer)
 
         # Check if the raster has already been reprojected
-        is_reprojected = reproj.rasterfile.name is not None
+        is_reprojected = reproj.rasterfile.name not in (None, '')
 
         # Choose source for raster data, use the reprojected version if it exists.
         if is_reprojected:
