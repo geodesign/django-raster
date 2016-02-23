@@ -1,8 +1,9 @@
+import keyword
 import operator
 from functools import reduce
 
 import numpy
-from pyparsing import Forward, Literal, Optional, Regex, Word, ZeroOrMore, alphanums, oneOf
+from pyparsing import Forward, Keyword, Literal, Optional, Regex, Word, ZeroOrMore, alphanums, delimitedList, oneOf
 
 from django.contrib.gis.gdal import GDALRaster
 from raster.algebra import const
@@ -33,11 +34,11 @@ class FormulaParser(object):
         rpar = Literal(const.RPAR).suppress()
 
         # Expression for mathematical constants: Euler number and Pi
-        e = Literal(const.EULER)
-        pi = Literal(const.PI)
-        null = Literal(const.NULL)
-        _true = Literal(const.TRUE)
-        _false = Literal(const.FALSE)
+        e = Keyword(const.EULER)
+        pi = Keyword(const.PI)
+        null = Keyword(const.NULL)
+        _true = Keyword(const.TRUE)
+        _false = Keyword(const.FALSE)
 
         # Prepare operator expressions
         addop = oneOf(const.ADDOP)
@@ -50,7 +51,7 @@ class FormulaParser(object):
 
         # Variables are alphanumeric strings that represent keys in the input
         # data dictionary.
-        variable = Word(alphanums + const.VARIABLE_NAME_SEPARATOR)
+        variable = delimitedList(Word(alphanums), delim=const.VARIABLE_NAME_SEPARATOR, combine=True)
 
         # Functional calls
         function = Word(alphanums) + lpar + self.bnf + rpar
@@ -140,6 +141,20 @@ class FormulaParser(object):
         # Remove any white space and line breaks from formula.
         self.formula = formula.replace(' ', '').replace('\n', '').replace('\r', '')
 
+    def prepare_data(self):
+        """
+        Basic checks and conversion of input data.
+        """
+        for key, var in self.variable_map.items():
+            # Keywords are not allowed as variables, variables can not start or
+            # end with separator.
+            if keyword.iskeyword(key) or key != key.strip(const.VARIABLE_NAME_SEPARATOR):
+                raise RasterAlgebraException('Invalid variable name found: "{}".'.format(key))
+
+            # Convert all data to numpy arrays
+            if not isinstance(var, numpy.ndarray):
+                self.variable_map[key] = numpy.array(var)
+
     def evaluate(self, data={}, formula=None):
         """
         Evaluate the input data using the current formula expression stack.
@@ -153,13 +168,11 @@ class FormulaParser(object):
         if not self.formula:
             raise RasterAlgebraException('Formula not specified.')
 
-        # Make sure all data is in numpy format
-        for k, v in data.items():
-            if not isinstance(v, numpy.ndarray):
-                data[k] = numpy.array(v)
-
         # Store data for variables
         self.variable_map = data
+
+        # Check and convert input data
+        self.prepare_data()
 
         # Reset expression stack
         self.expr_stack = []

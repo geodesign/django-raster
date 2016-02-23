@@ -256,3 +256,20 @@ class FormulaParserTests(TestCase):
         self.assertFormulaResult('median(x)', numpy.median(d['x']))
         self.assertFormulaResult('std(x)', numpy.std(d['x']))
         self.assertFormulaResult('y * min(x)', numpy.arange(3) * numpy.min(d['x']))
+
+    def test_keyword_variable_exception(self):
+        msg = 'Invalid variable name found: "del".'
+        with self.assertRaisesMessage(RasterAlgebraException, msg):
+            self.parser.evaluate({'del': [1]}, 'del')
+
+    def test_invalid_variables(self):
+        d = self.data = {
+            '_no': range(5),
+            'no_': range(5),
+            '__no__': range(5),
+            '__': range(5),
+        }
+        for key, val in d.items():
+            msg = 'Invalid variable name found: "{}".'.format(key)
+            with self.assertRaisesMessage(RasterAlgebraException, msg):
+                self.parser.evaluate({key: val}, key)

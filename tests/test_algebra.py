@@ -80,7 +80,7 @@ class RasterAlgebraViewTests(RasterTestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_long_variable_algebra_request(self):
-        response = self.client.get(self.algebra_tile_url + '?layers=abc={0},def={0}&formula=((abc*5)%2B(def*3))*4'.format(self.rasterlayer.id))
+        response = self.client.get(self.algebra_tile_url + '?layers=abc={0},a_long_var={0}&formula=((abc*5)%2B(a_long_var*3))*4'.format(self.rasterlayer.id))
         self.assertEqual(response.status_code, 200)
 
     def test_broken_formula_request(self):
