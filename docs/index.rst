@@ -1,8 +1,7 @@
 =============
 Django Raster
 =============
-
-django-raster provides raster data functionality for Django projects with a
+Django-raster provides raster data functionality for Django projects with a
 PostGIS database backend. It is based on the Django internal raster data type
 `RasterField`__ and GDAL bindings through `GDALRaster`__.
 

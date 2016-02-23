@@ -1,11 +1,44 @@
-=====================
-Parsing raster layers
-=====================
+=======================
+Ingesting raster layers
+=======================
+This section describes how to input raster data into a Django application
+that has django-raster installed.
 
-How to input data.
+Creating Raster Layers
+----------------------
+Raster files can be uploaded through the admin interface and are stored the
+RasterLayer model. Each raster file corresponds to one RasterLayer object. When
+adding a new raster file, the following properties can be specified:
 
-After setting the package up, raster files can be uploaded through the admin interface using the RasterLayer model. Specify a layer name, the raster data type (continuous, categorical, mask or rank ordered), the raster's srid, the nodata value and the raster file to be uploaded.
+  - Layer name
+  - Raster file
+  - Data type (continuous, categorical, mask, or rank ordered)
+  - SRID (optional)
+  - Nodata value (optional)
+  - Max zoom value (highest z-x-y zoom level to create tiles for, optional)
 
-Upon saving the a RasterLayer instance with a raster file, django-raster automatically loads the raster data from the file into a raster field in the RasterTile model. The RasterLayer instances have a *parse_log* field, which stores information about the parsing process. For debugging, there might be some useful information in the parse log.
+The srid, the nodata value and the maximum zoom value are all determined
+automatically from the raster propreties if left blank.
 
-A simple TMS view is part of this package as well, to serve the tiles with dynamic symbology. The endpoint is briefly described below, it works as a ``{z}/{x}/{y}.png`` url.
+Raster Tile Creation
+--------------------
+After uploading a file, django-raster automatically parses the raster file. The
+parsing includes extraction of metadata for the raster and its bands and
+creating tiles. The progess or possible errors in parsing is written to a parse
+log object, which is exposed on the RasterLayer admin interface.
+
+The parser automatically creates a tile pyramid in the z-x-y scheme of a TMS,
+for all tile levels above the max zoom value. By default, the max zoom is
+calculated automatically from the resolution of the raster. The zoom level
+is set such that the resolution of the highest zoom is at least the original
+resolution. This behavior can be changed by manually setting the highest zoom
+level.
+
+Asynchronous Parsing
+^^^^^^^^^^^^^^^^^^^^
+For most raster files, the creation of tiles takes several minutes or even
+hours to complete. It is therefore highly recommended to configure the django
+application with `Celery`__, to parse the rasters asynchronously. See also the
+:doc:`installation` docs.
+
+__ http://celeryproject.org
