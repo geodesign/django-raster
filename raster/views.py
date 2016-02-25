@@ -45,6 +45,29 @@ class RasterView(View):
             colormap = legend.colormap
         elif layer and hasattr(layer.legend, 'colormap'):
             colormap = layer.legend.colormap
+        elif layer:
+            # Construct a grayscale colormap from layer metadata
+            meta = layer.rasterlayerbandmetadata_set.first()
+
+            # Return if no metadata can be found to construct the colormap
+            if meta is None:
+                return
+
+            # Set the number of breaks to be used
+            nr_of_breaks = 7
+
+            # Compute bin width for a linear scaling
+            diff = (meta.max - meta.min) / 7
+
+            # Create colormap with seven breaks
+            colormap = {}
+            for i in range(nr_of_breaks):
+                if i == 0:
+                    expression = '({0} <= x) & (x <= {1})'
+                else:
+                    expression = '({0} < x) & (x <= {1})'
+                expression = expression.format(meta.min + diff * i, meta.min + diff * (i + 1))
+                colormap[expression] = [(255 / (nr_of_breaks - 1)) * i] * 3 + [255, ]
         else:
             return
 

@@ -1,6 +1,5 @@
-from unittest import skipIf
+from unittest import skip
 
-from django.utils import version
 from tests.raster_testcase import RasterTestCase
 
 
@@ -9,14 +8,14 @@ class RasterLayerBandHistogram(RasterTestCase):
     def test_histogram_creation(self):
         self.assertEqual(self.rasterlayer.rasterlayerbandmetadata_set.count(), 1)
 
-    @skipIf(version.get_version() >= '1.9', 'Fails on current release -- Refs #25734.')
+    @skip('Fails on current release -- Refs #25734.')
     def test_histogram_values(self):
         self.assertEqual(
             self.rasterlayer.rasterlayerbandmetadata_set.first().hist_values,
             [21741.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 695.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 56.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 4131.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 31490.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1350.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2977.0]
         )
 
-    @skipIf(version.get_version() >= '1.9', 'Fails on current release -- Refs #25734.')
+    @skip('Fails on current release -- Refs #25734.')
     def test_histogram_bins(self):
         self.assertEqual(
             self.rasterlayer.rasterlayerbandmetadata_set.first().hist_bins,
