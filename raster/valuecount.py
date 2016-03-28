@@ -6,10 +6,10 @@ from django.contrib.gis.geos import MultiPolygon, Polygon
 from django.core.exceptions import ObjectDoesNotExist
 from raster.algebra.parser import FormulaParser, RasterAlgebraParser
 from raster.exceptions import RasterAggregationException
-from raster.models import Legend, RasterLayer, RasterTile
+from raster.models import Legend, RasterLayer
 from raster.rasterize import rasterize
 from raster.tiles.const import WEB_MERCATOR_SRID
-from raster.tiles.utils import tile_index_range
+from raster.tiles.utils import get_raster_tile, tile_index_range
 
 
 class Aggregator(object):
@@ -102,14 +102,9 @@ class Aggregator(object):
                 # Prepare a data dictionary with named tiles for algebra evaluation
                 data = {}
                 for name, layerid in self.layer_dict.items():
-                    tile = RasterTile.objects.filter(
-                        tilex=tilex,
-                        tiley=tiley,
-                        tilez=self.zoom,
-                        rasterlayer_id=layerid
-                    ).first()
+                    tile = get_raster_tile(layerid, self.zoom, tilex, tiley)
                     if tile:
-                        data[name] = tile.rast
+                        data[name] = tile
                     else:
                         break
 
@@ -244,7 +239,7 @@ class Aggregator(object):
                         selector = result_data.compressed() == float(key)
                     except ValueError:
                         # Otherwise use it as numpy expression directly
-                        selector = formula_parser.evaluate({'x': result_data}, key)
+                        selector = formula_parser.evaluate({'x': result_data.compressed()}, key)
                     values[key] = numpy.sum(selector)
 
             # Add counts to results
