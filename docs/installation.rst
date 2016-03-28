@@ -45,7 +45,4 @@ to your project's settings to tell django-raster to use it::
 
     RASTER_USE_CELERY = True
 
-For additional customization of django-raster, consult the :doc:`settings`
-section.
-
 .. _Celery: http://celeryproject.org
