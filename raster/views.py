@@ -3,7 +3,6 @@ import json
 import numpy
 from PIL import Image
 
-from django.conf import settings
 from django.db.models import Q
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
@@ -12,9 +11,9 @@ from django.views.generic import View
 from raster.algebra.parser import RasterAlgebraParser
 from raster.const import IMG_FORMATS
 from raster.exceptions import RasterAlgebraException
-from raster.models import Legend, RasterLayer, RasterTile
+from raster.models import Legend, RasterLayer
 from raster.tiles.const import WEB_MERCATOR_TILESIZE
-from raster.tiles.utils import tile_bounds, tile_scale
+from raster.tiles.utils import get_raster_tile
 from raster.utils import band_data_to_image, hex_to_rgba
 
 
@@ -103,45 +102,11 @@ class RasterView(View):
         level tiles are searched and warped to lower level if found.
         """
         # Get tile indices from request
+        tilez = int(self.kwargs.get('z'))
         tilex = int(self.kwargs.get('x'))
         tiley = int(self.kwargs.get('y'))
-        tilez = int(self.kwargs.get('z'))
 
-        # Loop through zoom levels to search for a tile
-        result = None
-        for zoom in range(tilez, -1, -1):
-            # Compute multiplier to find parent raster
-            multiplier = 2 ** (tilez - zoom)
-            # Fetch tile
-            tile = RasterTile.objects.filter(
-                tilex=tilex / multiplier,
-                tiley=tiley / multiplier,
-                tilez=zoom,
-                rasterlayer_id=layer_id
-            )
-
-            if tile.exists():
-                # Extract raster from tile model
-                result = tile[0].rast
-                # If the tile is a parent of the original, warp it to the
-                # original request tile.
-                if zoom < tilez:
-                    # Compute bounds, scale and size of child tile
-                    bounds = tile_bounds(tilex, tiley, tilez)
-                    tilesize = int(getattr(settings, 'RASTER_TILESIZE', WEB_MERCATOR_TILESIZE))
-                    tilescale = tile_scale(tilez)
-
-                    # Warp parent tile to child tile
-                    result = result.warp({
-                        'width': tilesize,
-                        'height': tilesize,
-                        'scale': [tilescale, -tilescale],
-                        'origin': [bounds[0], bounds[3]],
-                    })
-
-                break
-
-        return result
+        return get_raster_tile(layer_id, tilez, tilex, tiley)
 
     def get_layer(self):
         """
