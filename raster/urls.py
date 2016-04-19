@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.conf.urls import url
 from django.views.decorators.cache import cache_page
-from raster.views import AlgebraView, LegendView, TmsView
+from raster.views import AlgebraView, ExportView, LegendView, TmsView
 
 if hasattr(settings, 'RASTER_TILE_CACHE_TIMEOUT'):
     cache_timeout = settings.RASTER_TILE_CACHE_TIMEOUT
@@ -29,5 +29,12 @@ urlpatterns = [
         r'^legend(?:/(?P<legend_id>[^/]+))?/$',
         cache_page(cache_timeout)(LegendView.as_view()),
         name='legend'
+    ),
+
+    # Exporter endpoing
+    url(
+        r'^export$',
+        cache_page(cache_timeout)(ExportView.as_view()),
+        name='export'
     ),
 ]

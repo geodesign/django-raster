@@ -1,19 +1,25 @@
 import json
+import zipfile
+from datetime import datetime
+from tempfile import NamedTemporaryFile
 
 import numpy
 from PIL import Image
 
+from django.conf import settings
+from django.contrib.gis.gdal import GDALRaster
 from django.db.models import Q
-from django.http import Http404, HttpResponse
+from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import six
 from django.views.generic import View
+from raster.algebra.const import ALGEBRA_PIXEL_TYPE_GDAL
 from raster.algebra.parser import RasterAlgebraParser
 from raster.const import IMG_FORMATS
 from raster.exceptions import RasterAlgebraException
 from raster.models import Legend, RasterLayer
-from raster.tiles.const import WEB_MERCATOR_TILESIZE
-from raster.tiles.utils import get_raster_tile
+from raster.tiles.const import WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE
+from raster.tiles.utils import get_raster_tile, tile_bounds, tile_index_range, tile_scale
 from raster.utils import band_data_to_image, hex_to_rgba
 
 
@@ -134,11 +140,9 @@ class AlgebraView(RasterView):
     A view to calculate map algebra on raster layers.
     """
 
-    def get(self, request, *args, **kwargs):
-        parser = RasterAlgebraParser()
-
+    def get_ids(self):
         # Get layer ids
-        ids = request.GET.get('layers', '').split(',')
+        ids = self.request.GET.get('layers', '').split(',')
 
         # Check if layer parameter is valid
         if not len(ids) or not all('=' in idx for idx in ids):
@@ -152,6 +156,14 @@ class AlgebraView(RasterView):
             ids = {idx[0]: int(idx[1]) for idx in ids}
         except ValueError:
             raise RasterAlgebraException('Layer parameter is not valid.')
+
+        return ids
+
+    def get(self, request, *args, **kwargs):
+        parser = RasterAlgebraParser()
+
+        # Get layer ids
+        ids = self.get_ids()
 
         # Get raster data as 1D arrays and store in dict that can be used
         # for formula evaluation.
@@ -252,3 +264,106 @@ class LegendView(RasterView):
             legend = lyr.legend
 
         return HttpResponse(legend.json, content_type='application/json')
+
+
+class ExportView(AlgebraView):
+
+    def construct_raster(self, z, xmin, xmax, ymin, ymax):
+        bounds = []
+        for x in range(xmin, xmax + 1):
+            for y in range(ymin, ymax + 1):
+                bounds.append(tile_bounds(x, y, z))
+        bounds = [
+            min([bnd[0] for bnd in bounds]),
+            min([bnd[1] for bnd in bounds]),
+            max([bnd[2] for bnd in bounds]),
+            max([bnd[3] for bnd in bounds]),
+        ]
+        scale = tile_scale(z)
+        raster_workdir = getattr(settings, 'RASTER_WORKDIR', None)
+        self.exportfile = NamedTemporaryFile(dir=raster_workdir, suffix='.tif')
+        return GDALRaster({
+            'srid': WEB_MERCATOR_SRID,
+            'width': (xmax - xmin + 1) * WEB_MERCATOR_TILESIZE,
+            'height': (ymax - ymin + 1) * WEB_MERCATOR_TILESIZE,
+            'scale': (scale, -scale),
+            'origin': (bounds[0], bounds[3]),
+            'driver': 'tif',
+            'bands': [{'data': [0], 'nodata_value': 0}],
+            'name': self.exportfile.name,
+            'datatype': ALGEBRA_PIXEL_TYPE_GDAL,
+        })
+
+    def get_tile_range(self):
+        # Get raster layers
+        layers = RasterLayer.objects.filter(id__in=self.get_ids().values())
+        # Establish zoom level
+        zlevel = max([layer.metadata.max_zoom for layer in layers])
+        # Get list of tile ranges
+        layer_ranges = []
+        for layer in layers:
+            layer_ranges.append(tile_index_range(layer.extent(), zlevel))
+        # Estabish overlap of tile index ranges
+        return (
+            zlevel,
+            min([rng[0] for rng in layer_ranges]),
+            min([rng[1] for rng in layer_ranges]),
+            max([rng[2] for rng in layer_ranges]),
+            max([rng[3] for rng in layer_ranges]),
+        )
+
+    def get(self, request):
+        parser = RasterAlgebraParser()
+        # Get formula from request
+        formula = request.GET.get('formula')
+        # Get id list from request
+        ids = self.get_ids()
+        zoom, xmin, ymin, xmax, ymax = self.get_tile_range()
+        # Construct an empty raster with the output dimensions
+        result_raster = self.construct_raster(zoom, xmin, xmax, ymin, ymax)
+        target = result_raster.bands[0]
+        # Get raster data as 1D arrays and store in dict that can be used
+        # for formula evaluation.
+        for xindex, x in enumerate(range(xmin, xmax + 1)):
+            for yindex, y in enumerate(range(ymin, ymax + 1)):
+                data = {}
+                for name, layerid in ids.items():
+                    tile = get_raster_tile(layerid, zoom, x, y)
+                    if tile:
+                        data[name] = tile
+                # Ignore this tile if data is not found for all layers
+                if len(data) != len(ids):
+                    continue
+                # Evaluate raster algebra expression, return 400 if not successful
+                try:
+                    # Evaluate raster algebra expression
+                    tile_result = parser.evaluate_raster_algebra(data, formula)
+                except:
+                    raise RasterAlgebraException('Failed to evaluate raster algebra.')
+                # Update nodata value on target
+                target.nodata_value = tile_result.bands[0].nodata_value
+                # Update results raster with algebra
+                target.data(
+                    data=tile_result.bands[0].data(),
+                    size=(WEB_MERCATOR_TILESIZE, WEB_MERCATOR_TILESIZE),
+                    offset=(xindex * WEB_MERCATOR_TILESIZE, yindex * WEB_MERCATOR_TILESIZE),
+                )
+        # Create filename base with datetime stamp
+        filename_base = 'algebra_export_{0}'.format(datetime.now().strftime('%Y_%m_%d_%H_%M'))
+        # Compress resulting raster file into a zip archive
+        raster_workdir = getattr(settings, 'RASTER_WORKDIR', None)
+        dest = NamedTemporaryFile(dir=raster_workdir, suffix='.zip')
+        dest_zip = zipfile.ZipFile(dest.name, 'w', allowZip64=True)
+        dest_zip.write(
+            filename=self.exportfile.name,
+            arcname=filename_base + '.tif',
+            compress_type=zipfile.ZIP_DEFLATED,
+        )
+        dest_zip.close()
+        # Create file based response containing zip file and return for download
+        response = FileResponse(
+            open(dest.name, 'rb'),
+            content_type='application/zip'
+        )
+        response['Content-Disposition'] = 'attachment; filename="{0}"'.format(filename_base + '.zip')
+        return response
