@@ -8,6 +8,7 @@ from PIL import Image
 
 from django.conf import settings
 from django.contrib.gis.gdal import GDALRaster
+from django.contrib.gis.geos import Polygon
 from django.db.models import Q
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404
@@ -15,7 +16,7 @@ from django.utils import six
 from django.views.generic import View
 from raster.algebra.const import ALGEBRA_PIXEL_TYPE_GDAL
 from raster.algebra.parser import RasterAlgebraParser
-from raster.const import IMG_FORMATS
+from raster.const import EXPORT_MAX_PIXELS, IMG_FORMATS
 from raster.exceptions import RasterAlgebraException
 from raster.models import Legend, RasterLayer
 from raster.tiles.const import WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE
@@ -299,18 +300,25 @@ class ExportView(AlgebraView):
         layers = RasterLayer.objects.filter(id__in=self.get_ids().values())
         # Establish zoom level
         zlevel = max([layer.metadata.max_zoom for layer in layers])
-        # Get list of tile ranges
-        layer_ranges = []
-        for layer in layers:
-            layer_ranges.append(tile_index_range(layer.extent(), zlevel))
-        # Estabish overlap of tile index ranges
-        return (
-            zlevel,
-            min([rng[0] for rng in layer_ranges]),
-            min([rng[1] for rng in layer_ranges]),
-            max([rng[2] for rng in layer_ranges]),
-            max([rng[3] for rng in layer_ranges]),
-        )
+        # Use bounding box to compute tile range
+        if self.request.GET.get('bbox', None):
+            bbox = Polygon.from_bbox(self.request.GET.get('bbox').split(','))
+            bbox.srid = 4326
+            bbox.transform(WEB_MERCATOR_SRID)
+            tile_range = tile_index_range(bbox.extent, zlevel)
+        else:
+            # Get list of tile ranges
+            layer_ranges = []
+            for layer in layers:
+                layer_ranges.append(tile_index_range(layer.extent(), zlevel))
+            # Estabish overlap of tile index ranges
+            tile_range = [
+                min([rng[0] for rng in layer_ranges]),
+                min([rng[1] for rng in layer_ranges]),
+                max([rng[2] for rng in layer_ranges]),
+                max([rng[3] for rng in layer_ranges]),
+            ]
+        return [zlevel, ] + tile_range
 
     def get(self, request):
         parser = RasterAlgebraParser()
@@ -319,6 +327,8 @@ class ExportView(AlgebraView):
         # Get id list from request
         ids = self.get_ids()
         zoom, xmin, ymin, xmax, ymax = self.get_tile_range()
+        if 256 * (xmax - xmin) * 256 * (ymax - ymin) > EXPORT_MAX_PIXELS:
+            raise RasterAlgebraException('Export raster too large.')
         # Construct an empty raster with the output dimensions
         result_raster = self.construct_raster(zoom, xmin, xmax, ymin, ymax)
         target = result_raster.bands[0]
