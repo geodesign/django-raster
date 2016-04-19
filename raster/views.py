@@ -299,7 +299,11 @@ class ExportView(AlgebraView):
         # Get raster layers
         layers = RasterLayer.objects.filter(id__in=self.get_ids().values())
         # Establish zoom level
-        zlevel = max([layer.metadata.max_zoom for layer in layers])
+        if self.request.GET.get('zoom', None):
+            zlevel = int(self.request.GET.get('zoom'))
+        else:
+            # Get highest zoom level of all input layers
+            zlevel = max([layer.metadata.max_zoom for layer in layers])
         # Use bounding box to compute tile range
         if self.request.GET.get('bbox', None):
             bbox = Polygon.from_bbox(self.request.GET.get('bbox').split(','))
@@ -327,7 +331,7 @@ class ExportView(AlgebraView):
         # Get id list from request
         ids = self.get_ids()
         zoom, xmin, ymin, xmax, ymax = self.get_tile_range()
-        if 256 * (xmax - xmin) * 256 * (ymax - ymin) > EXPORT_MAX_PIXELS:
+        if WEB_MERCATOR_TILESIZE * (xmax - xmin) * WEB_MERCATOR_TILESIZE * (ymax - ymin) > EXPORT_MAX_PIXELS:
             raise RasterAlgebraException('Export raster too large.')
         # Construct an empty raster with the output dimensions
         result_raster = self.construct_raster(zoom, xmin, xmax, ymin, ymax)
