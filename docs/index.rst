@@ -7,10 +7,9 @@ PostGIS database backend. It is based on the Django internal raster data type
 
 The django-raster repository is hosted `on GitHub`__.
 
-__ https://docs.djangoproject.com/en/1.9/ref/contrib/gis/model-api/#rasterfield
-__ https://docs.djangoproject.com/en/1.9/ref/contrib/gis/gdal/#raster-data-objects
+__ https://docs.djangoproject.com/en/dev/ref/contrib/gis/model-api/#rasterfield
+__ https://docs.djangoproject.com/en/dev/ref/contrib/gis/gdal/#raster-data-objects
 __ https://github.com/geodesign/django-raster
-
 
 Contents
 --------
@@ -22,9 +21,9 @@ Contents
     introduction
     parser
     tms
-    algebra
     settings
-    ref/index
+
+.. Removed "algebra" and "ref/index" from toctree because they are incomplete.
 
 Indices and tables
 ------------------
