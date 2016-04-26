@@ -3,6 +3,7 @@ language: python
 python:
   - '2.7'
   - '3.4'
+  - '3.5'
 
 sudo: false
 
@@ -14,7 +15,7 @@ before_script:
   - psql -c 'create extension postgis' -U postgres -d raster_test
 
 install: 
-  - pip install Django==1.9.2
+  - pip install Django==1.9.5
   - pip install psycopg2==2.5.3
   - pip install celery==3.1.19
   - pip install numpy
