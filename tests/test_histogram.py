@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 from unittest import skip
 
 from tests.raster_testcase import RasterTestCase

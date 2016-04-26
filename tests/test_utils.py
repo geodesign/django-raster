@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 from django.test import TestCase
 from raster.exceptions import RasterException
 from raster.utils import hex_to_rgba

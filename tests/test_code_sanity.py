@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 from subprocess import PIPE, Popen
 
 from django.test import TestCase

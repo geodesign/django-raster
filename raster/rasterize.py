@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 from ctypes import POINTER, c_double, c_int, c_void_p
 
 import numpy

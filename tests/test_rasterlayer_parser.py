@@ -1,5 +1,6 @@
+from __future__ import unicode_literals
+
 import os
-from unittest import skipIf
 
 from django.core.files import File
 from django.test.utils import override_settings
@@ -62,12 +63,9 @@ class RasterLayerParserTests(RasterTestCase):
             tile = self.rasterlayer.rastertile_set.first()
             self.assertEqual(tile.rast.bands[0].nodata_value, 15)
 
-    @skipIf('TRAVIS' in os.environ, 'Exception not raised on travisci.')
     def test_parse_with_wrong_srid(self):
         with self.settings(MEDIA_ROOT=self.media_root):
             self.rasterlayer.srid = 4326
-            self.rasterlayer.parsestatus.status = self.rasterlayer.parsestatus.UNPARSED
-            self.rasterlayer.parsestatus.save()
             msg = 'Failed to compute max zoom. Check the SRID of the raster.'
             with self.assertRaisesMessage(RasterException, msg):
                 self.rasterlayer.save()

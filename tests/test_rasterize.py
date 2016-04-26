@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 from django.contrib.gis.gdal import GDALRaster, OGRGeometry
 from django.test import TestCase
 from raster.rasterize import rasterize

@@ -1,6 +1,8 @@
 """
 Settings for django-raster tests.
 """
+from __future__ import unicode_literals
+
 import os
 
 SECRET_KEY = 'testkey'

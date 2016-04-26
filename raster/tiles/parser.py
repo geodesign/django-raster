@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import datetime
 import fnmatch
 import os
@@ -130,7 +132,7 @@ class RasterLayerParser(object):
 
             # Override file internal srid if specified manually
             if self.rasterlayer.srid:
-                self.dataset.srid = self.rasterlayer.srid
+                self.dataset.srs = self.rasterlayer.srid
 
     def reproject_rasterfile(self):
         """
