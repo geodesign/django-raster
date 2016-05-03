@@ -27,11 +27,11 @@ class RasterAlgebraViewTests(RasterTestCase):
         # Response status is OK
         self.assertEqual(response.status_code, 200)
         # Create tempdir, extract result into it
-        tmpdir = mkdtemp()
+        self.tmpdir = mkdtemp()
         zf = ZipFile(io.BytesIO(b''.join(response.streaming_content)))
-        zf.extractall(tmpdir)
+        zf.extractall(self.tmpdir)
         # Open result as GDALRaster
-        rst = GDALRaster(os.path.join(tmpdir, zf.filelist[0].filename))
+        rst = GDALRaster(os.path.join(self.tmpdir, zf.filelist[0].filename))
         # Size is 512x512
         self.assertEqual(rst.width, 512)
         self.assertEqual(rst.height, 512)
@@ -50,3 +50,16 @@ class RasterAlgebraViewTests(RasterTestCase):
         response = self.client.get(url + '?layers=a={0}&formula=a&bbox=0,0,45,45'.format(self.rasterlayer.id))
         # Response status is OK
         self.assertEqual(response.status_code, 400)
+
+    def test_readme_content(self):
+        self.test_simple_export_request()
+        readme = open(os.path.join(self.tmpdir, "README.txt"), "r").read()
+        self.assertIn('Django Raster Algebra Export', readme)
+        self.assertIn('Zoom level: 11', readme)
+        self.assertIn('Layer {0}: Raster data (Formula label: a)'.format(self.rasterlayer.id), readme)
+        self.assertIn('Indexrange x: 552 - 553', readme)
+        self.assertIn('Indexrange y: 858 - 859', readme)
+        self.assertIn('Date:', readme)
+        self.assertIn('Formula: a', readme)
+        self.assertIn('BBox: No bbox provided, defaulted to maximum extent of input layers.', readme)
+        self.assertIn('Url:', readme)

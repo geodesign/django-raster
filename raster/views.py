@@ -272,6 +272,12 @@ class LegendView(RasterView):
 class ExportView(AlgebraView):
 
     def construct_raster(self, z, xmin, xmax, ymin, ymax):
+        """
+        Create an empty tif raster file on disk using the input tile range. The
+        new raster aligns with the xyz tile scheme and can be filled
+        sequentially with raster algebra results.
+        """
+        # Compute bounds and scale to construct raster.
         bounds = []
         for x in range(xmin, xmax + 1):
             for y in range(ymin, ymax + 1):
@@ -283,8 +289,10 @@ class ExportView(AlgebraView):
             max([bnd[3] for bnd in bounds]),
         ]
         scale = tile_scale(z)
+        # Create tempfile.
         raster_workdir = getattr(settings, 'RASTER_WORKDIR', None)
         self.exportfile = NamedTemporaryFile(dir=raster_workdir, suffix='.tif')
+        # Instantiate raster using the tempfile path.
         return GDALRaster({
             'srid': WEB_MERCATOR_SRID,
             'width': (xmax - xmin + 1) * WEB_MERCATOR_TILESIZE,
@@ -298,6 +306,11 @@ class ExportView(AlgebraView):
         })
 
     def get_tile_range(self):
+        """
+        Compute a xyz tile range from the query parameters. If no bbox
+        parameter is found, the range defaults to the maximum extent of
+        all input raster layers.
+        """
         # Get raster layers
         layers = RasterLayer.objects.filter(id__in=self.get_ids().values())
         # Establish zoom level
@@ -327,12 +340,30 @@ class ExportView(AlgebraView):
         return [zlevel, ] + tile_range
 
     def get(self, request):
+        # Initiate metadata object
+        metadata = {
+            'Date': datetime.now().strftime('%Y-%m-%d, %H:%M'),
+            'Url': request.get_full_path(),
+            'BBox': request.GET.get('bbox', 'No bbox provided, defaulted to maximum extent of input layers.'),
+            'Formula': request.GET.get('formula')
+        }
+        # Initiate algebra parser
         parser = RasterAlgebraParser()
         # Get formula from request
         formula = request.GET.get('formula')
         # Get id list from request
         ids = self.get_ids()
+        # Add layer names to metadata
+        for name, layerid in ids.items():
+            layer = RasterLayer.objects.get(id=layerid)
+            metadata['Layer ' + str(layerid)] = '{0} (Formula label: {1})'.format(layer.name, name)
+        # Compute tile index range
         zoom, xmin, ymin, xmax, ymax = self.get_tile_range()
+        # Add tile index range to metadata
+        metadata['Zoom level'] = str(zoom)
+        metadata['Indexrange x'] = '{} - {}'.format(xmin, xmax)
+        metadata['Indexrange y'] = '{} - {}'.format(ymin, ymax)
+        # Check maximum size of target raster in pixels
         if WEB_MERCATOR_TILESIZE * (xmax - xmin) * WEB_MERCATOR_TILESIZE * (ymax - ymin) > EXPORT_MAX_PIXELS:
             raise RasterAlgebraException('Export raster too large.')
         # Construct an empty raster with the output dimensions
@@ -375,6 +406,12 @@ class ExportView(AlgebraView):
             arcname=filename_base + '.tif',
             compress_type=zipfile.ZIP_DEFLATED,
         )
+        # Add metadata to the zip archive
+        readme = 'Django Raster Algebra Export\n----------------------------\n'
+        for key, val in metadata.items():
+            readme += key + ': ' + val + '\n'
+        dest_zip.writestr('README.txt', readme)
+        # Close zip file before returning
         dest_zip.close()
         # Create file based response containing zip file and return for download
         response = FileResponse(
