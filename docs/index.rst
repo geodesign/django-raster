@@ -21,6 +21,7 @@ Contents
     introduction
     parser
     tms
+    algebra
     settings
 
 .. Removed "algebra" and "ref/index" from toctree because they are incomplete.

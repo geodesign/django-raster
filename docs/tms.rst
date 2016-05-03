@@ -1,10 +1,10 @@
 ===============
 Rendering tiles
 ===============
-After creating a :class:`RaterLayer` through the admin, the tiles for that
-layer can be accessed through the tiles url. The raster urls have to be added
-to the application's url patterns. Here we assume that the `/raster/` base url
-is used as proposed in the :doc:`installation` section.
+After creating and parsing a :class:`RaterLayer`, the tiles for that layer can
+be accessed through the tiles url. The raster urls have to be added to the
+application's url patterns. Here we assume that the `/raster/` base url is used
+as proposed in the :doc:`installation` section.
 
 The tiles url is structured as follows,
 
@@ -21,17 +21,19 @@ returning a tile in png format of the layer with ID ``pk=23`` at zoom level
 __ http://openlayers.org/
 __ http://leafletjs.com/
 
-By default, the tiles are rendered using simple grayscale. legend used for the layer. However, the
-symbology can be changed by assigning a :class:`Legend` to the layer.
+By default, the tiles are rendered using simple grayscale. To apply a custom
+colormap, a  :class:`Legend` needs to be assigned to the layer. Raster layers
+have an optional foreign key to a Legend object, which can be set through the
+admin interface.
 
 Legends
 -------
 Legends are objects that are used to interpret raster data. This includes
 the cartographic information (colors), but also the semantics of the data
-(such as names). This information can be input through the admin interface.
+(such as names). Legends be created through the admin interface.
 
 A legend is stored as in the :class:`Legend` model, which is essentially a
-collection of :class:`LegendEntries` that each have an expression for
+collection of :class:`LegendEntry` that each have an expression for
 classifying the data and a semantic meaning of the expression. The semantics
 of the expression are stored in the :class:`LegendSemantics` model. Here is
 an example for a legend representing two temperatures::
@@ -46,17 +48,30 @@ an example for a legend representing two temperatures::
     >>> legend.json
     ... '[{"color": "#FFFFFF", "expression": "1", "name": "Earth"}]'
 
-The classification expression describes a section of the pixel values in the
-data. It is either an exact number for discrete rasters, or a formula for
-continuous rasters.
+Legend Entries
+^^^^^^^^^^^^^^
+:class:`LegendEntry` entries relate semantics and a color value with a range
+of pixel values. One entry has a foreign key to a :class:`LegendSemantics`
+object, a color in hex format and an expression.
 
+The expression is a classification of pixels. It describes a range of pixel
+values in the data. It is either an exact number for discrete rasters, or a
+formula for continuous rasters::
 
-:class:`Legend` objects are sets of cartographies that are used to interpret
-raster data in django-raster. The are composed of a set of
-:class:`LegendEntries` which in turn each have a :class:`LegendSemantics`
-attribute.
+    expression = "3"  # Matches all pixels with an exact value of 3
 
+For more complicated expressions, a logical expression can be specified through
+a formula. The variable ``x`` represents the pixel value in the formula. Here
+are some examples of valid formula expressions::
+    
+    # Match pixel values bigger than -3 and smaller or equal than 1
+    expression = "(-3.0 < x) & (x <= 1)"
+    # Match all pixels with values smaller or equal to one
+    expression = "x <= 1"
 
+Formula expressions are currenlty not validated on input. Wrongly specified
+formulas might lead to errors when rendering raster tiles. Check your formulas
+if unexpected errors happen on the TMS endpoints.
 
 Overriding the colormap and the legend
 ---------------------------------------
@@ -116,4 +131,3 @@ you can do so by using this url:
     /raster/tiles/{z}/{x}/{y}.png?colormap=%22%7B1%3A%20'%23FF0000'%2C%202%3A%20'%2300FF00'%2C%203%3A%20'%230000FF'%7D%22
 
 Colormap value is the URIEncoded version of the json stringifyed colormap object.
-

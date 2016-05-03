@@ -31,12 +31,14 @@ Limitations
 The main limitation of the django-raster package is that it is focused on
 single band rasters. For most of the functionality, only the first band in
 the raster is used. While the tile parser processes and stores all bands of
-the input rasters, for the TMS endpoints, currently only the first band is
-used.
+the input rasters, for the TMS endpoints and raster algebra calculations,
+currently only the first band is used.
 
 Another limitation is that the projection of the raster tiles is fixed to
-the web mercator projection (EPSG 3857). This is because a large part of 
-online mapping uses this projection, and especially TMS services.
+the `Web Mercator Projection (EPSG 3857)`__. This is because a large part of
+online mapping applications use this projection, especially TMS services.
+
+__ http://epsg.io/3857
 
 .. _RasterField: https://docs.djangoproject.com/en/1.9/ref/contrib/gis/model-api/#rasterfield
 .. _GDALRaster: https://docs.djangoproject.com/en/1.9/ref/contrib/gis/gdal/#raster-data-objects
