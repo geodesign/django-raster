@@ -339,13 +339,26 @@ class ExportView(AlgebraView):
             ]
         return [zlevel, ] + tile_range
 
+    def get_colormap_string(self):
+        # Try to get colormap
+        colormap = self.get_colormap()
+        # Return early if colormap was not specified
+        if not colormap:
+            return
+        # Set a simple header for this colormap
+        colorstr = '# Raster Algebra Colormap\nINTERPOLATION:DISCRETE\n'
+        # Add expressions and colors of the colormap
+        for key, val in colormap.items():
+            colorstr += str(key) + ',' + ','.join((str(x) for x in val[:3])) + ',None\n'
+        return colorstr
+
     def get(self, request):
         # Initiate metadata object
         metadata = {
             'Date': datetime.now().strftime('%Y-%m-%d, %H:%M'),
             'Url': request.get_full_path(),
             'BBox': request.GET.get('bbox', 'No bbox provided, defaulted to maximum extent of input layers.'),
-            'Formula': request.GET.get('formula')
+            'Formula': request.GET.get('formula'),
         }
         # Initiate algebra parser
         parser = RasterAlgebraParser()
@@ -411,6 +424,10 @@ class ExportView(AlgebraView):
         for key, val in metadata.items():
             readme += key + ': ' + val + '\n'
         dest_zip.writestr('README.txt', readme)
+        # Write colormap
+        colormap = self.get_colormap_string()
+        if colormap:
+            dest_zip.writestr('COLORMAP.txt', colormap)
         # Close zip file before returning
         dest_zip.close()
         # Create file based response containing zip file and return for download
