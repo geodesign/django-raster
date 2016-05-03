@@ -82,9 +82,9 @@ class RasterAlgebraViewTests(RasterTestCase):
         self.assertIn('Url: ' + reverse('export'), readme)
 
     def test_colormap(self):
-        response = self.get_export(colormap='{"%281.134e-23%20%3C%3D%20x%29%20%26%20%28x%20%3C%205.234%29": [1,2,3,0], "5.234%20%3C%20x": "%23FFFFFF"}')
+        response = self.get_export(colormap='{"%281.134e-23%20%3C%3D%20x%29%20%26%20%28x%20%3C%205.234%29": [1,2,3,23], "5.234%20%3C%20x": "%23FFFFFF"}')
         self.unzip_response(response)
         colormap = open(os.path.join(self.tmpdir, "COLORMAP.txt"), "r").read()
-        self.assertIn('1,2,3,None', colormap)
-        self.assertIn('255,255,255,None', colormap)
+        self.assertIn('1,2,3,23', colormap)
+        self.assertIn('255,255,255,255', colormap)
         self.assertIn('5.234', colormap)

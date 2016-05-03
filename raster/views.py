@@ -349,7 +349,7 @@ class ExportView(AlgebraView):
         colorstr = '# Raster Algebra Colormap\nINTERPOLATION:DISCRETE\n'
         # Add expressions and colors of the colormap
         for key, val in colormap.items():
-            colorstr += str(key) + ',' + ','.join((str(x) for x in val[:3])) + ',None\n'
+            colorstr += str(key) + ',' + ','.join((str(x) for x in val)) + ',' + str(key) + '\n'
         return colorstr
 
     def get(self, request):
