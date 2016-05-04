@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 
 import json
+import re
 import zipfile
 from datetime import datetime
 from tempfile import NamedTemporaryFile
@@ -14,11 +15,12 @@ from django.contrib.gis.geos import Polygon
 from django.db.models import Q
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404
+from django.template.defaultfilters import slugify
 from django.utils import six
 from django.views.generic import View
 from raster.algebra.const import ALGEBRA_PIXEL_TYPE_GDAL
 from raster.algebra.parser import RasterAlgebraParser
-from raster.const import EXPORT_MAX_PIXELS, IMG_FORMATS
+from raster.const import EXPORT_MAX_PIXELS, IMG_FORMATS, MAX_EXPORT_NAME_LENGTH, README_TEMPLATE
 from raster.exceptions import RasterAlgebraException
 from raster.models import Legend, RasterLayer
 from raster.tiles.const import WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE
@@ -339,7 +341,7 @@ class ExportView(AlgebraView):
             ]
         return [zlevel, ] + tile_range
 
-    def get_colormap_string(self):
+    def write_colormap(self, zfile):
         # Try to get colormap
         colormap = self.get_colormap()
         # Return early if colormap was not specified
@@ -350,34 +352,40 @@ class ExportView(AlgebraView):
         # Add expressions and colors of the colormap
         for key, val in colormap.items():
             colorstr += str(key) + ',' + ','.join((str(x) for x in val)) + ',' + str(key) + '\n'
-        return colorstr
+        # Write colormap file
+        zfile.writestr('COLORMAP.txt', colorstr)
 
-    def write_context_files(self, zfile):
-        # Initiate metadata object
-        metadata = {
-            'Date': datetime.now().strftime('%Y-%m-%d, %H:%M'),
-            'Url': self.request.get_full_path(),
-            'BBox': self.request.GET.get('bbox', 'No bbox provided, defaulted to maximum extent of input layers.'),
-            'Formula': self.request.GET.get('formula'),
-        }
-        # Add layer names to metadata
+    def write_readme(self, zfile):
+        # Get tile index range
+        zoom, xmin, ymin, xmax, ymax = self.get_tile_range()
+        # Construct layer names string
+        layerstr = ''
         for name, layerid in self.get_ids().items():
             layer = RasterLayer.objects.get(id=layerid)
-            metadata['Layer ' + str(layerid)] = '{0} (Formula label: {1})'.format(layer.name, name)
-        # Add tile index range to metadata
-        zoom, xmin, ymin, xmax, ymax = self.get_tile_range()
-        metadata['Zoom level'] = str(zoom)
-        metadata['Indexrange x'] = '{} - {}'.format(xmin, xmax)
-        metadata['Indexrange y'] = '{} - {}'.format(ymin, ymax)
-        # Add metadata to the zip archive
-        readme = 'Django Raster Algebra Export\n----------------------------\n'
-        for key, val in metadata.items():
-            readme += key + ': ' + val + '\n'
+            layerstr += '{layerid} "{name}" (Formula label: {label})\n'.format(
+                name=layer.name,
+                label=name,
+                layerid=layerid
+            )
+        # Get description, append newline if provided
+        description = self.request.GET.get('description', '')
+        if description:
+            description += '\n'
+        # Initiate metadata object
+        readmedata = {
+            'datetime': datetime.now().strftime('%Y-%m-%d at %H:%M'),
+            'url': self.request.build_absolute_uri(),
+            'bbox': self.request.GET.get('bbox', 'Minimum bounding-box covering all layers.'),
+            'formula': self.request.GET.get('formula'),
+            'zoom': str(zoom),
+            'xindexrange': '{} - {}'.format(xmin, xmax),
+            'yindexrange': '{} - {}'.format(ymin, ymax),
+            'layers': layerstr,
+            'description': description,
+        }
+        # Write readme file
+        readme = README_TEMPLATE.format(**readmedata)
         zfile.writestr('README.txt', readme)
-        # Write colormap
-        colormap = self.get_colormap_string()
-        if colormap:
-            zfile.writestr('COLORMAP.txt', colormap)
 
     def get(self, request):
         # Initiate algebra parser
@@ -421,7 +429,18 @@ class ExportView(AlgebraView):
                     offset=(xindex * WEB_MERCATOR_TILESIZE, yindex * WEB_MERCATOR_TILESIZE),
                 )
         # Create filename base with datetime stamp
-        filename_base = 'algebra_export_{0}'.format(datetime.now().strftime('%Y_%m_%d_%H_%M'))
+        filename_base = 'algebra_export'
+        # Add name slug to filename if provided
+        if request.GET.get('filename', ''):
+            # Sluggify name
+            slug = slugify(request.GET.get('filename'))
+            # Remove all unwanted characters
+            slug = "".join([c for c in slug if re.match(r'\w|\-', c)])
+            # Limit length of custom name slug
+            slug = slug[:MAX_EXPORT_NAME_LENGTH]
+            # Add name slug to filename base
+            filename_base += '_' + slug
+        filename_base += '_{0}'.format(datetime.now().strftime('%Y_%m_%d_%H_%M'))
         # Compress resulting raster file into a zip archive
         raster_workdir = getattr(settings, 'RASTER_WORKDIR', None)
         dest = NamedTemporaryFile(dir=raster_workdir, suffix='.zip')
@@ -432,7 +451,8 @@ class ExportView(AlgebraView):
             compress_type=zipfile.ZIP_DEFLATED,
         )
         # Write README.txt and COLORMAP.txt files to zip file
-        self.write_context_files(dest_zip)
+        self.write_readme(dest_zip)
+        self.write_colormap(dest_zip)
         # Close zip file before returning
         dest_zip.close()
         # Create file based response containing zip file and return for download

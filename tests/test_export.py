@@ -16,7 +16,7 @@ from tests.raster_testcase import RasterTestCase
 @override_settings(RASTER_TILE_CACHE_TIMEOUT=0)
 class RasterAlgebraViewTests(RasterTestCase):
 
-    def get_export(self, bbox=None, colormap=None):
+    def get_export(self, bbox=None, colormap=None, description=None, name=None):
         # Setup the Get export url
         url = reverse('export')
         # Request export for a simple algebra formula
@@ -25,6 +25,10 @@ class RasterAlgebraViewTests(RasterTestCase):
             url += '&bbox={0}'.format(bbox)
         if colormap:
             url += '&colormap={0}'.format(colormap)
+        if description:
+            url += '&description=' + description
+        if name:
+            url += '&filename=' + name
         # Request url and return response
         return self.client.get(url)
 
@@ -68,18 +72,18 @@ class RasterAlgebraViewTests(RasterTestCase):
         self.assertEqual(response.status_code, 400)
 
     def test_readme_content(self):
-        response = self.get_export()
+        response = self.get_export(description='Description%20with%20url%0Ahttp%3A//django-raster-example.org')
         self.unzip_response(response)
         readme = open(os.path.join(self.tmpdir, "README.txt"), "r").read()
         self.assertIn('Django Raster Algebra Export', readme)
         self.assertIn('Zoom level: 11', readme)
-        self.assertIn('Layer {0}: Raster data (Formula label: a)'.format(self.rasterlayer.id), readme)
-        self.assertIn('Indexrange x: 552 - 553', readme)
-        self.assertIn('Indexrange y: 858 - 859', readme)
-        self.assertIn('Date:', readme)
-        self.assertIn('Formula: a', readme)
-        self.assertIn('BBox: No bbox provided, defaulted to maximum extent of input layers.', readme)
-        self.assertIn('Url: ' + reverse('export'), readme)
+        self.assertIn('{0} "Raster data" (Formula label: a)'.format(self.rasterlayer.id), readme)
+        self.assertIn('Tile index range x: 552 - 553', readme)
+        self.assertIn('Tile index range y: 858 - 859', readme)
+        self.assertIn('\na\n', readme)
+        self.assertIn('Bounding-box: Minimum bounding-box covering all layers.', readme)
+        self.assertIn(reverse('export'), readme)
+        self.assertIn('Description with url\nhttp://django-raster-example.org', readme)
 
     def test_colormap(self):
         response = self.get_export(colormap='{"%281.134e-23%20%3C%3D%20x%29%20%26%20%28x%20%3C%205.234%29": [1,2,3,23], "5.234%20%3C%20x": "%23FFFFFF"}')
@@ -88,3 +92,10 @@ class RasterAlgebraViewTests(RasterTestCase):
         self.assertIn('1,2,3,23', colormap)
         self.assertIn('255,255,255,255', colormap)
         self.assertIn('5.234', colormap)
+
+    def test_export_custom_name(self):
+        response = self.get_export(name="model 23 (special edition 23.4)")
+        self.unzip_response(response)
+        expected_slug = 'algebra_export_model-23-special-edition-234'
+        match = (expected_slug in name for name in os.listdir(self.tmpdir))
+        self.assertTrue(any(match))
