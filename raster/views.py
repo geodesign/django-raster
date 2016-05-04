@@ -352,30 +352,42 @@ class ExportView(AlgebraView):
             colorstr += str(key) + ',' + ','.join((str(x) for x in val)) + ',' + str(key) + '\n'
         return colorstr
 
-    def get(self, request):
+    def write_context_files(self, zfile):
         # Initiate metadata object
         metadata = {
             'Date': datetime.now().strftime('%Y-%m-%d, %H:%M'),
-            'Url': request.get_full_path(),
-            'BBox': request.GET.get('bbox', 'No bbox provided, defaulted to maximum extent of input layers.'),
-            'Formula': request.GET.get('formula'),
+            'Url': self.request.get_full_path(),
+            'BBox': self.request.GET.get('bbox', 'No bbox provided, defaulted to maximum extent of input layers.'),
+            'Formula': self.request.GET.get('formula'),
         }
+        # Add layer names to metadata
+        for name, layerid in self.get_ids().items():
+            layer = RasterLayer.objects.get(id=layerid)
+            metadata['Layer ' + str(layerid)] = '{0} (Formula label: {1})'.format(layer.name, name)
+        # Add tile index range to metadata
+        zoom, xmin, ymin, xmax, ymax = self.get_tile_range()
+        metadata['Zoom level'] = str(zoom)
+        metadata['Indexrange x'] = '{} - {}'.format(xmin, xmax)
+        metadata['Indexrange y'] = '{} - {}'.format(ymin, ymax)
+        # Add metadata to the zip archive
+        readme = 'Django Raster Algebra Export\n----------------------------\n'
+        for key, val in metadata.items():
+            readme += key + ': ' + val + '\n'
+        zfile.writestr('README.txt', readme)
+        # Write colormap
+        colormap = self.get_colormap_string()
+        if colormap:
+            zfile.writestr('COLORMAP.txt', colormap)
+
+    def get(self, request):
         # Initiate algebra parser
         parser = RasterAlgebraParser()
         # Get formula from request
         formula = request.GET.get('formula')
         # Get id list from request
         ids = self.get_ids()
-        # Add layer names to metadata
-        for name, layerid in ids.items():
-            layer = RasterLayer.objects.get(id=layerid)
-            metadata['Layer ' + str(layerid)] = '{0} (Formula label: {1})'.format(layer.name, name)
         # Compute tile index range
         zoom, xmin, ymin, xmax, ymax = self.get_tile_range()
-        # Add tile index range to metadata
-        metadata['Zoom level'] = str(zoom)
-        metadata['Indexrange x'] = '{} - {}'.format(xmin, xmax)
-        metadata['Indexrange y'] = '{} - {}'.format(ymin, ymax)
         # Check maximum size of target raster in pixels
         if WEB_MERCATOR_TILESIZE * (xmax - xmin) * WEB_MERCATOR_TILESIZE * (ymax - ymin) > EXPORT_MAX_PIXELS:
             raise RasterAlgebraException('Export raster too large.')
@@ -419,15 +431,8 @@ class ExportView(AlgebraView):
             arcname=filename_base + '.tif',
             compress_type=zipfile.ZIP_DEFLATED,
         )
-        # Add metadata to the zip archive
-        readme = 'Django Raster Algebra Export\n----------------------------\n'
-        for key, val in metadata.items():
-            readme += key + ': ' + val + '\n'
-        dest_zip.writestr('README.txt', readme)
-        # Write colormap
-        colormap = self.get_colormap_string()
-        if colormap:
-            dest_zip.writestr('COLORMAP.txt', colormap)
+        # Write README.txt and COLORMAP.txt files to zip file
+        self.write_context_files(dest_zip)
         # Close zip file before returning
         dest_zip.close()
         # Create file based response containing zip file and return for download
