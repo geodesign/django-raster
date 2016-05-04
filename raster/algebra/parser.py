@@ -18,7 +18,25 @@ class FormulaParser(object):
     Deconstruct mathematical algebra expressions and convert those into
     callable funcitons.
 
-    Adopted from: http://pyparsing.wikispaces.com/file/view/fourFn.py
+
+    Deconstruct mathematical algebra expressions and convert those into
+    callable funcitons.
+
+    This formula parser was inspired by the fourFun pyparsing example and also
+    benefited from additional substantial contributions by Paul McGuire.
+    This module uses pyparsing for this purpose and the parser is adopted from
+    the `fourFun example`__.
+
+    Example usage::
+
+        >>> parser = FormulaParser()
+        >>> parser.set_formula('log(a * 3 + b)')
+        >>> parser.evaluate({'a': 5, 'b': 23})
+        ... 3.6375861597263857
+        >>> parser.evaluate({'a': [5, 6, 7], 'b': [23, 24, 25]})
+        ... array([ 3.63758616,  3.73766962,  3.8286414 ])
+
+    __ http://pyparsing.wikispaces.com/file/view/fourFn.py
     """
 
     def __init__(self):

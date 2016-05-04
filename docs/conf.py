@@ -18,10 +18,16 @@ import sys
 
 from recommonmark.parser import CommonMarkParser
 
+import django
+
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
+# Prepare Django
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
+django.setup()
 
 # -- General configuration ------------------------------------------------
 
@@ -36,6 +42,9 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
 ]
+
+# Default autodoc flags
+autodoc_default_flags = ['members']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

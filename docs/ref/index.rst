@@ -5,9 +5,10 @@ API Reference
 .. toctree::
    :maxdepth: 2
 
-   algebra/parser
+   algebra
+   const
+   tiles
    models
-   parser
    rasterize
    utils
    valuecount

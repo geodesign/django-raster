@@ -23,8 +23,9 @@ Contents
     tms
     algebra
     settings
+    ref/index
 
-.. Removed "algebra" and "ref/index" from toctree because they are incomplete.
+.. Removed "ref/index" from toctree because the reference is incomplete.
 
 Indices and tables
 ------------------

@@ -17,3 +17,5 @@ For use in javascript libraries such as leaflet or openlayers, the TMS enpoint f
         var layer = new L.tileLayer(/tiles/myraster.tif/{z}/{x}/{y}.png)
 
 By default, the TMS view is cached for 24 hours, to change the timeout of the cache use the ``RASTER_TILE_CACHE_TIMEOUT`` setting. To disable caching, set this timeout to 0.
+
+.. automodule:: raster.views

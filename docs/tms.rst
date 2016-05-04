@@ -26,6 +26,12 @@ colormap, a  :class:`Legend` needs to be assigned to the layer. Raster layers
 have an optional foreign key to a Legend object, which can be set through the
 admin interface.
 
+Caching
+-------
+All views of django-raster are cached for 24 hours by default. To change the
+timeout of the cache use the ``RASTER_TILE_CACHE_TIMEOUT`` setting. To disable
+caching, set this timeout to 0.
+
 Legends
 -------
 Legends are objects that are used to interpret raster data. This includes
@@ -63,7 +69,7 @@ formula for continuous rasters::
 For more complicated expressions, a logical expression can be specified through
 a formula. The variable ``x`` represents the pixel value in the formula. Here
 are some examples of valid formula expressions::
-    
+
     # Match pixel values bigger than -3 and smaller or equal than 1
     expression = "(-3.0 < x) & (x <= 1)"
     # Match all pixels with values smaller or equal to one

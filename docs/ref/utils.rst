@@ -1,3 +1,5 @@
 =====
 Utils
 =====
+
+.. automodule:: raster.utils

@@ -1,3 +1,4 @@
+============
 Installation
 ============
 Django-raster requires ``Django >= 1.9`` configured with a `PostGIS`__ backend

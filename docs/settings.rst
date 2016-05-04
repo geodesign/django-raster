@@ -1,3 +1,4 @@
+========
 Settings
 ========
 A list of available settings to customize django-raster's behavior.

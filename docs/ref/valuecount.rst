@@ -1,3 +1,5 @@
 ==========
 Valuecount
 ==========
+
+.. automodule:: raster.valuecount
