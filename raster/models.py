@@ -21,7 +21,7 @@ from raster.utils import hex_to_rgba
 
 class LegendSemantics(models.Model):
     """
-    Labels for pixel types (urban, forrest, warm, cold, etc)
+    Labels for pixel types (urban, forest, warm, cold, etc)
     """
     name = models.CharField(max_length=50)
     description = models.TextField(null=True, blank=True)
@@ -127,13 +127,16 @@ class RasterLayer(models.Model, ValueCountMixin):
         (CONTINUOUS, 'Continuous'),
         (CATEGORICAL, 'Categorical'),
         (MASK, 'Mask'),
-        (RANK_ORDERED, 'Rank Ordered')
+        (RANK_ORDERED, 'Rank Ordered'),
     )
 
     name = models.CharField(max_length=100, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     datatype = models.CharField(max_length=2, choices=DATATYPES, default='co')
     rasterfile = models.FileField(upload_to='rasters', null=True, blank=True)
+    source_url = models.URLField(default='', blank=True, max_length=2500,
+        help_text='External url to get the raster file from. If a value is set,'
+                  'the rasterfile field will be ignored.')
     nodata = models.CharField(max_length=100, null=True, blank=True,
         help_text='Leave blank to keep the internal band nodata values. If a nodata '
                   'value is specified here, it will be used for all bands of this raster.')
@@ -144,6 +147,17 @@ class RasterLayer(models.Model, ValueCountMixin):
         help_text='Leave blank to automatically determine the max zoom level '
                   'from the raster scale. Otherwise the raster parsed up to '
                   'the zoom level specified here.')
+    build_pyramid = models.BooleanField(default=True,
+        help_text='Should the tile pyramid be built? If unchecked, tiles will '
+                  'only be generated at the max zoom level.')
+    next_higher = models.BooleanField(default=True,
+        help_text='Compared to the scale of the rasterlayer, use the next-higher '
+                  'zoomlevel as max zoom? If unchecked, the next-lower zoom level '
+                  'is used. This flag is ignored if the max_zoom is manually '
+                  'specified.')
+    store_reprojected = models.BooleanField(default=True,
+        help_text='Should the reprojected raster be stored? If unchecked, the '
+                  'reprojected version of the raster is not stored.')
     legend = models.ForeignKey(Legend, blank=True, null=True)
     modified = models.DateTimeField(auto_now=True)
 
@@ -213,30 +227,38 @@ class RasterLayer(models.Model, ValueCountMixin):
         async = getattr(settings, 'RASTER_USE_CELERY', False)
 
         # Create array of all allowed zoom levels
-        zoom_range = range(GLOBAL_MAX_ZOOM_LEVEL + 1)
+        if self.build_pyramid:
+            zoom_range = range(GLOBAL_MAX_ZOOM_LEVEL + 1)
+        else:
+            if self.max_zoom is not None:
+                zoom_range = (self.max_zoom, )
+            else:
+                zoom_range = (self.metadata.max_zoom, )
 
         if async:
-            # Bundle the first five raster layers to one task, downloading is
-            # more costly than the parsing itself.
-            high_level_bundle = create_tiles.si(self, zoom_range[:5])
+            # Bundle the first five raster layers to one task. For low zoom
+            # levels, downloading is more costly than parsing.
+            create_tiles_chain = create_tiles.si(self, zoom_range[:5])
 
-            # Create a group of tasks with the middle level zoom levels that should
-            # be prioritized.
-            middle_level_group = group(
-                create_tiles.si(self, zoom) for zoom in zoom_range[5:10]
-            )
-            # Combine bundle and middle levels to priority group
-            priority_group = group(high_level_bundle, middle_level_group)
+            if len(zoom_range) > 5:
+                # Create a group of tasks with the middle zoom levels that are
+                # prioritized over high zoom levels.
+                middle_level_group = group(
+                    create_tiles.si(self, zoom) for zoom in zoom_range[5:10]
+                )
+                # Combine bundle and middle levels to priority group.
+                create_tiles_chain = group(create_tiles_chain, middle_level_group)
 
-            # Create a task group for high zoom levels
-            high_level_group = group(create_tiles.si(self, zoom) for zoom in zoom_range[10:])
+            if len(zoom_range) > 10:
+                # Create a task group for high zoom levels.
+                high_level_group = group(create_tiles.si(self, zoom) for zoom in zoom_range[10:])
+                create_tiles_chain = (create_tiles_chain | high_level_group)
 
             # Setup the parser logic as parsing chain
             parsing_task_chain = (
                 prepare_raster.si(self) |
                 clear_tiles.si(self) |
-                priority_group |
-                high_level_group |
+                create_tiles_chain |
                 send_success_signal.si(self)
             )
 
@@ -266,7 +288,9 @@ def reset_parse_log_if_data_changed(sender, instance, **kwargs):
         if (obj.rasterfile.name != instance.rasterfile.name or
                 obj.nodata != instance.nodata or
                 obj.max_zoom != instance.max_zoom or
-                obj.srid != instance.srid):
+                obj.srid != instance.srid or
+                obj.source_url != instance.source_url or
+                obj.build_pyramid != instance.build_pyramid):
             if hasattr(instance, 'reprojected'):
                 instance.reprojected.delete()
             instance.parsestatus.reset()
@@ -276,7 +300,7 @@ def reset_parse_log_if_data_changed(sender, instance, **kwargs):
 def parse_raster_layer_if_status_is_unparsed(sender, instance, created, **kwargs):
     RasterLayerMetadata.objects.get_or_create(rasterlayer=instance)
     status, created = RasterLayerParseStatus.objects.get_or_create(rasterlayer=instance)
-    if instance.rasterfile.name and status.status == status.UNPARSED:
+    if (instance.rasterfile.name or instance.source_url) and status.status == status.UNPARSED:
         instance.parse()
 
 

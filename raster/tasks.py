@@ -16,6 +16,7 @@ def create_tiles(rasterlayer, zoom):
     try:
         parser = RasterLayerParser(rasterlayer)
         parser.open_raster_file()
+        parser.reproject_rasterfile()
         parser.create_tiles(zoom)
     except:
         parser.log(
@@ -56,7 +57,6 @@ def prepare_raster(rasterlayer):
         parser.log('Started parsing raster.')
         parser.open_raster_file()
         parser.extract_metadata()
-        parser.reproject_rasterfile()
     except:
         parser.log(
             traceback.format_exc(),

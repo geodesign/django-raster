@@ -16,10 +16,12 @@ from django.contrib.gis.gdal.error import GDALException
 from django.core.files import File
 from django.db import connection
 from django.dispatch import Signal
+from django.utils.six.moves.urllib.parse import urlparse
+from django.utils.six.moves.urllib.request import urlretrieve
 from raster.exceptions import RasterException
 from raster.models import RasterLayerBandMetadata, RasterLayerReprojected, RasterTile
 from raster.tiles import utils
-from raster.tiles.const import BATCH_STEP_SIZE, WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE
+from raster.tiles.const import BATCH_STEP_SIZE, INTERMEDIATE_RASTER_FORMAT, WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE
 
 rasterlayers_parser_ended = Signal(providing_args=['instance'])
 
@@ -33,7 +35,6 @@ class RasterLayerParser(object):
 
         # Set raster tilesize
         self.tilesize = int(getattr(settings, 'RASTER_TILESIZE', WEB_MERCATOR_TILESIZE))
-        self.zoomdown = getattr(settings, 'RASTER_ZOOM_NEXT_HIGHER', True)
 
     def log(self, msg, status=None, zoom=None):
         """
@@ -71,36 +72,41 @@ class RasterLayerParser(object):
         storages.
         """
         reproj, created = RasterLayerReprojected.objects.get_or_create(rasterlayer=self.rasterlayer)
-
         # Check if the raster has already been reprojected
         has_reprojected = reproj.rasterfile.name not in (None, '')
-
-        # Choose source for raster data, use the reprojected version if it exists.
-        if has_reprojected:
-            rasterfile_source = reproj.rasterfile
-        else:
-            rasterfile_source = self.rasterlayer.rasterfile
 
         # Create workdir
         raster_workdir = getattr(settings, 'RASTER_WORKDIR', None)
         self.tmpdir = tempfile.mkdtemp(dir=raster_workdir)
 
-        # Copy raster file source to local folder
-        filepath = os.path.join(self.tmpdir, os.path.basename(rasterfile_source.name))
-        rasterfile = open(filepath, 'wb')
-        for chunk in rasterfile_source.chunks():
-            rasterfile.write(chunk)
-        rasterfile.close()
+        # Choose source for raster data, use the reprojected version if it exists.
+        if self.rasterlayer.source_url and not has_reprojected:
+            url_path = urlparse(self.rasterlayer.source_url).path
+            filename = url_path.split('/')[-1]
+            filepath = os.path.join(self.tmpdir, filename)
+            urlretrieve(self.rasterlayer.source_url, filepath)
+        else:
+            if has_reprojected:
+                rasterfile_source = reproj.rasterfile
+            else:
+                rasterfile_source = self.rasterlayer.rasterfile
+
+            # Copy raster file source to local folder
+            filepath = os.path.join(self.tmpdir, os.path.basename(rasterfile_source.name))
+            rasterfile = open(filepath, 'wb')
+            for chunk in rasterfile_source.chunks():
+                rasterfile.write(chunk)
+            rasterfile.close()
 
         # If the raster file is compressed, decompress it, otherwise try to
         # open the source file directly.
-        if os.path.splitext(rasterfile.name)[1].lower() == '.zip':
+        if os.path.splitext(filepath)[1].lower() == '.zip':
             # Open and extract zipfile
-            zf = zipfile.ZipFile(rasterfile.name)
+            zf = zipfile.ZipFile(filepath)
             zf.extractall(self.tmpdir)
 
             # Remove zipfile
-            os.remove(rasterfile.name)
+            os.remove(filepath)
 
             # Get filelist from directory
             matches = []
@@ -112,7 +118,7 @@ class RasterLayerParser(object):
             self.dataset = None
             for match in matches:
                 try:
-                    self.dataset = GDALRaster(match, write=True)
+                    self.dataset = GDALRaster(match)
                     break
                 except GDALException:
                     pass
@@ -121,48 +127,63 @@ class RasterLayerParser(object):
             if not self.dataset:
                 raise RasterException('Could not open rasterfile.')
         else:
-            self.dataset = GDALRaster(rasterfile.name, write=True)
+            self.dataset = GDALRaster(filepath)
 
-        # Set manual overrides
-        if not has_reprojected:
-            # Override nodata value if specified manually
-            if self.rasterlayer.nodata not in ('', None):
-                for band in self.dataset.bands:
-                    band.nodata_value = float(self.rasterlayer.nodata)
-
-            # Override file internal srid if specified manually
-            if self.rasterlayer.srid:
-                self.dataset.srs = self.rasterlayer.srid
+        # Override srid if provided
+        if self.rasterlayer.srid:
+            try:
+                self.dataset = GDALRaster(self.dataset.name, write=True)
+            except GDALException:
+                raise RasterException(
+                    'Could not override srid because the driver for this '
+                    'type of raster does not support write mode.'
+                )
+            self.dataset.srid = self.rasterlayer.srid
 
     def reproject_rasterfile(self):
         """
         Reproject the rasterfile into web mercator.
         """
-        # Do nothing if the raser already has the right projection
-        if self.dataset.srs.srid == WEB_MERCATOR_SRID:
+        # Do nothing if the raser already has the right projection and nodata value
+        if self.dataset.srs.srid == WEB_MERCATOR_SRID and self.rasterlayer.nodata in ('', None):
             return
 
-        self.log(
-            'Transforming raster to SRID {0}'.format(WEB_MERCATOR_SRID),
-            status=self.rasterlayer.parsestatus.REPROJECTING_RASTER
+        if not self.dataset.srs.srid == WEB_MERCATOR_SRID:
+            self.log(
+                'Transforming raster to SRID {0}'.format(WEB_MERCATOR_SRID),
+                status=self.rasterlayer.parsestatus.REPROJECTING_RASTER,
+            )
+
+        # Reproject the dataset.
+        self.dataset = self.dataset.transform(
+            WEB_MERCATOR_SRID,
+            driver=INTERMEDIATE_RASTER_FORMAT,
         )
 
-        # Reproject the dataset
-        self.dataset = self.dataset.transform(WEB_MERCATOR_SRID)
+        # Manually override nodata value if neccessary
+        if self.rasterlayer.nodata not in ('', None):
+            self.log(
+                'Setting no data values to {0}.'.format(self.rasterlayer.nodata),
+                status=self.rasterlayer.parsestatus.REPROJECTING_RASTER,
+            )
+            for band in self.dataset.bands:
+                band.nodata_value = float(self.rasterlayer.nodata)
 
         # Compress reprojected raster file and store it
-        dest = tempfile.NamedTemporaryFile(dir=self.tmpdir, suffix='.zip')
-        dest_zip = zipfile.ZipFile(dest.name, 'w', allowZip64=True)
-        dest_zip.write(
-            filename=self.dataset.name,
-            arcname=os.path.basename(self.dataset.name),
-            compress_type=zipfile.ZIP_DEFLATED,
-        )
-        dest_zip.close()
+        if self.rasterlayer.store_reprojected:
+            dest = tempfile.NamedTemporaryFile(dir=self.tmpdir, suffix='.zip')
+            dest_zip = zipfile.ZipFile(dest.name, 'w', allowZip64=True)
+            dest_zip.write(
+                filename=self.dataset.name,
+                arcname=os.path.basename(self.dataset.name),
+                compress_type=zipfile.ZIP_DEFLATED,
+            )
+            dest_zip.close()
 
-        # Store zip file in reprojected raster model
-        self.rasterlayer.reprojected.rasterfile = File(open(dest_zip.filename, 'rb'))
-        self.rasterlayer.reprojected.save()
+            # Store zip file in reprojected raster model
+            self.rasterlayer.reprojected.rasterfile = File(open(dest_zip.filename, 'rb'))
+            self.rasterlayer.reprojected.save()
+
         self.log('Finished transforming raster.')
 
     def create_initial_histogram_buckets(self):
@@ -439,7 +460,7 @@ class RasterLayerParser(object):
         max_zoom = self.rasterlayer.metadata.max_zoom
 
         # Reduce max zoom by one if zoomdown flag was disabled
-        if not self.zoomdown:
+        if not self.rasterlayer.next_higher:
             max_zoom -= 1
 
         return max_zoom
