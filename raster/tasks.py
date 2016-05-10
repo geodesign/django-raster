@@ -15,6 +15,14 @@ def create_tiles(rasterlayer, zoom):
     """
     try:
         parser = RasterLayerParser(rasterlayer)
+        # Check if zoom level should be built
+        if isinstance(zoom, (int, float)):
+            if zoom > parser.max_zoom:
+                return
+        else:
+            zoom = [zl for zl in zoom if zl <= parser.max_zoom]
+            if not len(zoom):
+                return
         parser.open_raster_file()
         parser.reproject_rasterfile()
         parser.create_tiles(zoom)
@@ -25,7 +33,8 @@ def create_tiles(rasterlayer, zoom):
         )
         raise
     finally:
-        shutil.rmtree(parser.tmpdir)
+        if hasattr(parser, 'tmpdir'):
+            shutil.rmtree(parser.tmpdir)
 
 
 @task

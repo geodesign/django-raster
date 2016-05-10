@@ -145,7 +145,9 @@ class RasterLayerParser(object):
         Reproject the rasterfile into web mercator.
         """
         # Do nothing if the raser already has the right projection and nodata value
-        if self.dataset.srs.srid == WEB_MERCATOR_SRID and self.rasterlayer.nodata in ('', None):
+        if hasattr(self.rasterlayer, 'reprojected') and self.rasterlayer.reprojected.rasterfile.name:
+            return
+        elif self.dataset.srs.srid == WEB_MERCATOR_SRID and self.rasterlayer.nodata in ('', None):
             return
 
         if not self.dataset.srs.srid == WEB_MERCATOR_SRID:

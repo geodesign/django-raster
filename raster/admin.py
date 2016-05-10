@@ -96,8 +96,8 @@ class RasterLayerModelAdmin(admin.ModelAdmin):
         """
         for rasterlayer in queryset:
             rasterlayer.parsestatus.reset()
+            rasterlayer.refresh_from_db()
             rasterlayer.save()
-
         msg = 'Parsing Rasters, check parse logs for progress'
         self.message_user(request, msg)
 
