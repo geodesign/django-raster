@@ -4,8 +4,11 @@ import os
 from unittest import skipIf
 
 from django.core.files import File
+from django.test import TestCase
 from django.test.utils import override_settings
 from raster.exceptions import RasterException
+from raster.models import RasterLayer
+from raster.tasks import parse
 from tests.raster_testcase import RasterTestCase
 
 
@@ -105,3 +108,11 @@ class RasterLayerParserWithoutCeleryTests(RasterTestCase):
 
     def test_raster_layer_parsing_without_celery(self):
         self.assertEqual(self.rasterlayer.rastertile_set.count(), 9 + 4 + 6 * 1)
+
+
+class RasterParserWithoutDataTests(TestCase):
+
+    def test_no_max_zoom(self):
+        layer = RasterLayer.objects.create(name='No max zoom', build_pyramid=False)
+        parse(layer)
+        self.assertIn('Could not determine max zoom level, aborting prasing.', layer.parsestatus.log)

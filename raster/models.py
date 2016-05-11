@@ -4,10 +4,8 @@ import json
 import math
 
 import numpy
-from celery import group
 from colorful.fields import RGBColorField
 
-from django.conf import settings
 from django.contrib.gis.db import models
 from django.contrib.gis.gdal import Envelope, OGRGeometry, SpatialReference
 from django.contrib.postgres.fields import ArrayField
@@ -15,7 +13,7 @@ from django.db.models import Max, Min
 from django.db.models.signals import m2m_changed, post_save, pre_save
 from django.dispatch import receiver
 from raster.mixins import ValueCountMixin
-from raster.tiles.const import GLOBAL_MAX_ZOOM_LEVEL, WEB_MERCATOR_SRID
+from raster.tiles.const import WEB_MERCATOR_SRID
 from raster.utils import hex_to_rgba
 
 
@@ -216,64 +214,6 @@ class RasterLayer(models.Model, ValueCountMixin):
             Min('tilex'), Max('tilex'), Min('tiley'), Max('tiley')
         )
 
-    def parse(self):
-        """
-        Parse raster layer to extract metadata and create tiles.
-        """
-        from raster.tasks import prepare_raster, create_tiles, clear_tiles, send_success_signal
-        from raster.tiles.parser import RasterLayerParser
-
-        # Check if parsing should happen asynchronously
-        async = getattr(settings, 'RASTER_USE_CELERY', False)
-
-        # Create array of all allowed zoom levels
-        if self.build_pyramid:
-            zoom_range = range(GLOBAL_MAX_ZOOM_LEVEL + 1)
-        else:
-            if self.max_zoom is not None:
-                zoom_range = (self.max_zoom, )
-            else:
-                zoom_range = (self.metadata.max_zoom, )
-
-        if async:
-            # Bundle the first five raster layers to one task. For low zoom
-            # levels, downloading is more costly than parsing.
-            create_tiles_chain = create_tiles.si(self, zoom_range[:5])
-
-            if len(zoom_range) > 5:
-                # Create a group of tasks with the middle zoom levels that are
-                # prioritized over high zoom levels.
-                middle_level_group = group(
-                    create_tiles.si(self, zoom) for zoom in zoom_range[5:10]
-                )
-                # Combine bundle and middle levels to priority group.
-                create_tiles_chain = group(create_tiles_chain, middle_level_group)
-
-            if len(zoom_range) > 10:
-                # Create a task group for high zoom levels.
-                high_level_group = group(create_tiles.si(self, zoom) for zoom in zoom_range[10:])
-                create_tiles_chain = (create_tiles_chain | high_level_group)
-
-            # Setup the parser logic as parsing chain
-            parsing_task_chain = (
-                prepare_raster.si(self) |
-                clear_tiles.si(self) |
-                create_tiles_chain |
-                send_success_signal.si(self)
-            )
-
-            # Apply the parsing chain
-            parsing_task_chain.apply_async()
-
-            parser = RasterLayerParser(self)
-            parser.log('Parse task queued, waiting for worker availability.')
-        else:
-            prepare_raster(self)
-            clear_tiles(self)
-            for zoom in zoom_range:
-                create_tiles(self, zoom)
-            send_success_signal(self)
-
 
 @receiver(pre_save, sender=RasterLayer)
 def reset_parse_log_if_data_changed(sender, instance, **kwargs):
@@ -299,10 +239,11 @@ def reset_parse_log_if_data_changed(sender, instance, **kwargs):
 
 @receiver(post_save, sender=RasterLayer)
 def parse_raster_layer_if_status_is_unparsed(sender, instance, created, **kwargs):
+    from raster.tasks import parse
     RasterLayerMetadata.objects.get_or_create(rasterlayer=instance)
     status, created = RasterLayerParseStatus.objects.get_or_create(rasterlayer=instance)
     if (instance.rasterfile.name or instance.source_url) and status.status == status.UNPARSED:
-        instance.parse()
+        parse(instance)
 
 
 class RasterLayerReprojected(models.Model):
