@@ -16,7 +16,7 @@ setup(
         'celery>=3.1.19',
         'Pillow>=2.7.0',
         'django-colorful>=1.0.1',
-        'pyparsing>=2.0.3',
+        'pyparsing>=2.0.3,<=2.1.1',
     ],
     keywords=['django', 'raster', 'gis', 'gdal', 'celery', 'geo', 'spatial'],
     classifiers=[
