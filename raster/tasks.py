@@ -24,7 +24,9 @@ def create_tiles(rasterlayer, zoom, extract_metadata=False):
             parser.extract_metadata()
 
         # Check if zoom level should be built.
-        if isinstance(zoom, (int, float)):
+        if zoom is None:
+            zoom = parser.max_zoom
+        elif isinstance(zoom, (int, float)):
             if zoom > parser.max_zoom:
                 return
         else:
@@ -80,33 +82,34 @@ def parse(rasterlayer):
     else:
         if rasterlayer.max_zoom is not None:
             zoom_range = (rasterlayer.max_zoom, )
-        elif hasattr(rasterlayer, 'metadata') and rasterlayer.metadata.max_zoom is not None:
-            zoom_range = (rasterlayer.metadata.max_zoom, )
         else:
-            parser.log('Could not determine max zoom level, aborting prasing.')
-            return
+            zoom_range = None
 
     # Check if parsing should happen asynchronously
     async = getattr(settings, 'RASTER_USE_CELERY', False)
-
     if async:
-        # Bundle the first five raster layers to one task. For low zoom
-        # levels, downloading is more costly than parsing.
-        create_tiles_chain = create_tiles.si(rasterlayer, zoom_range[:5], True)
+        if zoom_range is not None:
+            create_tiles_chain = create_tiles.si(rasterlayer, zoom_range[:5], True)
 
-        if len(zoom_range) > 5:
-            # Create a group of tasks with the middle zoom levels that are
-            # prioritized over high zoom levels.
-            middle_level_group = group(
-                create_tiles.si(rasterlayer, zoom) for zoom in zoom_range[5:10]
-            )
-            # Combine bundle and middle levels to priority group.
-            create_tiles_chain = group(create_tiles_chain, middle_level_group)
+            # Bundle the first five raster layers to one task. For low zoom
+            # levels, downloading is more costly than parsing.
+            create_tiles_chain = create_tiles.si(rasterlayer, zoom_range[:5], True)
 
-        if len(zoom_range) > 10:
-            # Create a task group for high zoom levels.
-            high_level_group = group(create_tiles.si(rasterlayer, zoom) for zoom in zoom_range[10:])
-            create_tiles_chain = (create_tiles_chain | high_level_group)
+            if len(zoom_range) > 5:
+                # Create a group of tasks with the middle zoom levels that are
+                # prioritized over high zoom levels.
+                middle_level_group = group(
+                    create_tiles.si(rasterlayer, zoom) for zoom in zoom_range[5:10]
+                )
+                # Combine bundle and middle levels to priority group.
+                create_tiles_chain = group(create_tiles_chain, middle_level_group)
+
+            if len(zoom_range) > 10:
+                # Create a task group for high zoom levels.
+                high_level_group = group(create_tiles.si(rasterlayer, zoom) for zoom in zoom_range[10:])
+                create_tiles_chain = (create_tiles_chain | high_level_group)
+        else:
+            create_tiles_chain = create_tiles.si(rasterlayer, None, True)
 
         # Setup the parser logic as parsing chain
         parsing_task_chain = (

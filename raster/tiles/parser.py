@@ -91,6 +91,9 @@ class RasterLayerParser(object):
             else:
                 rasterfile_source = self.rasterlayer.rasterfile
 
+            if not rasterfile_source.name:
+                raise RasterException('No data source found. Provide a rasterfile or a source url.')
+
             # Copy raster file source to local folder
             filepath = os.path.join(self.tmpdir, os.path.basename(rasterfile_source.name))
             rasterfile = open(filepath, 'wb')
@@ -459,6 +462,8 @@ class RasterLayerParser(object):
             return self.rasterlayer.max_zoom
 
         # Get max zoom from metadata
+        if not hasattr(self.rasterlayer, 'metadata'):
+            raise RasterException('Could not determine max zoom level.')
         max_zoom = self.rasterlayer.metadata.max_zoom
 
         # Reduce max zoom by one if zoomdown flag was disabled

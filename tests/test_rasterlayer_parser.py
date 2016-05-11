@@ -91,6 +91,7 @@ class RasterLayerParserTests(RasterTestCase):
     def test_parse_without_building_pyramid(self):
         with self.settings(MEDIA_ROOT=self.media_root):
             self.rasterlayer.rastertile_set.all().delete()
+            self.rasterlayer.metadata.delete()
             self.rasterlayer.build_pyramid = False
             self.rasterlayer.save()
             self.assertEqual(self.rasterlayer.rastertile_set.filter(tilez=12).count(), 9)
@@ -110,7 +111,8 @@ class RasterLayerParserWithoutCeleryTests(RasterTestCase):
 
 class RasterParserWithoutDataTests(TestCase):
 
-    def test_no_max_zoom(self):
+    def test_no_raterfile(self):
         layer = RasterLayer.objects.create(name='No max zoom', build_pyramid=False)
-        parse(layer)
-        self.assertIn('Could not determine max zoom level, aborting prasing.', layer.parsestatus.log)
+        msg = 'No data source found. Provide a rasterfile or a source url.'
+        with self.assertRaisesMessage(RasterException, msg):
+            parse(layer)
