@@ -138,7 +138,7 @@ class RasterLayerParser(object):
                     'Could not override srid because the driver for this '
                     'type of raster does not support write mode.'
                 )
-            self.dataset.srid = self.rasterlayer.srid
+            self.dataset.srs = self.rasterlayer.srid
 
     def reproject_rasterfile(self):
         """

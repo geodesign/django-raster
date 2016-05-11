@@ -1,7 +1,6 @@
 from __future__ import unicode_literals
 
 import os
-from unittest import skipIf
 
 from django.core.files import File
 from django.test import TestCase
@@ -75,12 +74,11 @@ class RasterLayerParserTests(RasterTestCase):
             tile = self.rasterlayer.rastertile_set.first()
             self.assertEqual(tile.rast.bands[0].nodata_value, 15)
 
-    @skipIf(os.environ.get('CI', False), 'Assertion not raised on CI.')
     def test_parse_with_wrong_srid(self):
         with self.settings(MEDIA_ROOT=self.media_root):
-            self.rasterlayer.srid = 4326
             msg = 'Failed to compute max zoom. Check the SRID of the raster.'
             with self.assertRaisesMessage(RasterException, msg):
+                self.rasterlayer.srid = 4326
                 self.rasterlayer.save()
 
     def test_parse_with_source_url(self):
