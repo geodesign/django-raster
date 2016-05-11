@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 
 import io
 import os
+import shutil
 from tempfile import mkdtemp
 from zipfile import ZipFile
 
@@ -15,6 +16,11 @@ from tests.raster_testcase import RasterTestCase
 
 @override_settings(RASTER_TILE_CACHE_TIMEOUT=0)
 class RasterAlgebraViewTests(RasterTestCase):
+
+    def tearDown(self):
+        super(RasterAlgebraViewTests, self).tearDown()
+        if hasattr(self, 'tmpdir'):
+            shutil.rmtree(self.tmpdir)
 
     def get_export(self, bbox=None, colormap=None, description=None, name=None):
         # Setup the Get export url
