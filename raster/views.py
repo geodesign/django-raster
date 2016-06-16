@@ -397,7 +397,8 @@ class ExportView(AlgebraView):
         # Compute tile index range
         zoom, xmin, ymin, xmax, ymax = self.get_tile_range()
         # Check maximum size of target raster in pixels
-        if WEB_MERCATOR_TILESIZE * (xmax - xmin) * WEB_MERCATOR_TILESIZE * (ymax - ymin) > EXPORT_MAX_PIXELS:
+        max_pixels = getattr(settings, 'RASTER_EXPORT_MAX_PIXELS', EXPORT_MAX_PIXELS)
+        if WEB_MERCATOR_TILESIZE * (xmax - xmin) * WEB_MERCATOR_TILESIZE * (ymax - ymin) > max_pixels:
             raise RasterAlgebraException('Export raster too large.')
         # Construct an empty raster with the output dimensions
         result_raster = self.construct_raster(zoom, xmin, xmax, ymin, ymax)
