@@ -206,10 +206,15 @@ class RasterAlgebraParser(FormulaParser):
         if check_aligned:
             self.check_aligned(list(data.values()))
 
-        # Construct list of numpy arrays holding raster pixel data
+        # Construct list of numpy arrays holding raster pixel data, converting
+        # data to default number type. This is necessary because formula
+        # evaluation can lead to unexpected results. This could be
+        # differentiated in the future based on data types and formulas.
         data_arrays = {
-            key: numpy.ma.masked_values(rast.bands[0].data().ravel(), rast.bands[0].nodata_value)
-            for key, rast in data.items()
+            key: numpy.ma.masked_values(
+                rast.bands[0].data().ravel().astype(const.ALGEBRA_PIXEL_TYPE_NUMPY),
+                rast.bands[0].nodata_value
+            ) for key, rast in data.items()
         }
 
         # Evaluate formula on raster data
@@ -226,9 +231,6 @@ class RasterAlgebraParser(FormulaParser):
             result = result.filled()
         else:
             nodata = orig.bands[0].nodata_value
-
-        # Convert to default number type
-        result = result.astype(const.ALGEBRA_PIXEL_TYPE_NUMPY)
 
         # Return GDALRaster holding results
         return GDALRaster({
