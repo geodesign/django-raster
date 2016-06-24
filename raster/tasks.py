@@ -89,8 +89,6 @@ def parse(rasterlayer):
     async = getattr(settings, 'RASTER_USE_CELERY', False)
     if async:
         if zoom_range is not None:
-            create_tiles_chain = create_tiles.si(rasterlayer, zoom_range[:5], True)
-
             # Bundle the first five raster layers to one task. For low zoom
             # levels, downloading is more costly than parsing.
             create_tiles_chain = create_tiles.si(rasterlayer, zoom_range[:5], True)
@@ -102,7 +100,7 @@ def parse(rasterlayer):
                     create_tiles.si(rasterlayer, zoom) for zoom in zoom_range[5:10]
                 )
                 # Combine bundle and middle levels to priority group.
-                create_tiles_chain = group(create_tiles_chain, middle_level_group)
+                create_tiles_chain = (create_tiles_chain | middle_level_group)
 
             if len(zoom_range) > 10:
                 # Create a task group for high zoom levels.
