@@ -10,7 +10,7 @@ import numpy
 from django.core.files import File
 from django.core.urlresolvers import reverse
 from django.test import Client, TransactionTestCase
-from raster.models import Legend, LegendEntry, LegendSemantics, RasterLayer
+from raster.models import Legend, LegendEntry, LegendEntryOrder, LegendSemantics, RasterLayer
 
 
 class RasterTestCase(TransactionTestCase):
@@ -38,19 +38,21 @@ class RasterTestCase(TransactionTestCase):
 
         # Create legends
         leg = Legend.objects.create(title='MyLegend')
-        leg.entries.add(ent1)
+        LegendEntryOrder.objects.create(legend=leg, legendentry=ent1, code='1')
 
         self.legend = Legend.objects.create(title='Algebra Legend')
-        self.legend.entries.add(ent2, ent3)
+        LegendEntryOrder.objects.create(legend=self.legend, legendentry=ent2, code='1')
+        LegendEntryOrder.objects.create(legend=self.legend, legendentry=ent3, code='2')
 
         leg2 = Legend.objects.create(title='Other')
-        leg2.entries.add(ent4)
+        LegendEntryOrder.objects.create(legend=leg2, legendentry=ent4, code='1')
 
         leg3 = Legend.objects.create(title='Dual')
-        leg3.entries.add(ent5, ent6)
+        LegendEntryOrder.objects.create(legend=leg3, legendentry=ent5, code='1')
+        LegendEntryOrder.objects.create(legend=leg3, legendentry=ent6, code='2')
 
         leg_expression = Legend.objects.create(title='Legend with Expression')
-        leg_expression.entries.add(ent7)
+        LegendEntryOrder.objects.create(legend=leg_expression, legendentry=ent7, code='1')
         self.legend_with_expression = leg_expression
 
         # Create test raster layer

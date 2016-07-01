@@ -36,13 +36,13 @@ classifying the data and a semantic meaning of the expression. The semantics
 of the expression are stored in the :class:`LegendSemantics` model. Here is
 an example for a legend representing two temperatures::
 
-    >>> from raster.models import Legend, LegendEntry, LegendSemantics
+    >>> from raster.models import Legend, LegendEntry, LegendEntryOrder, LegendSemantics
     >>> hot_semantics = LegendSemantics.objects.create(name='Hot')
     >>> cold_semantics = LegendSemantics.objects.create(name='Cold')
     >>> hot_entry = LegendEntry.objects.create(semantics=cold, expression='0', color='#0000FF')
     >>> cold_entry = LegendEntry.objects.create(semantics=hot, expression='1', color='#FF0000')
     >>> legend = Legend.objects.create(title='Temperatures')
-    >>> legend.entries.add(entry)
+    >>> LegendEntryOrder.objects.create(legend=legend, legendentry=entry, code='1')
     >>> legend.json
     ... '[{"color": "#FFFFFF", "expression": "1", "name": "Earth"}]'
 

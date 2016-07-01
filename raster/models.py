@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 
 import json
 import math
+from operator import itemgetter
 
 import numpy
 from colorful.fields import RGBColorField
@@ -10,7 +11,7 @@ from django.contrib.gis.db import models
 from django.contrib.gis.gdal import Envelope, OGRGeometry, SpatialReference
 from django.contrib.postgres.fields import ArrayField
 from django.db.models import Max, Min
-from django.db.models.signals import m2m_changed, post_save, pre_save
+from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 from raster.mixins import ValueCountMixin
 from raster.tiles.const import WEB_MERCATOR_SRID
@@ -49,7 +50,7 @@ class Legend(models.Model):
     """
     title = models.CharField(max_length=200)
     description = models.TextField(null=True, blank=True)
-    entries = models.ManyToManyField(LegendEntry)
+    entries = models.ManyToManyField(LegendEntry, through='LegendEntryOrder')
     json = models.TextField(null=True, blank=True)
     modified = models.DateTimeField(auto_now=True)
 
@@ -58,12 +59,15 @@ class Legend(models.Model):
 
     def update_json(self):
         data = []
-        for val in self.entries.all():
+        for val in self.legendentryorder_set.prefetch_related('legendentry').all():
             data.append({
-                'name': val.semantics.name,
-                'expression': val.expression,
-                'color': val.color
+                'name': val.legendentry.semantics.name,
+                'expression': val.legendentry.expression,
+                'code': val.code,
+                'color': val.legendentry.color,
             })
+        # Sort data by name and code.
+        data = sorted(sorted(data, key=itemgetter('name')), key=itemgetter('code'))
         self.json = json.dumps(data)
 
     @property
@@ -80,15 +84,29 @@ class Legend(models.Model):
         super(Legend, self).save(*args, **kwargs)
 
 
-def legend_entries_changed(sender, instance, action, **kwargs):
+class LegendEntryOrder(models.Model):
+    """
+    Order and hierarchy of entries in legend.
+    """
+    legend = models.ForeignKey(Legend)
+    legendentry = models.ForeignKey(LegendEntry)
+    code = models.CharField(max_length=100, blank=True, default='')
+
+    class Meta:
+        unique_together = ('legend', 'legendentry')
+
+    def __str__(self):
+        return '%s' % self.id
+
+
+@receiver(post_save, sender=LegendEntryOrder)
+@receiver(post_delete, sender=LegendEntryOrder)
+def legend_entries_changed(sender, instance, **kwargs):
     """
     Updates style json upon adding or removing legend entries.
     """
-    if action in ('post_add', 'post_remove'):
-        instance.update_json()
-        instance.save()
-
-m2m_changed.connect(legend_entries_changed, sender=Legend.entries.through)
+    instance.legend.update_json()
+    instance.legend.save()
 
 
 @receiver(post_save, sender=LegendEntry)
