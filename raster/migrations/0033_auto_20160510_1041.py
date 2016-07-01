@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='rasterlayer',
             name='build_pyramid',
-            field=models.BooleanField(default=True, help_text='Shoud the tile pyramid be built? If unchecked, tiles will only be generated at the max zoom level.'),
+            field=models.BooleanField(default=True, help_text='Should the tile pyramid be built? If unchecked, tiles will only be generated at the max zoom level.'),
         ),
         migrations.AddField(
             model_name='rasterlayer',
@@ -30,6 +30,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='rasterlayer',
             name='store_reprojected',
-            field=models.BooleanField(default=True, help_text='Shoudl the reprojected raster be stored? If unchecked, the reprojected version of the raster is not stored.'),
+            field=models.BooleanField(default=True, help_text='Should the reprojected raster be stored? If unchecked, the reprojected version of the raster is not stored.'),
         ),
     ]
