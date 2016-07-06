@@ -151,11 +151,16 @@ class RasterLayerParser(object):
         if hasattr(self.rasterlayer, 'reprojected') and self.rasterlayer.reprojected.rasterfile.name:
             return
 
-        # Return if the raser already has the right projection and nodata value is acceptable.
+        # Return if the raster already has the right projection
+        # and nodata value is acceptable.
         if self.dataset.srs.srid == WEB_MERCATOR_SRID:
+            # SRID was not manually specified.
             if self.rasterlayer.nodata in ('', None):
                 return
-            if all([self.rasterlayer.nodata == band.nodata_value for band in self.rasterlayer.bands]):
+            # All bands from dataset already have the same nodata value as the
+            # one that was manually specified.
+            if all([self.rasterlayer.nodata == band.nodata_value
+                    for band in self.dataset.bands]):
                 return
         else:
             # Log projection change if original raster is not in web mercator.

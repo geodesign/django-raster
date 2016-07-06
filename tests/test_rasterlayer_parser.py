@@ -2,12 +2,13 @@ from __future__ import unicode_literals
 
 import os
 
+from django.contrib.gis.gdal import GDALRaster
 from django.core.files import File
-from django.test import TestCase
 from django.test.utils import override_settings
 from raster.exceptions import RasterException
 from raster.models import RasterLayer
 from raster.tasks import parse
+from raster.tiles.const import WEB_MERCATOR_SRID
 from tests.raster_testcase import RasterTestCase
 
 
@@ -101,18 +102,37 @@ class RasterLayerParserTests(RasterTestCase):
             self.assertEqual(self.rasterlayer.rastertile_set.filter(tilez=11).count(), 4)
             self.assertEqual(self.rasterlayer.rastertile_set.exclude(tilez=11).count(), 0)
 
+    def test_no_rasterfile(self):
+        layer = RasterLayer.objects.create(name='No max zoom', build_pyramid=False)
+        msg = 'No data source found. Provide a rasterfile or a source url.'
+        with self.assertRaisesMessage(RasterException, msg):
+            parse(layer)
+
+    def test_manual_nodata_override_matches_input_layer(self):
+        with self.settings(MEDIA_ROOT=self.media_root):
+            filepath = os.path.join(self.media_root, 'testraster.tif')
+            GDALRaster({
+                'name': filepath,
+                'driver': 'tif',
+                'width': 3,
+                'height': 3,
+                'origin': (-5e4, 5e4),
+                'scale': [100, -100],
+                'srid': WEB_MERCATOR_SRID,
+                'bands': [
+                    {'nodata_value': 0, 'data': range(9)},
+                ],
+            })
+            rasterlayer = RasterLayer.objects.create(
+                rasterfile=filepath,
+                name='Raster data',
+                nodata=0,
+            )
+            self.assertEqual(rasterlayer.rastertile_set.count(), 4)
+
 
 @override_settings(RASTER_TILESIZE=100, RASTER_USE_CELERY=False)
 class RasterLayerParserWithoutCeleryTests(RasterTestCase):
 
     def test_raster_layer_parsing_without_celery(self):
         self.assertEqual(self.rasterlayer.rastertile_set.count(), 9 + 4 + 6 * 1)
-
-
-class RasterParserWithoutDataTests(TestCase):
-
-    def test_no_raterfile(self):
-        layer = RasterLayer.objects.create(name='No max zoom', build_pyramid=False)
-        msg = 'No data source found. Provide a rasterfile or a source url.'
-        with self.assertRaisesMessage(RasterException, msg):
-            parse(layer)
