@@ -65,7 +65,6 @@ def send_success_signal(rasterlayer):
     Drop empty tiles of a raster layer and send parse succes signal.
     """
     parser = RasterLayerParser(rasterlayer)
-    parser.drop_empty_tiles()
     parser.send_success_signal()
 
 

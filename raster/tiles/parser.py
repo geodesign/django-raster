@@ -14,7 +14,6 @@ from django.conf import settings
 from django.contrib.gis.gdal import GDALRaster, OGRGeometry
 from django.contrib.gis.gdal.error import GDALException
 from django.core.files import File
-from django.db import connection
 from django.dispatch import Signal
 from django.utils.six.moves.urllib.parse import urlparse
 from django.utils.six.moves.urllib.request import urlretrieve
@@ -351,6 +350,10 @@ class RasterLayerParser(object):
                     } for band in snapped_dataset.bands
                 ]
 
+                # Ignore tile if its only nodata.
+                if all([numpy.all(dat['data'] == dat['nodata_value']) for dat in band_data]):
+                    continue
+
                 # Add tile data to histogram
                 if zoom == self.max_zoom:
                     self.push_histogram(band_data)
@@ -404,27 +407,6 @@ class RasterLayerParser(object):
         self.log('Clearing all existing tiles.')
         self.rasterlayer.rastertile_set.all().delete()
         self.log('Finished clearing existing tiles.')
-
-    def drop_empty_tiles(self):
-        """
-        Remove rasters that are only no-data from the current rasterlayer.
-        """
-        self.log(
-            'Dropping empty raster tiles.',
-            status=self.rasterlayer.parsestatus.DROPPING_EMPTY_TILES
-        )
-
-        # Setup SQL command
-        sql = (
-            "DELETE FROM raster_rastertile "
-            "WHERE ST_Count(rast)=0 "
-            "AND rasterlayer_id={0}"
-        ).format(self.rasterlayer.id)
-
-        # Run SQL to drop empty tiles
-        cursor = connection.cursor()
-        cursor.execute(sql)
-        self.log('Finished dropping empty raster tiles.')
 
     def send_success_signal(self):
         """
