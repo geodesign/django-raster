@@ -16,43 +16,50 @@ from django.db.models import Q
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.template.defaultfilters import slugify
-from django.utils import six
 from django.views.generic import View
 from raster.algebra.const import ALGEBRA_PIXEL_TYPE_GDAL
 from raster.algebra.parser import RasterAlgebraParser
 from raster.const import DEFAULT_LEGEND_BREAKS, EXPORT_MAX_PIXELS, IMG_FORMATS, MAX_EXPORT_NAME_LENGTH, README_TEMPLATE
 from raster.exceptions import RasterAlgebraException
 from raster.models import Legend, RasterLayer
+from raster.shortcuts import get_session_colormap
 from raster.tiles.const import WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE
 from raster.tiles.utils import get_raster_tile, tile_bounds, tile_index_range, tile_scale
-from raster.utils import band_data_to_image, hex_to_rgba
+from raster.utils import band_data_to_image, colormap_to_rgba
 
 
 class RasterView(View):
 
     def get_colormap(self, layer=None):
         """
-        Returns colormap from request and layer, looking for a colormap in
-        the request, a custom legend name to construct the legend or the
+        Returns colormap from request and layer, looking for a colormap in the
+        request or session, a custom legend name to construct the legend or the
         default colormap from the layer legend.
         """
         if 'colormap' in self.request.GET:
             colormap = self.request.GET['colormap']
-            colormap = json.loads(colormap)
-            colormap = {k: hex_to_rgba(v) if isinstance(v, (six.string_types, int)) else v for k, v in colormap.items()}
+            colormap = colormap_to_rgba(json.loads(colormap))
         elif 'legend' in self.request.GET:
-            legend_input = self.request.GET['legend']
-            try:
-                legend_input = int(legend_input)
-            except ValueError:
-                pass
-
-            # Try to get legend by id, name or from input layer
-            if isinstance(legend_input, int):
-                legend = get_object_or_404(Legend, id=legend_input)
+            store = self.request.GET.get('store', 'database')
+            if store == 'session':
+                colormap = get_session_colormap(
+                    self.request.session,
+                    self.request.GET['legend']
+                )
             else:
-                legend = Legend.objects.filter(title__iexact=legend_input).first()
-            colormap = legend.colormap
+                legend_input = self.request.GET['legend']
+                try:
+                    legend_input = int(legend_input)
+                except ValueError:
+                    pass
+
+                # Try to get legend by id, name or from input layer
+                if isinstance(legend_input, int):
+                    legend = get_object_or_404(Legend, id=legend_input)
+                else:
+                    legend = Legend.objects.filter(title__iexact=legend_input).first()
+                colormap = legend.colormap
+
         elif layer and hasattr(layer.legend, 'colormap'):
             colormap = layer.legend.colormap
         elif layer:
@@ -299,7 +306,7 @@ class LegendView(RasterView):
         Returns the legend for this layer as a json string. The legend is a list of
         legend entries with the attributes "name", "expression" and "color".
         """
-        if(legend_id):
+        if legend_id:
             # Get legend from id
             legend = get_object_or_404(Legend, id=legend_id)
         else:

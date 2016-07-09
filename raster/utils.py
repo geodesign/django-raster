@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 import numpy
 from PIL import Image
 
+from django.utils import six
 from raster.algebra.parser import FormulaParser
 from raster.exceptions import RasterException
 
@@ -67,3 +68,10 @@ def band_data_to_image(band_data, colormap):
     img = Image.fromarray(rgba)
 
     return img, stats
+
+
+def colormap_to_rgba(colormap):
+    """
+    Convert color ma to rgba colors.
+    """
+    return {k: hex_to_rgba(v) if isinstance(v, (six.string_types, int)) else v for k, v in colormap.items()}

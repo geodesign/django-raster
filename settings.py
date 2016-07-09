@@ -8,9 +8,15 @@ import os
 SECRET_KEY = 'testkey'
 
 INSTALLED_APPS = (
+    'django.contrib.sessions',
     'raster',
     'django_nose',
 )
+
+
+MIDDLEWARE_CLASSES = [
+    'django.contrib.sessions.middleware.SessionMiddleware',
+]
 
 DATABASES = {
     'default': {

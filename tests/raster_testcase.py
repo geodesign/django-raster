@@ -4,9 +4,11 @@ import inspect
 import os
 import shutil
 import tempfile
+from importlib import import_module
 
 import numpy
 
+from django.conf import settings
 from django.core.files import File
 from django.core.urlresolvers import reverse
 from django.test import Client, TransactionTestCase
@@ -54,6 +56,14 @@ class RasterTestCase(TransactionTestCase):
         leg_expression = Legend.objects.create(title='Legend with Expression')
         LegendEntryOrder.objects.create(legend=leg_expression, legendentry=ent7, code='1')
         self.legend_with_expression = leg_expression
+
+        # Create user sssion
+        # https://docs.djangoproject.com/en/1.9/topics/http/sessions/#using-sessions-out-of-views
+
+        engine = import_module(settings.SESSION_ENGINE)
+        store = engine.SessionStore()
+        store.save()
+        self.client.cookies[settings.SESSION_COOKIE_NAME] = store.session_key
 
         # Create test raster layer
         rasterfile = File(open(os.path.join(self.pwd, 'raster.tif.zip'), 'rb'))

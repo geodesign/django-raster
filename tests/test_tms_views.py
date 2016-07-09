@@ -4,6 +4,7 @@ from unittest import skip
 
 from django.core.urlresolvers import reverse
 from django.test.utils import override_settings
+from raster.shortcuts import set_session_colormap
 from tests.raster_testcase import RasterTestCase
 
 
@@ -82,4 +83,38 @@ class RasterTmsTests(RasterTestCase):
         response = self.client.get(self.tile_url + '?entries=4&legend=dual')
         self.assertEqual(response['Content-type'], 'PNG')
         self.assertIsExpectedTile(response.content, 'test_tms_entries_query_arg')
+        self.assertEqual(response.status_code, 200)
+
+    def test_tms_session_colormap(self):
+        session = self.client.session
+        set_session_colormap(session, 'SessionLegend', {
+            "4": [255, 0, 255, 255],
+        })
+        session.save()
+        response = self.client.get(self.tile_url + '?legend=SessionLegend&store=session')
+        self.assertEqual(response['Content-type'], 'PNG')
+        self.assertIsExpectedTile(response.content, 'test_tms_session_colormap')
+        self.assertEqual(response.status_code, 200)
+
+    def test_tms_session_colormap_overrides_database_legend(self):
+        session = self.client.session
+        set_session_colormap(session, 'MyLegend', {
+            "4": [255, 0, 255, 255],
+        })
+        session.save()
+
+        response = self.client.get(self.tile_url + '?legend=MyLegend&store=session')
+        self.assertEqual(response['Content-type'], 'PNG')
+        self.assertIsExpectedTile(response.content, 'test_tms_session_colormap_overrides_database_legend_store=session')
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.get(self.tile_url + '?legend=MyLegend')
+        self.assertEqual(response['Content-type'], 'PNG')
+        self.assertIsExpectedTile(response.content, 'test_tms_session_colormap_overrides_database_legend_store=database')
+        self.assertEqual(response.status_code, 200)
+
+    def test_tms_session_colormap_invalid_legend(self):
+        response = self.client.get(self.tile_url + '?legend=MyLegend&store=session')
+        self.assertEqual(response['Content-type'], 'PNG')
+        self.assertIsExpectedTile(response.content, 'test_tms_session_colormap_invalid_legend')
         self.assertEqual(response.status_code, 200)

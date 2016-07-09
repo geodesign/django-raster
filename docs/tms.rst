@@ -55,3 +55,65 @@ continuous rasters.
 raster data in django-raster. The are composed of a set of
 :class:`LegendEntries` which in turn each have a :class:`LegendSemantics`
 attribute.
+
+
+
+Overriding the colormap and the legend
+---------------------------------------
+
+While a legend and a colormap can be associated with a raster layer objects in
+the database it is nonetheless possible to overwrite the legend or colormap
+used to render the tiling. Overriding is done via the following url
+parameters:
+
++----------+----------------------------------------------------------------------------------------------+
+| Parameter| Description                                                                                  |
++==========+==============================================================================================+
+| legend   | Use given legend to render the tiles                                                         |
++----------+----------------------------------------------------------------------------------------------+
+| store    | One of ``database``, ``session``. Fetch legend from database or session, default is database |
++----------+----------------------------------------------------------------------------------------------+
+| colormap | Overrides the raster layer's legend colormap.                                                |
++----------+----------------------------------------------------------------------------------------------+
+
+Examples
+~~~~~~~~
+
+If you want to overrides the legend to use MyOtherLegend stored in database you
+can use the following url for the tiling:
+
+::
+
+    /raster/tiles/{z}/{x}/{y}.png?legend=MyOtherLegend
+
+If you want to use the legend from the session with the same name as above you
+can use following one:
+
+::
+
+    /raster/tiles/{z}/{x}/{y}.png?legend=MyOtherLegend&store=session
+
+.. note::
+
+    You can set and get a session colormap with the help of shortcuts functions
+    :func:`raster.shortcuts.set_session_colormap` and
+    :func:`raster.shortcuts.get_session_colormap`
+
+And finally if you want to provide this custom colormap
+
+.. code-block:: json
+
+    {
+        "1": "#FF0000",
+        "2": "#00FF00",
+        "3": "#0000FF"
+    }
+
+you can do so by using this url:
+
+::
+
+    /raster/tiles/{z}/{x}/{y}.png?colormap=%22%7B1%3A%20'%23FF0000'%2C%202%3A%20'%2300FF00'%2C%203%3A%20'%230000FF'%7D%22
+
+Colormap value is the URIEncoded version of the json stringifyed colormap object.
+
