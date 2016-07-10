@@ -42,17 +42,22 @@ class RasterLayerParserTests(RasterTestCase):
         self.assertEqual(self.rasterlayer.rastertile_set.count(), 9 + 4 + 6 * 1)
 
     def test_layermeta_creation(self):
-        self.assertEqual(self.rasterlayer.metadata.width, 163)
-        self.assertEqual(self.rasterlayer.metadata.max_zoom, 12)
+        lyr = RasterLayer.objects.get(id=self.rasterlayer.id)
+        self.assertEqual(lyr.metadata.width, 163)
+        self.assertEqual(lyr.metadata.max_zoom, 12)
 
     def test_reprojected_stored(self):
-        self.assertIn('rasters/reprojected/', self.rasterlayer.reprojected.rasterfile.name)
+        lyr = RasterLayer.objects.get(id=self.rasterlayer.id)
+        self.assertIn('rasters/reprojected/', lyr.reprojected.rasterfile.name)
+        lyr.refresh_from_db()
+        lyr.parsestatus.refresh_from_db()
         with self.settings(MEDIA_ROOT=self.media_root):
-            self.rasterlayer.reprojected.delete()
-            self.rasterlayer.store_reprojected = False
-            self.rasterlayer.parsestatus.reset()
-            self.rasterlayer.save()
-            self.assertIsNone(self.rasterlayer.reprojected.rasterfile.name)
+            lyr.reprojected.delete()
+            lyr.store_reprojected = False
+            lyr.parsestatus.reset()
+            lyr.save()
+            lyr = RasterLayer.objects.get(id=self.rasterlayer.id)
+            self.assertEqual(lyr.reprojected.rasterfile.name, '')
 
     def test_bandmeta_creation(self):
         self.assertEqual(self.rasterlayer.rasterlayerbandmetadata_set.count(), 1)
@@ -62,17 +67,19 @@ class RasterLayerParserTests(RasterTestCase):
             self.assertAlmostEqual(meta.std, 2.4260526986669)
 
     def test_parsestatus_creation(self):
-        self.assertEqual(self.rasterlayer.parsestatus.status, self.rasterlayer.parsestatus.FINISHED)
-        self.assertEqual(self.rasterlayer.parsestatus.tile_levels, list(range(13)))
+        lyr = RasterLayer.objects.get(id=self.rasterlayer.id)
+        self.assertEqual(lyr.parsestatus.status, self.rasterlayer.parsestatus.FINISHED)
+        self.assertEqual(lyr.parsestatus.tile_levels, list(range(13)))
 
     def test_parse_nodata(self):
+        lyr = RasterLayer.objects.get(id=self.rasterlayer.id)
         self.assertEqual(self.tile.rast.bands[0].nodata_value, 255)
-        self.assertIn('Setting no data values to 255.', self.rasterlayer.parsestatus.log)
+        self.assertIn('Setting no data values to 255.', lyr.parsestatus.log)
         with self.settings(MEDIA_ROOT=self.media_root):
-            self.rasterlayer.nodata = ''
-            self.rasterlayer.parsestatus.reset()
-            self.rasterlayer.save()
-            tile = self.rasterlayer.rastertile_set.first()
+            lyr.nodata = ''
+            lyr.parsestatus.reset()
+            lyr.save()
+            tile = lyr.rastertile_set.first()
             self.assertEqual(tile.rast.bands[0].nodata_value, 15)
 
     def test_parse_with_wrong_srid(self):
@@ -90,23 +97,26 @@ class RasterLayerParserTests(RasterTestCase):
             self.assertEqual(self.rasterlayer.rastertile_set.count(), 9 + 4 + 6 * 1)
 
     def test_parse_without_building_pyramid(self):
+        lyr = RasterLayer.objects.get(id=self.rasterlayer.id)
         with self.settings(MEDIA_ROOT=self.media_root):
-            self.rasterlayer.rastertile_set.all().delete()
-            self.rasterlayer.metadata.delete()
-            self.rasterlayer.build_pyramid = False
-            self.rasterlayer.save()
-            self.assertEqual(self.rasterlayer.rastertile_set.filter(tilez=12).count(), 9)
-            self.assertEqual(self.rasterlayer.rastertile_set.exclude(tilez=12).count(), 0)
-            self.rasterlayer.max_zoom = 11
-            self.rasterlayer.save()
-            self.assertEqual(self.rasterlayer.rastertile_set.filter(tilez=11).count(), 4)
-            self.assertEqual(self.rasterlayer.rastertile_set.exclude(tilez=11).count(), 0)
+            lyr.rastertile_set.all().delete()
+            lyr.metadata.delete()
+            lyr.build_pyramid = False
+            lyr.save()
+            lyr = RasterLayer.objects.get(id=self.rasterlayer.id)
+            self.assertEqual(lyr.rastertile_set.filter(tilez=12).count(), 9)
+            self.assertEqual(lyr.rastertile_set.exclude(tilez=12).count(), 0)
+            lyr.max_zoom = 11
+            lyr.save()
+            lyr = RasterLayer.objects.get(id=self.rasterlayer.id)
+            self.assertEqual(lyr.rastertile_set.filter(tilez=11).count(), 4)
+            self.assertEqual(lyr.rastertile_set.exclude(tilez=11).count(), 0)
 
     def test_no_rasterfile(self):
         layer = RasterLayer.objects.create(name='No max zoom', build_pyramid=False)
         msg = 'No data source found. Provide a rasterfile or a source url.'
         with self.assertRaisesMessage(RasterException, msg):
-            parse(layer)
+            parse(layer.id)
 
     def test_manual_nodata_override_matches_input_layer(self):
         with self.settings(MEDIA_ROOT=self.media_root):

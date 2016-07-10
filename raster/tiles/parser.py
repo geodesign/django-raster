@@ -18,7 +18,7 @@ from django.dispatch import Signal
 from django.utils.six.moves.urllib.parse import urlparse
 from django.utils.six.moves.urllib.request import urlretrieve
 from raster.exceptions import RasterException
-from raster.models import RasterLayerBandMetadata, RasterLayerReprojected, RasterTile
+from raster.models import RasterLayer, RasterLayerBandMetadata, RasterLayerReprojected, RasterTile
 from raster.tiles import utils
 from raster.tiles.const import BATCH_STEP_SIZE, INTERMEDIATE_RASTER_FORMAT, WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE
 
@@ -29,8 +29,8 @@ class RasterLayerParser(object):
     """
     Class to parse raster layers.
     """
-    def __init__(self, rasterlayer):
-        self.rasterlayer = rasterlayer
+    def __init__(self, rasterlayer_id):
+        self.rasterlayer = RasterLayer.objects.get(id=rasterlayer_id)
 
         # Set raster tilesize
         self.tilesize = int(getattr(settings, 'RASTER_TILESIZE', WEB_MERCATOR_TILESIZE))

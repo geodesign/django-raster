@@ -261,7 +261,7 @@ def parse_raster_layer_if_status_is_unparsed(sender, instance, created, **kwargs
     RasterLayerMetadata.objects.get_or_create(rasterlayer=instance)
     status, created = RasterLayerParseStatus.objects.get_or_create(rasterlayer=instance)
     if (instance.rasterfile.name or instance.source_url) and status.status == status.UNPARSED:
-        parse(instance)
+        parse(instance.id)
 
 
 class RasterLayerReprojected(models.Model):
