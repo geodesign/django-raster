@@ -115,3 +115,7 @@ class RasterTestCase(TransactionTestCase):
 
     def tearDown(self):
         shutil.rmtree(self.media_root)
+
+    def assertIsExpectedTile(self, png, tile):
+        with open(os.path.join('tests/expected_tiles/', '%s.png' % tile), 'rb') as f:
+            self.assertEqual(png, f.read())
