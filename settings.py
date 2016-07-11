@@ -9,6 +9,7 @@ SECRET_KEY = 'testkey'
 
 INSTALLED_APPS = (
     'raster',
+    'django_nose',
 )
 
 DATABASES = {
@@ -27,6 +28,12 @@ TEMPLATES = [
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'APP_DIRS': True,
     },
+]
+
+TEST_RUNNER = 'django_nose.NoseTestSuiteRunner'
+NOSE_ARGS = [
+    '--with-coverage',
+    '--cover-package=raster',
 ]
 
 ROOT_URLCONF = 'raster.urls'
