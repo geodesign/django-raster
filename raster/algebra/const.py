@@ -14,6 +14,7 @@ RPAR = ")"
 NUMBER = r"[+-]?\d+(\.\d*)?([Ee][+-]?\d+)?"
 
 VARIABLE_NAME_SEPARATOR = "_"
+BAND_INDEX_SEPARATOR = ":"
 
 # Keywords
 EULER = "E"

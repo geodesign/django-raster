@@ -210,12 +210,22 @@ class RasterAlgebraParser(FormulaParser):
         # data to default number type. This is necessary because formula
         # evaluation can lead to unexpected results. This could be
         # differentiated in the future based on data types and formulas.
-        data_arrays = {
-            key: numpy.ma.masked_values(
-                rast.bands[0].data().ravel().astype(const.ALGEBRA_PIXEL_TYPE_NUMPY),
-                rast.bands[0].nodata_value
-            ) for key, rast in data.items()
-        }
+        data_arrays = {}
+        for key, rast in data.items():
+
+            keysplit = key.split(const.BAND_INDEX_SEPARATOR)
+
+            variable = keysplit[0]
+
+            if len(keysplit) > 1:
+                band_index = int(keysplit[1])
+            else:
+                band_index = 0
+
+            data_arrays[variable] = numpy.ma.masked_values(
+                rast.bands[band_index].data().ravel().astype(const.ALGEBRA_PIXEL_TYPE_NUMPY),
+                rast.bands[band_index].nodata_value
+            )
 
         # Evaluate formula on raster data
         result = self.evaluate(data_arrays, formula)

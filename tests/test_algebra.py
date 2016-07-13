@@ -4,6 +4,7 @@ from django.contrib.gis.gdal import GDALRaster
 from django.test import TestCase
 from django.test.utils import override_settings
 from django.utils.http import urlquote
+from raster.algebra.const import BAND_INDEX_SEPARATOR
 from raster.algebra.parser import RasterAlgebraParser
 from tests.raster_testcase import RasterTestCase
 
@@ -16,17 +17,20 @@ class RasterAlgebraParserTests(TestCase):
             'driver': 'MEM',
             'width': 2,
             'height': 2,
-            'nr_of_bands': 1,
             'srid': 3086,
             'origin': (500000, 400000),
             'scale': (100, -100),
             'skew': (0, 0),
-            'bands': [{
-                'nodata_value': 10,
-            }],
+            'bands': [
+                {'nodata_value': 10},
+                {'nodata_value': 10},
+                {'nodata_value': 10},
+            ],
         }
 
-        base['bands'][0]['data'] = [10, 11, 12, 13]
+        base['bands'][0]['data'] = range(20, 24)
+        base['bands'][1]['data'] = range(10, 14)
+        base['bands'][2]['data'] = range(30, 34)
         rast1 = GDALRaster(base)
 
         base['bands'][0]['data'] = [1, 1, 1, 1]
@@ -36,7 +40,8 @@ class RasterAlgebraParserTests(TestCase):
         base['bands'][0]['nodata_value'] = 31
         rast3 = GDALRaster(base)
 
-        self.data = dict(zip(['x', 'y', 'z'], [rast1, rast2, rast3]))
+        self.data = dict(zip(['x:1', 'y:0', 'z'], [rast1, rast2, rast3]))
+        self.data2 = dict(zip(['x:0', 'y:1'], [rast1, rast1]))
 
     def test_algebra_parser(self):
         parser = RasterAlgebraParser()
@@ -47,6 +52,11 @@ class RasterAlgebraParserTests(TestCase):
         parser = RasterAlgebraParser()
         result = parser.evaluate_raster_algebra(self.data, 'x * (z != NULL) + 99 * (z == NULL)')
         self.assertEqual(result.bands[0].data().ravel().tolist(), [10, 99, 12, 13])
+
+    def test_algebra_parser_same_raster_twice(self):
+        parser = RasterAlgebraParser()
+        result = parser.evaluate_raster_algebra(self.data2, 'x + y')
+        self.assertEqual(result.bands[0].data().ravel().tolist(), [10, 32, 34, 36])
 
 
 @override_settings(RASTER_TILE_CACHE_TIMEOUT=0)
@@ -101,4 +111,12 @@ class RasterAlgebraViewTests(RasterTestCase):
         self.assertEqual(response.status_code, 400)
         # Layer id is not an integer
         response = self.client.get(self.algebra_tile_url + '?layers=a=x&formula=3*a')
+        self.assertEqual(response.status_code, 400)
+
+    def test_band_level_algebra_request(self):
+        # Manually specify first band.
+        response = self.client.get(self.algebra_tile_url + '?layers=a{0}0={1}&formula=a'.format(BAND_INDEX_SEPARATOR, self.rasterlayer.id))
+        self.assertEqual(response.status_code, 200)
+        # Try getting band that does not exist.
+        response = self.client.get(self.algebra_tile_url + '?layers=a{0}1={1}&formula=a'.format(BAND_INDEX_SEPARATOR, self.rasterlayer.id))
         self.assertEqual(response.status_code, 400)
