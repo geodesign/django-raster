@@ -120,3 +120,7 @@ class RasterAlgebraViewTests(RasterTestCase):
         # Try getting band that does not exist.
         response = self.client.get(self.algebra_tile_url + '?layers=a{0}1={1}&formula=a'.format(BAND_INDEX_SEPARATOR, self.rasterlayer.id))
         self.assertEqual(response.status_code, 400)
+
+    def test_rgb_request(self):
+        response = self.client.get(self.algebra_tile_url + '?layers=r={0},g={0},b={0}'.format(self.rasterlayer.id))
+        self.assertEqual(response.status_code, 200)

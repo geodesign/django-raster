@@ -162,8 +162,6 @@ class AlgebraView(RasterView):
         return ids
 
     def get(self, request, *args, **kwargs):
-        parser = RasterAlgebraParser()
-
         # Get layer ids
         ids = self.get_ids()
 
@@ -180,7 +178,21 @@ class AlgebraView(RasterView):
                 return self.write_img_to_response(img, {})
 
         # Get formula from request
-        formula = request.GET.get('formula')
+        formula = request.GET.get('formula', None)
+
+        # Dispatch by request type. If a formula was provided, use raster
+        # algebra otherwise look for rgb request.
+        if formula:
+            return self.get_algebra(data, formula)
+        elif 'r' in data and 'g' in data and 'b' in data:
+            return self.get_rgb(data)
+        else:
+            raise RasterAlgebraException(
+                'Specify raster algebra formula or provide rgb layer keys.'
+            )
+
+    def get_algebra(self, data, formula):
+        parser = RasterAlgebraParser()
 
         # Evaluate raster algebra expression, return 400 if not successful
         try:
@@ -212,6 +224,38 @@ class AlgebraView(RasterView):
             # Create image from array
             img = Image.fromarray(rgba)
             stats = {}
+
+        # Return rendered image
+        return self.write_img_to_response(img, stats)
+
+    def get_rgb(self, data):
+        red = data['r']
+        green = data['g']
+        blue = data['b']
+
+        red = red.bands[0].data()
+        green = green.bands[0].data()
+        blue = blue.bands[0].data()
+
+        scale = float(self.request.GET.get('scale', 255))
+
+        red[red > scale] = scale
+        green[green > scale] = scale
+        blue[blue > scale] = scale
+
+        red = red * 255.0 / scale
+        green = green * 255.0 / scale
+        blue = blue * 255.0 / scale
+
+        # Create zeros array.
+        alpha = 255 * (red > 0) * (blue > 0) * (green > 0)
+
+        rgba = numpy.array((red.ravel(), green.ravel(), blue.ravel(), alpha.ravel())).T
+        rgba = rgba.reshape(WEB_MERCATOR_TILESIZE, WEB_MERCATOR_TILESIZE, 4).astype('uint8')
+
+        # Create image from array
+        img = Image.fromarray(rgba)
+        stats = {}
 
         # Return rendered image
         return self.write_img_to_response(img, stats)
