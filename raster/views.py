@@ -20,7 +20,7 @@ from django.utils import six
 from django.views.generic import View
 from raster.algebra.const import ALGEBRA_PIXEL_TYPE_GDAL
 from raster.algebra.parser import RasterAlgebraParser
-from raster.const import EXPORT_MAX_PIXELS, IMG_FORMATS, MAX_EXPORT_NAME_LENGTH, README_TEMPLATE
+from raster.const import DEFAULT_LEGEND_BREAKS, EXPORT_MAX_PIXELS, IMG_FORMATS, MAX_EXPORT_NAME_LENGTH, README_TEMPLATE
 from raster.exceptions import RasterAlgebraException
 from raster.models import Legend, RasterLayer
 from raster.tiles.const import WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE
@@ -63,21 +63,18 @@ class RasterView(View):
             if meta is None:
                 return
 
-            # Set the number of breaks to be used
-            nr_of_breaks = 7
-
             # Compute bin width for a linear scaling
-            diff = (meta.max - meta.min) / 7
+            diff = (meta.max - meta.min) / DEFAULT_LEGEND_BREAKS
 
             # Create colormap with seven breaks
             colormap = {}
-            for i in range(nr_of_breaks):
+            for i in range(DEFAULT_LEGEND_BREAKS):
                 if i == 0:
                     expression = '({0} <= x) & (x <= {1})'
                 else:
                     expression = '({0} < x) & (x <= {1})'
                 expression = expression.format(meta.min + diff * i, meta.min + diff * (i + 1))
-                colormap[expression] = [(255 / (nr_of_breaks - 1)) * i] * 3 + [255, ]
+                colormap[expression] = [(255 / (DEFAULT_LEGEND_BREAKS - 1)) * i] * 3 + [255, ]
         else:
             return
 
