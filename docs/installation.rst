@@ -12,7 +12,7 @@ The package is available on PyPI, you can install it with::
 
     pip install django-raster
 
-To integrate the the package into Django, add ``raster`` to your
+To integrate the package into Django, add ``raster`` to your
 ``INSTALLED_APPS`` setting like this::
 
     INSTALLED_APPS = (
@@ -24,10 +24,10 @@ Django-raster has its own url structure (to serve raster data through a
 ``TMS`` endpoint for instance). To activate those urls, add the raster
 urls to your main urlconf::
 
-    urlpatterns = patterns('',
+    urlpatterns = [
         ...
         url(r'^raster/', include('raster.urls')),
-    )
+    ]
 
 Finally, migrate your database to create the tables required by django-raster::
 

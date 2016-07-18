@@ -5,24 +5,13 @@ A list of available settings to customize django-raster's behavior.
 
 Asynchronous raster parsing
 ---------------------------
-Determines wether to use celery tasks for parsing raster layers. It is highly
+Determines whether to use celery tasks for parsing raster layers. It is highly
 recommended to configure celery, as raster parsing can take quite a while and
 the parsing through normal web requests will often timed out, even for medium
 sized raster.
 ::
 
     RASTER_USE_CELERY = False
-
-Maximum zoom levels for tile creation
--------------------------------------
-The raster layer parser automatically determines the scale of the input
-rasters. This setting defines the hightest zoom level at which tiles are
-created. By default, the next underlying zoomlevel is used. Set this to
-``False`` if you only want to create tiles up to the next-higher zoomlevel.
-Defaults to ``True``.
-::
-
-    RASTER_ZOOM_NEXT_HIGHER = True
 
 Parser working directory
 ------------------------

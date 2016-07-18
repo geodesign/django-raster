@@ -7,24 +7,27 @@ Django. It is based on the Django internal `GDALRaster`_ object and
 
 There are three main components in this package:
 
-* A parser utility to ingest rasters through the admin.
-* Tile map service endpoint to render raster data.
+* Parser utility to ingest rasters through the admin or the django shell.
+* Tile Map Service (TMS) endpoint to render raster data.
 * Raster calculator to compute and render raster calculator expressions.
 
-Raster files can be uploaded and parsed through the admin interface. The raw
-raster data can be parsed asynchronously if `Celery`__ is integrated into the
-Django project.
+Raster files are stored in a file field attached to :class:`RasterLayer`
+objects. Data can be added by creating raster layers through the admin
+interface or the Django shell.
 
-__ http://en.wikipedia.org/wiki/GIS_file_formats#Raster
-__ http://celeryproject.org
-
-Once a raster file is uploaded, the raster parser will automatically extract
-the data in the raster and store it as PostGIS raster tiles on the database.
+After creating a :class:`RasterLayer` object, the raster data will be parsed
+automatically. The parsing can be executed asynchronously if `Celery`__ is
+integrated into the Django project. The raster parser will automatically
+extract the data in the raster and store it as PostGIS raster tiles on the
+database.
 
 After ingesting the data, raster styles can be defined through the admin
 interface which are then used to render the data through TMS endpoints. The
-endpoints can be used in javascript mapping software such as OpenLayers or
+endpoints can be used in Javascript mapping software such as OpenLayers or
 Leaflet.
+
+__ http://en.wikipedia.org/wiki/GIS_file_formats#Raster
+__ http://celeryproject.org
 
 Limitations
 -----------

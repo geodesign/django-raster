@@ -11,5 +11,6 @@ API Reference
    models
    rasterize
    utils
+   shortcuts
    valuecount
    views
