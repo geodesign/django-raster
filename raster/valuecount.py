@@ -71,7 +71,7 @@ class Aggregator(object):
 
         # Auto determine grouping based on input data
         if grouping == 'auto':
-            all_discrete = all([lyr.datatype in ['ca', 'ma'] for lyr in self.layers])
+            all_discrete = all((lyr.datatype in (RasterLayer.CATEGORICAL, RasterLayer.MASK) for lyr in self.layers))
             grouping = 'discrete' if all_discrete else 'continuous'
         elif grouping in ('discrete', 'continuous'):
             pass
