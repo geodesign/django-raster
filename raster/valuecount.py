@@ -23,13 +23,14 @@ class Aggregator(object):
     functions on all tiles from a set of layers.
     """
 
-    def __init__(self, layer_dict, formula, zoom=None, geom=None, acres=True, grouping='auto'):
+    def __init__(self, layer_dict, formula, zoom=None, geom=None, acres=True, grouping='auto', all_touched=True):
         # Set defining parameter for this aggregator
         self.layer_dict = layer_dict
         self.formula = formula
         self.geom = geom
         self.acres = acres
         self.rastgeom = None
+        self.all_touched = all_touched
 
         # Get layers from input dict
         self.layers = RasterLayer.objects.filter(id__in=layer_dict.values())
@@ -172,7 +173,7 @@ class Aggregator(object):
 
     def mask_by_geom(self, tile, data):
         # Rasterize the aggregation area to the result raster
-        self.rastgeom = rasterize(self.geom, tile)
+        self.rastgeom = rasterize(self.geom, tile, all_touched=self.all_touched)
 
         # Get boolean mask based on rasterized geom
         rastgeom_mask = self.rastgeom.bands[0].data() != 1
