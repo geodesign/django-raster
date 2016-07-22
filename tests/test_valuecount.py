@@ -1,12 +1,9 @@
 from __future__ import unicode_literals
 
-from unittest import skipIf
-
 import numpy
 
 from django.contrib.gis.geos import Polygon
 from django.test.utils import override_settings
-from django.utils import version
 from raster.exceptions import RasterAggregationException
 from raster.tiles.const import WEB_MERCATOR_SRID
 from raster.valuecount import Aggregator
@@ -205,7 +202,6 @@ class RasterAggregatorTests(RasterTestCase):
             {'2': self.expected_totals[2]}
         )
 
-    @skipIf(version.get_version() >= '1.9', 'Fails on current release -- Refs #25734.')
     def test_layer_stats(self):
         # Use a legend with simple int expression
         agg = Aggregator(

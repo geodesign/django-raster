@@ -1,6 +1,6 @@
 from __future__ import unicode_literals
 
-from unittest import skip
+import platform
 
 from django.core.urlresolvers import reverse
 from django.test.utils import override_settings
@@ -39,14 +39,19 @@ class RasterTmsTests(RasterTestCase):
         self.assertIsExpectedTile(response.content, 'test_tms_existing_tile')
         self.assertEqual(response.status_code, 200)
 
-    @skip('Fails on current release -- Refs #25734.')
     def test_tms_existing_tile_without_legend(self):
         # Get tms tile for layer without legend
         self.rasterlayer.legend = None
         self.rasterlayer.save()
         response = self.client.get(self.tile_url)
         self.assertEqual(response['Content-type'], 'PNG')
-        self.assertIsExpectedTile(response.content, 'test_tms_existing_tile_without_legend')
+
+        # There are slight rounding differences in the automatic legend that
+        # make a difference in the rendering of the tile.
+        if platform.python_version_tuple() < ('3', '0', '0'):
+            self.assertIsExpectedTile(response.content, 'test_tms_existing_tile_without_legend_py2')
+        else:
+            self.assertIsExpectedTile(response.content, 'test_tms_existing_tile_without_legend_py3')
         self.assertEqual(response.status_code, 200)
 
     def test_tms_existing_tile_using_rasterlayer_id_in_url(self):

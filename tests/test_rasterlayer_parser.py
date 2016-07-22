@@ -72,15 +72,21 @@ class RasterLayerParserTests(RasterTestCase):
         self.assertEqual(lyr.parsestatus.tile_levels, list(range(13)))
 
     def test_parse_nodata(self):
-        lyr = RasterLayer.objects.get(id=self.rasterlayer.id)
-        self.assertEqual(self.tile.rast.bands[0].nodata_value, 255)
-        self.assertIn('Setting no data values to 255.', lyr.parsestatus.log)
         with self.settings(MEDIA_ROOT=self.media_root):
-            lyr.nodata = ''
-            lyr.parsestatus.reset()
+            lyr = RasterLayer.objects.get(id=self.rasterlayer.id)
+            lyr.nodata = 200
             lyr.save()
             tile = lyr.rastertile_set.first()
-            self.assertEqual(tile.rast.bands[0].nodata_value, 15)
+            self.assertEqual(tile.rast.bands[0].nodata_value, 200)
+
+            lyr.parsestatus.refresh_from_db()
+            self.assertIn('Setting no data values to 200.', lyr.parsestatus.log)
+
+            lyr = RasterLayer.objects.get(id=self.rasterlayer.id)
+            lyr.nodata = ''
+            lyr.save()
+            tile = lyr.rastertile_set.first()
+            self.assertEqual(tile.rast.bands[0].nodata_value, 255)
 
     def test_parse_with_wrong_srid(self):
         with self.settings(MEDIA_ROOT=self.media_root):
