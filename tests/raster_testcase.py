@@ -66,7 +66,10 @@ class RasterTestCase(TransactionTestCase):
         self.client.cookies[settings.SESSION_COOKIE_NAME] = store.session_key
 
         # Create test raster layer
-        rasterfile = File(open(os.path.join(self.pwd, 'raster.tif.zip'), 'rb'))
+        rasterfile = File(
+            open(os.path.join(self.pwd, 'raster.tif.zip'), 'rb'),
+            name='raster.tif.zip'
+        )
         self.media_root = tempfile.mkdtemp()
         with self.settings(MEDIA_ROOT=self.media_root):
             self.rasterlayer = RasterLayer.objects.create(

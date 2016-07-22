@@ -195,7 +195,10 @@ class RasterLayerParser(object):
             dest_zip.close()
 
             # Store zip file in reprojected raster model
-            self.rasterlayer.reprojected.rasterfile = File(open(dest_zip.filename, 'rb'))
+            self.rasterlayer.reprojected.rasterfile = File(
+                open(dest_zip.filename, 'rb'),
+                name=os.path.basename(dest_zip.filename)
+            )
             self.rasterlayer.reprojected.save()
 
         self.log('Finished transforming raster.')
