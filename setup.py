@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='django-raster',
-    version='0.2',
+    version='0.3',
     url='https://github.com/geodesign/django-raster',
     author='Daniel Wiesmann',
     author_email='daniel@urbmet.com',
@@ -16,13 +16,13 @@ setup(
         'celery>=3.1.19',
         'Pillow>=2.7.0',
         'django-colorful>=1.0.1',
-        'pyparsing>=2.0.3,<=2.1.1',
+        'pyparsing>=2.1.8',
     ],
     keywords=['django', 'raster', 'gis', 'gdal', 'celery', 'geo', 'spatial'],
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Framework :: Django',
-        'Framework :: Django :: 1.9',
+        'Framework :: Django :: 1.10',
         'Environment :: Web Environment',
         'Framework :: Django',
         'Intended Audience :: Developers',
