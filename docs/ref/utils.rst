@@ -1,5 +1,0 @@
-=====
-Utils
-=====
-
-.. automodule:: raster.utils

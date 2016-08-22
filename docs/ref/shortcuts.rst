@@ -2,6 +2,12 @@
 Shortcuts
 =========
 
-.. autofunction:: raster.shortcuts.set_session_colormap
+.. function:: set_session_colormap(session, key, colormap)
 
-.. autofunction:: raster.shortcuts.get_session_colormap
+    Store the colormap in the user session.
+    
+
+.. function:: get_session_colormap(session, key)
+
+    Get the colormap form a legend stored in the user session and identified
+    by key.

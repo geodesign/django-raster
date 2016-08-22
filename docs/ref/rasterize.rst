@@ -1,5 +1,0 @@
-=========
-Rasterize
-=========
-
-.. automodule:: raster.rasterize

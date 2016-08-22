@@ -25,8 +25,6 @@ Contents
     settings
     ref/index
 
-.. Removed "ref/index" from toctree because the reference is incomplete.
-
 Indices and tables
 ------------------
 

@@ -1,4 +1,0 @@
-=====
-Const
-=====
-.. automodule:: raster.const

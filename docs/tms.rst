@@ -92,7 +92,7 @@ parameters:
 +----------+----------------------------------------------------------------------------------------------+
 
 Examples
-~~~~~~~~
+^^^^^^^^
 
 If you want to overrides the legend to use MyOtherLegend stored in database you
 can use the following url for the tiling:
@@ -111,8 +111,7 @@ can use following one:
 .. note::
 
     You can set and get a session colormap with the help of shortcuts functions
-    :func:`raster.shortcuts.set_session_colormap` and
-    :func:`raster.shortcuts.get_session_colormap`
+    :func:`set_session_colormap` and :func:`get_session_colormap`.
 
 And finally if you want to provide this custom colormap
 
