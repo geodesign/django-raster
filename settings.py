@@ -10,7 +10,6 @@ SECRET_KEY = 'testkey'
 INSTALLED_APPS = (
     'django.contrib.sessions',
     'raster',
-    'django_nose',
 )
 
 
@@ -35,13 +34,6 @@ TEMPLATES = [
         'APP_DIRS': True,
     },
 ]
-
-if 'USE_NOSE' in os.environ:
-    TEST_RUNNER = 'django_nose.NoseTestSuiteRunner'
-    NOSE_ARGS = [
-        '--with-coverage',
-        '--cover-package=raster',
-    ]
 
 ROOT_URLCONF = 'raster.urls'
 

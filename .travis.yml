@@ -24,11 +24,10 @@ install:
   - pip install pyparsing==2.1.1
   - pip install flake8==2.5.0
   - pip install isort==4.2.2
-  - pip install coverage==4.0.3
-  - pip install django-nose==1.4.4
+  - pip install coverage==4.2
   - pip install coveralls
 
-script: django-admin.py test
+script: coverage run --include="raster/*" $(which django-admin.py) test
 
 after_success: coveralls
 
