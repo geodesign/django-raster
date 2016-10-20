@@ -36,11 +36,12 @@ TEMPLATES = [
     },
 ]
 
-TEST_RUNNER = 'django_nose.NoseTestSuiteRunner'
-NOSE_ARGS = [
-    '--with-coverage',
-    '--cover-package=raster',
-]
+if 'USE_NOSE' in os.environ:
+    TEST_RUNNER = 'django_nose.NoseTestSuiteRunner'
+    NOSE_ARGS = [
+        '--with-coverage',
+        '--cover-package=raster',
+    ]
 
 ROOT_URLCONF = 'raster.urls'
 
