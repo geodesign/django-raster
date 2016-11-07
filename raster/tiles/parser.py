@@ -51,7 +51,7 @@ class RasterLayerParser(object):
             parsestatus.tile_levels.sort()
 
         # Prepare datetime stamp for log
-        now = '[{0}] '.format(datetime.datetime.now().strftime('%Y-%m-%d %T'))
+        now = '[{0}] '.format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
         if parsestatus.log:
             now = '\n' + now
