@@ -1,5 +1,6 @@
 import json
 import math
+import os
 from operator import itemgetter
 
 import numpy
@@ -11,6 +12,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.db.models import Max, Min
 from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
+from raster.fields import RasterFileField
 from raster.mixins import ValueCountMixin
 from raster.tiles.const import WEB_MERCATOR_SRID
 from raster.utils import hex_to_rgba
@@ -348,6 +350,16 @@ class RasterLayerBandMetadata(models.Model):
         return (self.min, self.max, self.mean, self.std)
 
 
+def upload_tile_to(instance, filename):
+    return 'tiles/{rst}/{z}/tile-{x}-{y}{form}'.format(
+        rst=instance.rasterlayer_id,
+        z=instance.tilez,
+        x=instance.tilex,
+        y=instance.tiley,
+        form=os.path.splitext(filename)[-1],
+    )
+
+
 class RasterTile(models.Model):
     """
     Store individual tiles of a raster data source layer.
@@ -358,7 +370,7 @@ class RasterTile(models.Model):
         (14, 14), (15, 15), (16, 16), (17, 17), (18, 18)
     )
     rid = models.AutoField(primary_key=True)
-    rast = models.RasterField(null=True, blank=True, srid=WEB_MERCATOR_SRID)
+    rast = RasterFileField(null=True, blank=True, upload_to=upload_tile_to)
     rasterlayer = models.ForeignKey(RasterLayer, null=True, blank=True, db_index=True, on_delete=models.CASCADE)
     tilex = models.IntegerField(db_index=True, null=True)
     tiley = models.IntegerField(db_index=True, null=True)

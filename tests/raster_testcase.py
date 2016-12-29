@@ -56,23 +56,23 @@ class RasterTestCase(TransactionTestCase):
             open(os.path.join(self.pwd, 'raster.tif.zip'), 'rb'),
             name='raster.tif.zip'
         )
-        self.media_root = tempfile.mkdtemp()
-        with self.settings(MEDIA_ROOT=self.media_root):
-            self.rasterlayer = RasterLayer.objects.create(
-                name='Raster data',
-                description='Small raster for testing',
-                datatype='ca',
-                rasterfile=rasterfile,
-                legend=leg,
-            )
-            # Create another layer with no tiles
-            self.empty_rasterlayer = RasterLayer.objects.create(
-                name='Raster data',
-                description='Small raster for testing',
-                datatype='ca',
-                rasterfile=rasterfile,
-            )
-            self.empty_rasterlayer.rastertile_set.all().delete()
+        settings.MEDIA_ROOT = tempfile.mkdtemp()
+        self.media_root = settings.MEDIA_ROOT
+        self.rasterlayer = RasterLayer.objects.create(
+            name='Raster data',
+            description='Small raster for testing',
+            datatype='ca',
+            rasterfile=rasterfile,
+            legend=leg,
+        )
+        # Create another layer with no tiles
+        self.empty_rasterlayer = RasterLayer.objects.create(
+            name='Raster data',
+            description='Small raster for testing',
+            datatype='ca',
+            rasterfile=rasterfile,
+        )
+        self.empty_rasterlayer.rastertile_set.all().delete()
 
         # Setup query urls for tests
         self.tile = self.rasterlayer.rastertile_set.get(tilez=11, tilex=552, tiley=858)
@@ -92,7 +92,7 @@ class RasterTestCase(TransactionTestCase):
         # Precompute expected totals from value count
         expected = {}
         for tile in self.rasterlayer.rastertile_set.filter(tilez=11):
-            val, counts = numpy.unique(tile.rast.bands[0].data(), return_counts=True)
+            val, counts = numpy.unique(tile.rast.rast.bands[0].data(), return_counts=True)
             for pair in zip(val, counts):
                 if pair[0] in expected:
                     expected[pair[0]] += pair[1]
@@ -120,7 +120,7 @@ class RasterTestCase(TransactionTestCase):
         self.client = Client()
 
     def tearDown(self):
-        shutil.rmtree(self.media_root)
+        shutil.rmtree(settings.MEDIA_ROOT)
 
     def assertIsExpectedTile(self, png, tile, frmt='png'):
         with open(os.path.join('tests/expected_tiles/', '{0}.{1}'.format(tile, frmt)), 'rb') as f:

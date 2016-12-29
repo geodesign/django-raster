@@ -1,5 +1,6 @@
 import datetime
 import fnmatch
+import io
 import os
 import tempfile
 import uuid
@@ -352,7 +353,7 @@ class RasterLayerParser(object):
             'height': (indexrange[3] - indexrange[1] + 1) * self.tilesize,
         })
 
-        # Create all tiles in this quadrant in batches
+        # Create all tiles in this quadrant in batches.
         batch = []
         for tilex in range(indexrange[0], indexrange[2] + 1):
             for tiley in range(indexrange[1], indexrange[3] + 1):
@@ -380,8 +381,11 @@ class RasterLayerParser(object):
                 if zoom == self.max_zoom:
                     self.push_histogram(band_data)
 
-                # Warp source raster into this tile (in memory)
+                # Warp source raster into this tile (in memory).
                 dest = GDALRaster({
+                    'name': '/vsimem/{}'.format(uuid.uuid4()),
+                    'driver': 'tif',
+                    'compress': 'DEFLATE',
                     'width': self.tilesize,
                     'height': self.tilesize,
                     'origin': [bounds[0], bounds[3]],
@@ -391,16 +395,18 @@ class RasterLayerParser(object):
                     'bands': band_data,
                 })
 
-                # Store tile in batch array
-                batch.append(
-                    RasterTile(
-                        rast=dest,
-                        rasterlayer_id=self.rasterlayer.id,
-                        tilex=tilex,
-                        tiley=tiley,
-                        tilez=zoom
-                    )
+                # Convert raster to compressed pgraster.
+                dest = io.BytesIO(dest.vsi_buffer)
+
+                # Store tile in batch array.
+                tile = RasterTile(
+                    rast=File(dest, name='tile.tif'),
+                    rasterlayer_id=self.rasterlayer.id,
+                    tilex=tilex,
+                    tiley=tiley,
+                    tilez=zoom,
                 )
+                batch.append(tile)
 
                 # Commit batch to database and reset it
                 if len(batch) == self.batch_step_size:
