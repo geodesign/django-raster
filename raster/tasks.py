@@ -68,6 +68,16 @@ def send_success_signal(rasterlayer_id):
     parser.send_success_signal()
 
 
+@task
+def all_in_one(rasterlayer_id, zoom_range):
+    """
+    Parses raster in a single task.
+    """
+    clear_tiles(rasterlayer_id)
+    create_tiles(rasterlayer_id, zoom_range, True)
+    send_success_signal(rasterlayer_id)
+
+
 def parse(rasterlayer_id):
     """
     Parse raster layer to extract metadata and create tiles.
@@ -86,7 +96,8 @@ def parse(rasterlayer_id):
 
     # Check if parsing should happen asynchronously
     parse_async = getattr(settings, 'RASTER_USE_CELERY', False)
-    if parse_async:
+    parse_single_task = getattr(settings, 'RASTER_PARSE_SINGLE_TASK', False)
+    if parse_async and not parse_single_task:
         if zoom_range is not None:
             # Bundle the first five raster layers to one task. For low zoom
             # levels, downloading is more costly than parsing.
@@ -118,6 +129,9 @@ def parse(rasterlayer_id):
         # Apply the parsing chain
         parser.log('Parse task queued, waiting for worker availability.')
         parsing_task_chain.apply_async()
+    elif parse_async and parse_single_task:
+        parser.log('Parse task queued in all-in-one mode, waiting for worker availability.')
+        all_in_one.delay(rasterlayer_id, zoom_range)
     else:
         clear_tiles(rasterlayer_id)
         create_tiles(rasterlayer_id, zoom_range, True)

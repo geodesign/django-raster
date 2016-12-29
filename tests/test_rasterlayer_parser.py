@@ -152,3 +152,15 @@ class RasterLayerParserWithoutCeleryTests(RasterTestCase):
 
     def test_raster_layer_parsing_without_celery(self):
         self.assertEqual(self.rasterlayer.rastertile_set.count(), 9 + 4 + 6 * 1)
+
+
+@override_settings(RASTER_TILESIZE=100, RASTER_PARSE_SINGLE_TASK=True)
+class RasterLayerParserSingleTaskTests(RasterTestCase):
+
+    def test_raster_layer_parsing_without_celery(self):
+        self.assertEqual(self.rasterlayer.rastertile_set.count(), 9 + 4 + 6 * 1)
+        self.rasterlayer.parsestatus.refresh_from_db()
+        self.assertIn(
+            'Parse task queued in all-in-one mode, waiting for worker availability.',
+            self.rasterlayer.parsestatus.log,
+        )
