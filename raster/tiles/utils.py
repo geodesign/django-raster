@@ -54,20 +54,41 @@ def get_raster_tile(layer_id, tilez, tilex, tiley):
     return result
 
 
-def tile_index_range(bbox, z):
+def tile_index_range(bbox, z, tolerance=0):
     """
-    Calculate the index range for a given bounding box and zoomlevel.
+    Calculate the index range for a given bounding box and zoomlevel. The bbox
+    coordinages are assumed to be in Web Mercator.
+
+    The strict option can be used to force only strict overlaps, based on a
+    tolerance.
     """
-    # Calculate tile size for given zoom level
+    # Calculate tile size for given zoom level.
     zscale = WEB_MERCATOR_WORLDSIZE / 2 ** z
 
-    # Calculate overlaying tile indices
-    return [
-        int((bbox[0] + WEB_MERCATOR_TILESHIFT) / zscale),
-        int((WEB_MERCATOR_TILESHIFT - bbox[3]) / zscale),
-        int((bbox[2] + WEB_MERCATOR_TILESHIFT) / zscale),
-        int((WEB_MERCATOR_TILESHIFT - bbox[1]) / zscale)
+    # Calculate overlaying tile indices.
+    result_float = [
+        (bbox[0] + WEB_MERCATOR_TILESHIFT) / zscale,
+        (WEB_MERCATOR_TILESHIFT - bbox[3]) / zscale,
+        (bbox[2] + WEB_MERCATOR_TILESHIFT) / zscale,
+        (WEB_MERCATOR_TILESHIFT - bbox[1]) / zscale,
     ]
+    # Use integer floor as index. This ensures overlap, since
+    # the idex values are counted from the upper left corner.
+    result = [None] * 4
+
+    for i in range(4):
+        # If the index range is a close call, make sure that only
+        # strictly overlapping indices are included.
+        if abs(round(result_float[i]) - result_float[i]) < tolerance:
+            result[i] = round(result_float[i])
+            # For the max range values, reduce so that the edge tile is not
+            # included.
+            if i > 1:
+                result[i] -= 1
+        else:
+            result[i] = int(result_float[i])
+
+    return result
 
 
 def tile_bounds(x, y, z):

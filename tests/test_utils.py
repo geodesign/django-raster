@@ -1,7 +1,9 @@
 from __future__ import unicode_literals
 
+from django.contrib.gis.gdal import OGRGeometry
 from django.test import TestCase
 from raster.exceptions import RasterException
+from raster.tiles.utils import tile_bounds, tile_index_range
 from raster.utils import colormap_to_rgba, hex_to_rgba
 
 
@@ -52,3 +54,16 @@ class TestUtils(TestCase):
     def test_empty_colormap_to_rgba(self):
         colormap = {}
         self.assertEqual(colormap, colormap_to_rgba(colormap))
+
+    def test_tile_index_range(self):
+        bounds = tile_bounds(43, 67, 8)
+        geom = OGRGeometry.from_bbox(bounds)
+        # With the default tolerance 0, the edging tiles are
+        # included.
+        idx = tile_index_range(geom.extent, 11)
+        self.assertEqual(idx[2] - idx[0], 2 ** 3)
+        self.assertEqual(idx[3] - idx[1], 2 ** 3)
+        # With a larger tolerance, the strictly overlaping tiles are included.
+        idx = tile_index_range(geom.extent, 11, tolerance=1e-3)
+        self.assertEqual(idx[2] - idx[0], 2 ** 3 - 1)
+        self.assertEqual(idx[3] - idx[1], 2 ** 3 - 1)
