@@ -1,7 +1,5 @@
 from __future__ import unicode_literals
 
-import platform
-
 from django.core.urlresolvers import reverse
 from django.test.utils import override_settings
 from raster.shortcuts import set_session_colormap
@@ -45,13 +43,7 @@ class RasterTmsTests(RasterTestCase):
         self.rasterlayer.save()
         response = self.client.get(self.tile_url)
         self.assertEqual(response['Content-type'], 'PNG')
-
-        # There are slight rounding differences in the automatic legend that
-        # make a difference in the rendering of the tile.
-        if platform.python_version_tuple() < ('3', '0', '0'):
-            self.assertIsExpectedTile(response.content, 'test_tms_existing_tile_without_legend_py2')
-        else:
-            self.assertIsExpectedTile(response.content, 'test_tms_existing_tile_without_legend_py3')
+        self.assertIsExpectedTile(response.content, 'test_tms_existing_tile_without_legend')
         self.assertEqual(response.status_code, 200)
 
     def test_tms_existing_tile_using_rasterlayer_id_in_url(self):
@@ -122,4 +114,10 @@ class RasterTmsTests(RasterTestCase):
         response = self.client.get(self.tile_url + '?legend=MyLegend&store=session')
         self.assertEqual(response['Content-type'], 'PNG')
         self.assertIsExpectedTile(response.content, 'test_tms_session_colormap_invalid_legend')
+        self.assertEqual(response.status_code, 200)
+
+    def test_tms_continuous_colormap(self):
+        response = self.client.get(self.tile_url + '?colormap={"continuous": "True", "from": [237, 248, 177], "to": "7fcdbb", "over": [44, 127, 184]}')
+        self.assertEqual(response['Content-type'], 'PNG')
+        self.assertIsExpectedTile(response.content, 'test_tms_continuous_colormap')
         self.assertEqual(response.status_code, 200)

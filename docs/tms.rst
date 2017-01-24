@@ -73,6 +73,50 @@ Formula expressions are currently not validated on input. Wrongly specified
 formulas might lead to errors when rendering raster tiles. Check your formulas
 if unexpected errors happen on the TMS endpoints.
 
+Continuous Color Schemes
+^^^^^^^^^^^^^^^^^^^^^^^^
+The examples above show how to assign discrete pixel value ranges to individual
+colors. This allows applying discrete color schemes with a limited number of
+breaks to continuous rasters.
+
+Django-raster also supports applying continuous color scales. Colormaps are
+interpreted as continuous color schemes if the keyword ``continuous``
+is provided as a key in the colormap dictionary.
+
+The continuous color scheme requires at least two colors, which are
+interpolated over the range of pixel values. These colors can be specified
+using the ``from`` and ``to`` keywords. A third color can be specified to 
+force interpolation through another color in the middle of the range. This
+intermediate color can be specified using the ``over`` key.
+
+The range over which the colors are interpolated is determined automatically
+from the raster layer metadata if possible, and falls back to the range of
+the individual tile data. The fallback might result in a visually confusing
+color scheme, as the range of pixel values in a single tile may vary
+substantially and are not representative of the raster. The range can
+therefore also be specified manually using the ``range`` parameter.
+
+An example for a continuous color scheme, which will interpolate all values
+from ``0`` to ``100`` into colors ranging from red to blue over green is
+the following:
+
+.. code-block:: json
+
+    {
+        "continuous": "True",
+        "from": [255, 0, 0],
+        "to": [0, 0, 255],
+        "over": [0, 255, 0],
+        "range": [0, 100]
+    }
+
+The keys ``continuous``, ``from`` and ``to`` are required. The ``over``
+key is an optional intermediate color for the interpolation. The ``range``
+key specifies the pixel values over which to interpolate. This parameter
+is estimated from metadata if not provided in the legend. All other keys
+are ignored in the continuous color mode, which is triggered if the
+``continuous`` key is found in the legend.
+
 Overriding the colormap and the legend
 ---------------------------------------
 
@@ -129,7 +173,7 @@ you can do so by using this url:
 
     /raster/tiles/{z}/{x}/{y}.png?colormap=%22%7B1%3A%20'%23FF0000'%2C%202%3A%20'%2300FF00'%2C%203%3A%20'%230000FF'%7D%22
 
-Colormap value is the URIEncoded version of the json stringified colormap object.
+The colormap value is the URIEncoded version of the json stringified colormap object.
 
 Caching
 -------

@@ -19,7 +19,7 @@ from django.template.defaultfilters import slugify
 from django.views.generic import View
 from raster.algebra.const import ALGEBRA_PIXEL_TYPE_GDAL
 from raster.algebra.parser import RasterAlgebraParser
-from raster.const import DEFAULT_LEGEND_BREAKS, EXPORT_MAX_PIXELS, IMG_FORMATS, MAX_EXPORT_NAME_LENGTH, README_TEMPLATE
+from raster.const import EXPORT_MAX_PIXELS, IMG_FORMATS, MAX_EXPORT_NAME_LENGTH, README_TEMPLATE
 from raster.exceptions import RasterAlgebraException
 from raster.models import Legend, RasterLayer
 from raster.shortcuts import get_session_colormap
@@ -37,8 +37,7 @@ class RasterView(View):
         default colormap from the layer legend.
         """
         if 'colormap' in self.request.GET:
-            colormap = self.request.GET['colormap']
-            colormap = colormap_to_rgba(json.loads(colormap))
+            colormap = colormap_to_rgba(json.loads(self.request.GET['colormap']))
         elif 'legend' in self.request.GET:
             store = self.request.GET.get('store', 'database')
             if store == 'session':
@@ -62,33 +61,24 @@ class RasterView(View):
 
         elif layer and hasattr(layer.legend, 'colormap'):
             colormap = layer.legend.colormap
-        elif layer:
-            # Construct a grayscale colormap from layer metadata
-            meta = layer.rasterlayerbandmetadata_set.first()
-
-            # Return if no metadata can be found to construct the colormap
-            if meta is None:
-                return
-
-            # Compute bin width for a linear scaling
-            diff = (meta.max - meta.min) / DEFAULT_LEGEND_BREAKS
-
-            # Create colormap with seven breaks
-            colormap = {}
-            for i in range(DEFAULT_LEGEND_BREAKS):
-                if i == 0:
-                    expression = '({0} <= x) & (x <= {1})'
-                else:
-                    expression = '({0} < x) & (x <= {1})'
-                expression = expression.format(meta.min + diff * i, meta.min + diff * (i + 1))
-                colormap[expression] = [(255 / (DEFAULT_LEGEND_BREAKS - 1)) * i] * 3 + [255, ]
         else:
-            return
+            # Use a continous grayscale color scheme.
+            colormap = {
+                'continuous': True,
+                'from': (0, 0, 0),
+                'to': (255, 255, 255),
+            }
 
         # Filter by custom entries if requested
-        if 'entries' in self.request.GET:
+        if colormap and 'entries' in self.request.GET:
             entries = self.request.GET['entries'].split(',')
             colormap = {k: v for (k, v) in colormap.items() if str(k) in entries}
+
+        # Add layer level value range to colormap if it was not provided manually.
+        if layer and colormap and 'continuous' in colormap and 'range' not in colormap:
+            meta = layer.rasterlayerbandmetadata_set.first()
+            if meta is not None:
+                colormap['range'] = (meta.min, meta.max)
 
         return colormap
 
@@ -214,23 +204,11 @@ class AlgebraView(RasterView):
             result.bands[0].nodata_value,
         )
 
-        # Render tile
+        # Get colormap.
         colormap = self.get_colormap()
-        if colormap:
-            # Render tile using the legend data
-            img, stats = band_data_to_image(result, colormap)
-        else:
-            # Scale to grayscale rgb (can be colorscheme later on)
-            result = result.astype('float').ravel()
-            result = 255 * (result - numpy.min(result)) / (numpy.max(result) - numpy.min(result))
 
-            # Create rgba matrix from grayscale array
-            result = numpy.array((result, result, result, numpy.repeat(255, len(result)))).T
-            rgba = result.reshape(WEB_MERCATOR_TILESIZE, WEB_MERCATOR_TILESIZE, 4).astype('uint8')
-
-            # Create image from array
-            img = Image.fromarray(rgba)
-            stats = {}
+        # Render tile using the legend data
+        img, stats = band_data_to_image(result, colormap)
 
         # Return rendered image
         return self.write_img_to_response(img, stats)
@@ -277,7 +255,7 @@ class TmsView(RasterView):
         # Get layer
         layer = self.get_layer()
 
-        # Override color map if arg provided
+        # Get colormap.
         colormap = self.get_colormap(layer)
 
         # Get tile
@@ -392,11 +370,10 @@ class ExportView(AlgebraView):
     def write_colormap(self, zfile):
         # Try to get colormap
         colormap = self.get_colormap()
-        # Return early if colormap was not specified
-        if not colormap:
-            return
         # Set a simple header for this colormap
-        colorstr = '# Raster Algebra Colormap\nINTERPOLATION:DISCRETE\n'
+        colorstr = '# Raster Algebra Colormap\n'
+        # Check if this is a continuous legend.
+        colorstr += 'INTERPOLATION: ' + ('CONTINUOUS' if colormap.pop('continuous', None) else 'DISCRETE') + '\n'
         # Add expressions and colors of the colormap
         for key, val in colormap.items():
             colorstr += str(key) + ',' + ','.join((str(x) for x in val)) + ',' + str(key) + '\n'

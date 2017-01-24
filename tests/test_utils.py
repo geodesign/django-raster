@@ -1,10 +1,12 @@
 from __future__ import unicode_literals
 
+import numpy
+
 from django.contrib.gis.gdal import OGRGeometry
 from django.test import TestCase
 from raster.exceptions import RasterException
 from raster.tiles.utils import tile_bounds, tile_index_range
-from raster.utils import colormap_to_rgba, hex_to_rgba
+from raster.utils import colormap_to_rgba, hex_to_rgba, rescale_to_channel_range
 
 
 class TestUtils(TestCase):
@@ -67,3 +69,22 @@ class TestUtils(TestCase):
         idx = tile_index_range(geom.extent, 11, tolerance=1e-3)
         self.assertEqual(idx[2] - idx[0], 2 ** 3 - 1)
         self.assertEqual(idx[3] - idx[1], 2 ** 3 - 1)
+
+    def test_channel_rescale(self):
+        data = numpy.array([0, 0.5, 1], dtype='float')
+        numpy.testing.assert_equal(
+            rescale_to_channel_range(data, 50, 40, None),
+            [50, 45, 40]
+        )
+        numpy.testing.assert_equal(
+            rescale_to_channel_range(data, 40, 50, None),
+            [40, 45, 50]
+        )
+        numpy.testing.assert_equal(
+            rescale_to_channel_range(data, 50, 50, None),
+            [50, 50, 50]
+        )
+        numpy.testing.assert_equal(
+            rescale_to_channel_range(data, 60, 50, 40),
+            [60, 40, 50]
+        )
