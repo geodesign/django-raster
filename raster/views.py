@@ -38,6 +38,9 @@ class RasterView(View):
         """
         if 'colormap' in self.request.GET:
             colormap = colormap_to_rgba(json.loads(self.request.GET['colormap']))
+            # Ensure colormap range is in float format.
+            if 'range' in colormap:
+                colormap['range'] = (float(colormap['range'][0]), float(colormap['range'][1]))
         elif 'legend' in self.request.GET:
             store = self.request.GET.get('store', 'database')
             if store == 'session':

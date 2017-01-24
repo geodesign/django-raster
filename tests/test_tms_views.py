@@ -121,3 +121,8 @@ class RasterTmsTests(RasterTestCase):
         self.assertEqual(response['Content-type'], 'PNG')
         self.assertIsExpectedTile(response.content, 'test_tms_continuous_colormap')
         self.assertEqual(response.status_code, 200)
+
+        response = self.client.get(self.tile_url + '?colormap={"continuous": "True", "from": [237, 248, 177], "to": "7fcdbb", "over": [44, 127, 184], "range": [0, 9]}')
+        self.assertEqual(response['Content-type'], 'PNG')
+        self.assertIsExpectedTile(response.content, 'test_tms_continuous_colormap')
+        self.assertEqual(response.status_code, 200)
