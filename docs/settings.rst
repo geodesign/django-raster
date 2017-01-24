@@ -22,6 +22,17 @@ Defaults to the normal temporary directory of the machine.
 
     RASTER_WORKDIR = None
 
+
+All in one parse task
+---------------------
+For some applications where the size of the rasters is small, the distributed
+raster parsing might have more overhead than gain. The distributed parsing can
+be disactivated with the following setting. If it is set to ``True``, rasters
+are parsed in single celery tasks.
+::
+
+    RASTER_PARSE_SINGLE_TASK = True
+
 Tile Cache Timeout
 ------------------
 The tile out time for cached tiles. Set this to zero if you do not want to
