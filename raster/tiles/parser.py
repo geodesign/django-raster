@@ -7,8 +7,6 @@ import tempfile
 import zipfile
 
 import numpy
-from celery import current_app, group
-from celery.contrib.methods import task_method
 
 from django.conf import settings
 from django.contrib.gis.gdal import GDALRaster, OGRGeometry
@@ -291,8 +289,8 @@ class RasterLayerParser(object):
         self.log('Creating {0} tiles in {1} quadrants at zoom {2}.'.format(self.nr_of_tiles(zoom), len(quadrants), zoom))
 
         # Process quadrants in parallell
-        quadrant_task_group = group(self.process_quadrant.si(indexrange, zoom) for indexrange in quadrants)
-        quadrant_task_group.apply()
+        for indexrange in quadrants:
+            self.process_quadrant(indexrange, zoom)
 
         # Store histogram data
         if zoom == self.max_zoom:
@@ -305,12 +303,13 @@ class RasterLayerParser(object):
 
     _quadrant_count = 0
 
-    @current_app.task(filter=task_method)
     def process_quadrant(self, indexrange, zoom):
         """
         Create raster tiles for a quadrant of tiles defined by a x-y-z index
         range and a zoom level.
         """
+        # TODO Use a standalone celery task for this method in order to
+        # gain speedup from parallelism.
         self._quadrant_count += 1
         self.log(
             'Starting tile creation for quadrant {0} at zoom level {1}'.format(self._quadrant_count, zoom),
