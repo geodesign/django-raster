@@ -65,7 +65,7 @@ def band_data_to_image(band_data, colormap):
         dmin, dmax = colormap.get('range', (dat.min(), dat.max()))
 
         if dmax == dmin:
-            norm = numpy.ones((dat.shape[0], 4), dtype='uint8') * dmin
+            norm = dat == dmin
         else:
             norm = (dat - dmin) / (dmax - dmin)
 
@@ -79,9 +79,9 @@ def band_data_to_image(band_data, colormap):
 
         # Compute alpha channel from mask if available.
         if numpy.ma.is_masked(dat):
-            alpha = 255 * numpy.logical_not(dat.mask)
+            alpha = 255 * numpy.logical_not(dat.mask) * (norm > 0) * (norm < 1)
         else:
-            alpha = 255 * numpy.ones(norm.shape)
+            alpha = 255 * (norm > 0) * (norm < 1)
 
         rgba = numpy.array([red, green, blue, alpha], dtype='uint8').T
     else:
