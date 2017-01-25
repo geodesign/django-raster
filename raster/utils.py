@@ -79,7 +79,7 @@ def band_data_to_image(band_data, colormap):
 
         # Compute alpha channel from mask if available.
         if numpy.ma.is_masked(dat):
-            alpha = 255 * numpy.logical_not(dat.mask) * (norm > 0) * (norm < 1)
+            alpha = 255 * numpy.logical_not(dat.mask) * (norm >= 0) * (norm <= 1)
         else:
             alpha = 255 * (norm > 0) * (norm < 1)
 
