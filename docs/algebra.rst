@@ -310,3 +310,9 @@ calculator.
     Standard Deviation       ``std``
     Sum                      ``sum``
     ======================== ============
+
+Raster Algebra Export Endpoint
+------------------------------
+Data rendered using the django raster algebra can be exported into a tif format along with some metadata about how the layer was created. This can be useful to persist data into files, as well as to import the layers into desktop software for further processing.
+
+For this purpose, django-raster includes an algebra layer export endpoint. The endpoint works very similar to the raster algebra endpoint, but instead of rendering individual tiles, it returns a zip file containing the resulting raster as well as metadata about the parameters used for rendering.
