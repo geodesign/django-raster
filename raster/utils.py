@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 import numpy
 from PIL import Image
 
+from django.contrib.gis.gdal import OGRGeometry
 from django.utils import six
 from raster.algebra.parser import FormulaParser
 from raster.exceptions import RasterException
@@ -129,3 +130,45 @@ def colormap_to_rgba(colormap):
         return {k: hex_to_rgba(v) if isinstance(v, (six.string_types, int)) and k in ['from', 'to', 'over'] else v for k, v in colormap.items()}
     else:
         return {k: hex_to_rgba(v) if isinstance(v, (six.string_types, int)) else v for k, v in colormap.items()}
+
+
+def pixel_value_from_point(raster, point, band=0):
+    """
+    Returns the pixel value for the coordinate of the input point from selected
+    band.
+
+    The input can be a point or tuple, if its a tuple it is assumed to be
+    coordinates in the reference system of the raster.
+    """
+    if isinstance(point, (tuple, list)):
+        point = OGRGeometry('POINT({0} {1})'.format(*point))
+        point.srid = raster.srid
+    elif not point.srs or not raster.srs:
+        raise ValueError('Both the point and the raster are required to have a reference system specified.')
+    elif point.srs != raster.srs:
+        # Ensure the projection of the point is the same as of the raster.
+        point.transform(raster.srid)
+
+    # Return if point and raster do not touch.
+    bbox = OGRGeometry.from_bbox(raster.extent)
+    bbox.srs = raster.srs
+
+    if not point.intersects(bbox):
+        return
+
+    # Compute position of point relative to raster origin.
+    offset = (abs(raster.origin.x - point.coords[0]), abs(raster.origin.y - point.coords[1]))
+
+    # Compute pixel index value based on offset.
+    offset_index = [int(offset[0] / abs(raster.scale.x)), int(offset[1] / abs(raster.scale.y))]
+
+    # If the point is exactly on the boundary, the offset_index is rounded to
+    # a pixel index over the edge of the pixel. The index needs to be reduced
+    # by one pixel for those cases.
+    if offset_index[0] == raster.width:
+        offset_index[0] -= 1
+
+    if offset_index[1] == raster.height:
+        offset_index[1] -= 1
+
+    return raster.bands[band].data(offset=offset_index, size=(1, 1))[0, 0]

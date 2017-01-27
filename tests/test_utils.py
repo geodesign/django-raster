@@ -2,11 +2,11 @@ from __future__ import unicode_literals
 
 import numpy
 
-from django.contrib.gis.gdal import OGRGeometry
+from django.contrib.gis.gdal import GDALRaster, OGRGeometry
 from django.test import TestCase
 from raster.exceptions import RasterException
 from raster.tiles.utils import tile_bounds, tile_index_range
-from raster.utils import colormap_to_rgba, hex_to_rgba, rescale_to_channel_range
+from raster.utils import colormap_to_rgba, hex_to_rgba, pixel_value_from_point, rescale_to_channel_range
 
 
 class TestUtils(TestCase):
@@ -88,3 +88,58 @@ class TestUtils(TestCase):
             rescale_to_channel_range(data, 60, 50, 40),
             [60, 40, 50]
         )
+
+    def test_get_pixel_value(self):
+        raster = GDALRaster({'width': 5, 'height': 5, 'srid': 4326, 'bands': [{'data': range(25)}], 'origin': (2, 2), 'scale': (1, 1)})
+
+        # Pixel value at origin.
+        point = OGRGeometry('SRID=4326;POINT(2 2)')
+        result = pixel_value_from_point(raster, point)
+        self.assertEqual(result, 0)
+
+        # Coords as tuple.
+        result = pixel_value_from_point(raster, (2, 2))
+        self.assertEqual(result, 0)
+
+        # Point in different projection.
+        point = OGRGeometry('SRID=3857;POINT(222638.9815865472 222684.20850554455)')
+        result = pixel_value_from_point(raster, point)
+        self.assertEqual(result, 0)
+
+        # Pixel value outside of raster.
+        point = OGRGeometry('SRID=4326;POINT(-2 2)')
+        result = pixel_value_from_point(raster, point)
+        self.assertEqual(result, None)
+
+        point = OGRGeometry('SRID=4326;POINT(8 8)')
+        result = pixel_value_from_point(raster, point)
+        self.assertEqual(result, None)
+
+        # Pixel values within the raster.
+        point = OGRGeometry('SRID=4326;POINT(3.5 2)')
+        result = pixel_value_from_point(raster, point)
+        self.assertEqual(result, 1)
+
+        point = OGRGeometry('SRID=4326;POINT(2 3.5)')
+        result = pixel_value_from_point(raster, point)
+        self.assertEqual(result, 5)
+
+        point = OGRGeometry('SRID=4326;POINT(6.999 6.9999)')
+        result = pixel_value_from_point(raster, point)
+        self.assertEqual(result, 24)
+
+        # Pixel value at "outer" edge of raster.
+        point = OGRGeometry('SRID=4326;POINT(7 7)')
+        result = pixel_value_from_point(raster, point)
+        self.assertEqual(result, 24)
+
+        # Point without srs specified.
+        point = OGRGeometry('POINT(2 2)')
+        with self.assertRaises(ValueError):
+            pixel_value_from_point(raster, point)
+
+        # Raster with negative scale on y axis.
+        raster = GDALRaster({'width': 5, 'height': 5, 'srid': 4326, 'bands': [{'data': range(25)}], 'origin': (2, 2), 'scale': (1, -1)})
+        point = OGRGeometry('SRID=4326;POINT(3 1)')
+        result = pixel_value_from_point(raster, point)
+        self.assertEqual(result, 6)

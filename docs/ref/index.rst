@@ -6,3 +6,4 @@ API Reference
    :maxdepth: 2
 
    shortcuts
+   utils
