@@ -62,7 +62,7 @@ class ValueCountMixin(object):
         if self.datatype not in ['ca', 'ma']:
             raise TypeError(
                 'Wrong rastertype, value counts can only be '
-                'calculated for categorical or mask raster tpyes'
+                'calculated for categorical or mask raster types'
             )
 
         if geom:
