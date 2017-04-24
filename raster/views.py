@@ -89,7 +89,7 @@ class RasterView(View):
         """
         Returns image format requested.
         """
-        return IMG_FORMATS[self.kwargs.get('format')]
+        return IMG_FORMATS[self.kwargs.get('frmt')]
 
     def write_img_to_response(self, img, stats):
         """
@@ -97,8 +97,8 @@ class RasterView(View):
         """
         # Create response, and add image
         response = HttpResponse()
-        frmt = self.get_format()
-        response['Content-Type'] = frmt
+        frmt, content_type = self.get_format()
+        response['Content-Type'] = content_type
         response['aggregation'] = json.dumps(stats)
         img.save(response, frmt)
 

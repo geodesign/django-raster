@@ -92,11 +92,11 @@ class RasterTestCase(TransactionTestCase):
         self.tile = self.rasterlayer.rastertile_set.get(tilez=11, tilex=552, tiley=858)
         self.tile_url = reverse('tms', kwargs={
             'z': self.tile.tilez, 'y': self.tile.tiley, 'x': self.tile.tilex,
-            'layer': self.rasterlayer.id, 'format': '.png'
+            'layer': self.rasterlayer.id, 'frmt': 'png'
         })
         self.algebra_tile_url = reverse('algebra', kwargs={
             'z': self.tile.tilez, 'y': self.tile.tiley,
-            'x': self.tile.tilex, 'format': '.png'
+            'x': self.tile.tilex, 'frmt': 'png'
         })
 
         # Precompute expected totals from value count

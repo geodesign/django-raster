@@ -14,14 +14,14 @@ urlpatterns = [
 
     # Normal raster tiles endpoint
     url(
-        r'^tiles/(?P<layer>[^/]+)/(?P<z>[0-9]+)/(?P<x>[0-9]+)/(?P<y>[0-9]+)(?P<format>\.jpg|\.png)$',
+        r'^tiles/(?P<layer>[^/]+)/(?P<z>[0-9]+)/(?P<x>[0-9]+)/(?P<y>[0-9]+).(?P<frmt>png|jpg)$',
         cache_page(cache_timeout)(TmsView.as_view()),
         name='tms'
     ),
 
     # Raster algebra endpoint
     url(
-        r'^algebra/(?P<z>[0-9]+)/(?P<x>[0-9]+)/(?P<y>[0-9]+)(?P<format>\.jpg|\.png)$',
+        r'^algebra/(?P<z>[0-9]+)/(?P<x>[0-9]+)/(?P<y>[0-9]+).(?P<frmt>jpg|png)$',
         cache_page(cache_timeout)(AlgebraView.as_view()),
         name='algebra'
     ),
@@ -33,7 +33,7 @@ urlpatterns = [
         name='legend'
     ),
 
-    # Exporter endpoing
+    # Exporter endpoint
     url(
         r'^export$',
         cache_page(cache_timeout)(ExportView.as_view()),
