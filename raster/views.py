@@ -21,7 +21,7 @@ from raster.algebra.const import ALGEBRA_PIXEL_TYPE_GDAL
 from raster.algebra.parser import RasterAlgebraParser
 from raster.const import EXPORT_MAX_PIXELS, IMG_FORMATS, MAX_EXPORT_NAME_LENGTH, README_TEMPLATE
 from raster.exceptions import RasterAlgebraException
-from raster.models import Legend, RasterLayer
+from raster.models import Legend, RasterLayer, RasterLayerBandMetadata
 from raster.shortcuts import get_session_colormap
 from raster.tiles.const import WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE
 from raster.tiles.utils import get_raster_tile, tile_bounds, tile_index_range, tile_scale
@@ -36,6 +36,8 @@ class RasterView(View):
         request or session, a custom legend name to construct the legend or the
         default colormap from the layer legend.
         """
+        colormap = None
+
         if 'colormap' in self.request.GET:
             colormap = colormap_to_rgba(json.loads(self.request.GET['colormap']))
             # Ensure colormap range is in float format.
@@ -62,26 +64,32 @@ class RasterView(View):
                     legend = Legend.objects.filter(title__iexact=legend_input).first()
                 colormap = legend.colormap
 
-        elif layer and hasattr(layer.legend, 'colormap'):
-            colormap = layer.legend.colormap
-        else:
+        elif 'layer' in self.kwargs:
+            # Get legend for the input layer.
+            legend = Legend.objects.filter(rasterlayer=self.kwargs.get('layer')).first()
+
+            if legend and hasattr(legend, 'colormap'):
+                colormap = legend.colormap
+
+        if not colormap:
             # Use a continous grayscale color scheme.
             colormap = {
                 'continuous': True,
                 'from': (0, 0, 0),
                 'to': (255, 255, 255),
             }
+        else:
+            # Add layer level value range to continuous colormaps if it was
+            # not provided manually.
+            if 'continuous' in colormap and 'range' not in colormap:
+                meta = RasterLayerBandMetadata.objects.filter(rasterlayer_id=self.kwargs.get('layer')).first()
+                if meta:
+                    colormap['range'] = (meta.min, meta.max)
 
-        # Filter by custom entries if requested
-        if colormap and 'entries' in self.request.GET:
-            entries = self.request.GET['entries'].split(',')
-            colormap = {k: v for (k, v) in colormap.items() if str(k) in entries}
-
-        # Add layer level value range to colormap if it was not provided manually.
-        if layer and colormap and 'continuous' in colormap and 'range' not in colormap:
-            meta = layer.rasterlayerbandmetadata_set.first()
-            if meta is not None:
-                colormap['range'] = (meta.min, meta.max)
+            # Filter by custom entries if requested
+            if colormap and 'entries' in self.request.GET:
+                entries = self.request.GET['entries'].split(',')
+                colormap = {k: v for (k, v) in colormap.items() if str(k) in entries}
 
         return colormap
 
@@ -143,25 +151,38 @@ class AlgebraView(RasterView):
     """
 
     def get_ids(self):
-        # Get layer ids
-        ids = self.request.GET.get('layers', '').split(',')
+        if 'layer' in self.kwargs:
+            # For tms requests, construct simple ids dictionary.
+            data = self.kwargs.get('layer')
+            # Determine query paremeter type
+            try:
+                layer_id = int(data)
+            except ValueError:
+                query = Q(rasterfile__contains='rasters/' + data)
+                layer_id = get_object_or_404(RasterLayer, query).id
+            # For TMS tile request, get the layer id from the url.
+            return {'x': layer_id}
+        else:
+            # For algebra requests, get the layer ids from the query parameter.
+            ids = self.request.GET.get('layers', '').split(',')
 
-        # Check if layer parameter is valid
-        if not len(ids) or not all('=' in idx for idx in ids):
-            raise RasterAlgebraException('Layer parameter is not valid.')
+            # Check if layer parameter is valid
+            if not len(ids) or not all('=' in idx for idx in ids):
+                raise RasterAlgebraException('Layer parameter is not valid.')
 
-        # Split id/name input pairs
-        ids = [idx.split('=') for idx in ids]
+            # Split id/name input pairs
+            ids = [idx.split('=') for idx in ids]
 
-        # Convert ids to integer
-        try:
-            ids = {idx[0]: int(idx[1]) for idx in ids}
-        except ValueError:
-            raise RasterAlgebraException('Layer parameter is not valid.')
+            # Convert ids to integer
+            try:
+                ids = {idx[0]: int(idx[1]) for idx in ids}
+            except ValueError:
+                raise RasterAlgebraException('Layer parameter is not valid.')
 
-        return ids
+            return ids
 
     def get(self, request, *args, **kwargs):
+
         # Get layer ids
         ids = self.get_ids()
 
@@ -178,7 +199,11 @@ class AlgebraView(RasterView):
                 return self.write_img_to_response(img, {})
 
         # Get formula from request
-        formula = request.GET.get('formula', None)
+        if 'layer' in self.kwargs:
+            # Set the formula to trivial for TMS requests.
+            formula = 'x'
+        else:
+            formula = request.GET.get('formula', None)
 
         # Dispatch by request type. If a formula was provided, use raster
         # algebra otherwise look for rgb request.
@@ -246,37 +271,6 @@ class AlgebraView(RasterView):
         stats = {}
 
         # Return rendered image
-        return self.write_img_to_response(img, stats)
-
-
-class TmsView(RasterView):
-
-    def get(self, *args, **kwargs):
-        """
-        Returns an image rendered from a raster tile.
-        """
-        # Get layer
-        layer = self.get_layer()
-
-        # Get colormap.
-        colormap = self.get_colormap(layer)
-
-        # Get tile
-        tile = self.get_tile(layer.id)
-
-        # Render tile
-        if tile and colormap:
-            data = numpy.ma.masked_values(
-                tile.bands[0].data(),
-                tile.bands[0].nodata_value,
-            )
-            # Render tile using the legend data
-            img, stats = band_data_to_image(data, colormap)
-        else:
-            # Create empty image if tile cant be found
-            img = Image.new("RGBA", (WEB_MERCATOR_TILESIZE, WEB_MERCATOR_TILESIZE), (0, 0, 0, 0))
-            stats = {}
-
         return self.write_img_to_response(img, stats)
 
 

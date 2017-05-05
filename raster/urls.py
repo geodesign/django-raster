@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 from django.conf import settings
 from django.conf.urls import url
 from django.views.decorators.cache import cache_page
-from raster.views import AlgebraView, ExportView, LegendView, TmsView
+from raster.views import AlgebraView, ExportView, LegendView
 
 if hasattr(settings, 'RASTER_TILE_CACHE_TIMEOUT'):
     cache_timeout = settings.RASTER_TILE_CACHE_TIMEOUT
@@ -15,7 +15,7 @@ urlpatterns = [
     # Normal raster tiles endpoint
     url(
         r'^tiles/(?P<layer>[^/]+)/(?P<z>[0-9]+)/(?P<x>[0-9]+)/(?P<y>[0-9]+).(?P<frmt>png|jpg)$',
-        cache_page(cache_timeout)(TmsView.as_view()),
+        cache_page(cache_timeout)(AlgebraView.as_view()),
         name='tms'
     ),
 
