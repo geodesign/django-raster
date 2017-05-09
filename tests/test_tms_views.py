@@ -1,11 +1,15 @@
 from __future__ import unicode_literals
 
+import sys
+from unittest import skipUnless
+
 from django.core.urlresolvers import reverse
 from django.test.utils import override_settings
 from raster.shortcuts import set_session_colormap
 from tests.raster_testcase import RasterTestCase
 
 
+@skipUnless(sys.version_info[:2] == (3, 5), 'The binary version of the output files depends on the python version')
 @override_settings(RASTER_TILE_CACHE_TIMEOUT=0)
 class RasterTmsTests(RasterTestCase):
 
@@ -113,7 +117,7 @@ class RasterTmsTests(RasterTestCase):
     def test_tms_session_colormap_invalid_legend(self):
         response = self.client.get(self.tile_url + '?legend=MyLegend&store=session')
         self.assertEqual(response['Content-type'], 'image/png')
-        self.assertIsExpectedTile(response.content, 'test_tms_session_colormap_invalid_legend')
+        self.assertIsExpectedTile(response.content, 'test_tms_existing_tile_without_legend')
         self.assertEqual(response.status_code, 200)
 
     def test_tms_continuous_colormap(self):

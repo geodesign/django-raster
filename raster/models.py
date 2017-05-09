@@ -34,11 +34,13 @@ class LegendEntry(models.Model):
     """
     One row in a Legend.
     """
+    legend = models.ForeignKey('Legend', null=True)
     semantics = models.ForeignKey(LegendSemantics)
     expression = models.CharField(max_length=500,
         help_text='Use a number or a valid numpy logical expression where x is the'
                   'pixel value. For instance: "(-3.0 < x) & (x <= 1)" or "x <= 1".')
     color = RGBColorField()
+    code = models.CharField(max_length=100, blank=True, default='')
 
     def __str__(self):
         return '{}, {}, {}'.format(self.semantics.name, self.expression, self.color)
@@ -50,7 +52,6 @@ class Legend(models.Model):
     """
     title = models.CharField(max_length=200)
     description = models.TextField(null=True, blank=True)
-    entries = models.ManyToManyField(LegendEntry, through='LegendEntryOrder')
     json = models.TextField(null=True, blank=True)
     modified = models.DateTimeField(auto_now=True)
 
@@ -59,12 +60,12 @@ class Legend(models.Model):
 
     def update_json(self):
         data = []
-        for val in self.legendentryorder_set.prefetch_related('legendentry').all():
+        for entry in self.legendentry_set.all():
             data.append({
-                'name': val.legendentry.semantics.name,
-                'expression': val.legendentry.expression,
-                'code': val.code,
-                'color': val.legendentry.color,
+                'name': entry.semantics.name,
+                'expression': entry.expression,
+                'code': entry.code,
+                'color': entry.color,
             })
         # Sort data by name and code.
         data = sorted(sorted(data, key=itemgetter('name')), key=itemgetter('code'))
@@ -84,23 +85,8 @@ class Legend(models.Model):
         super(Legend, self).save(*args, **kwargs)
 
 
-class LegendEntryOrder(models.Model):
-    """
-    Order and hierarchy of entries in legend.
-    """
-    legend = models.ForeignKey(Legend)
-    legendentry = models.ForeignKey(LegendEntry)
-    code = models.CharField(max_length=100, blank=True, default='')
-
-    class Meta:
-        unique_together = ('legend', 'legendentry')
-
-    def __str__(self):
-        return '%s' % self.id
-
-
-@receiver(post_save, sender=LegendEntryOrder)
-@receiver(post_delete, sender=LegendEntryOrder)
+@receiver(post_save, sender=LegendEntry)
+@receiver(post_delete, sender=LegendEntry)
 def legend_entries_changed(sender, instance, **kwargs):
     """
     Updates style json upon adding or removing legend entries.
@@ -109,25 +95,15 @@ def legend_entries_changed(sender, instance, **kwargs):
     instance.legend.save()
 
 
-@receiver(post_save, sender=LegendEntry)
-def update_dependent_legends_on_entry_change(sender, instance, **kwargs):
-    """
-    Updates dependent Legends on a change in Legend entries.
-    """
-    for legend in Legend.objects.filter(entries__id=instance.id):
-        legend.update_json()
-        legend.save()
-
-
 @receiver(post_save, sender=LegendSemantics)
 def update_dependent_legends_on_semantics_change(sender, instance, **kwargs):
     """
     Updates dependent Legends on a change in Semantics.
     """
-    for entry in LegendEntry.objects.filter(semantics_id=instance.id):
-        for legend in Legend.objects.filter(entries__id=entry.id):
-            legend.update_json()
-            legend.save()
+    legend_ids = LegendEntry.objects.filter(semantics_id=instance.id).values_list('legend_id', flat=True)
+    for legend in Legend.objects.filter(id__in=legend_ids):
+        legend.update_json()
+        legend.save()
 
 
 class RasterLayer(models.Model, ValueCountMixin):

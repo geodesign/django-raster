@@ -12,7 +12,7 @@ from django.conf import settings
 from django.core.files import File
 from django.core.urlresolvers import reverse
 from django.test import Client, TransactionTestCase
-from raster.models import Legend, LegendEntry, LegendEntryOrder, LegendSemantics, RasterLayer
+from raster.models import Legend, LegendEntry, LegendSemantics, RasterLayer
 
 
 class RasterTestCase(TransactionTestCase):
@@ -29,37 +29,25 @@ class RasterTestCase(TransactionTestCase):
         sem3 = LegendSemantics.objects.create(name='Water')
         sem4 = LegendSemantics.objects.create(name='Fire')
 
-        # Create legend entries (semantics with colors and expressions)
-        ent1 = LegendEntry.objects.create(semantics=sem1, expression='4', color='#123456')
-        ent2 = LegendEntry.objects.create(semantics=sem1, expression='10', color='#123456')
-        ent3 = LegendEntry.objects.create(semantics=sem2, expression='2', color='#654321')
-        ent4 = LegendEntry.objects.create(semantics=sem3, expression='4', color='#654321')
-        ent5 = LegendEntry.objects.create(semantics=sem4, expression='4', color='#654321')
-        ent6 = LegendEntry.objects.create(semantics=sem4, expression='5', color='#123456')
-        ent7 = LegendEntry.objects.create(semantics=sem4, expression='(x >= 2) & (x < 5)', color='#123456')
-
         # Create legends
         leg = Legend.objects.create(title='MyLegend')
-        LegendEntryOrder.objects.create(legend=leg, legendentry=ent1, code='1')
-
         self.legend = Legend.objects.create(title='Algebra Legend')
-        LegendEntryOrder.objects.create(legend=self.legend, legendentry=ent2, code='1')
-        LegendEntryOrder.objects.create(legend=self.legend, legendentry=ent3, code='2')
-
         leg2 = Legend.objects.create(title='Other')
-        LegendEntryOrder.objects.create(legend=leg2, legendentry=ent4, code='1')
-
         leg3 = Legend.objects.create(title='Dual')
-        LegendEntryOrder.objects.create(legend=leg3, legendentry=ent5, code='1')
-        LegendEntryOrder.objects.create(legend=leg3, legendentry=ent6, code='2')
-
         leg_expression = Legend.objects.create(title='Legend with Expression')
-        LegendEntryOrder.objects.create(legend=leg_expression, legendentry=ent7, code='1')
         self.legend_with_expression = leg_expression
 
-        # Create user sssion
-        # https://docs.djangoproject.com/en/1.9/topics/http/sessions/#using-sessions-out-of-views
+        # Create legend entries (semantics with colors and expressions)
+        LegendEntry.objects.create(legend=leg, semantics=sem1, expression='4', color='#123456', code='1')
+        LegendEntry.objects.create(legend=self.legend, semantics=sem1, expression='10', color='#123456', code='1')
+        LegendEntry.objects.create(legend=self.legend, semantics=sem2, expression='2', color='#654321', code='2')
+        LegendEntry.objects.create(legend=leg2, semantics=sem3, expression='4', color='#654321', code='1')
+        LegendEntry.objects.create(legend=leg3, semantics=sem4, expression='4', color='#654321', code='1')
+        LegendEntry.objects.create(legend=leg3, semantics=sem4, expression='5', color='#123456', code='2')
+        LegendEntry.objects.create(legend=leg_expression, semantics=sem4, expression='(x >= 2) & (x < 5)', color='#123456', code='1')
 
+        # Create user session
+        # https://docs.djangoproject.com/en/1.9/topics/http/sessions/#using-sessions-out-of-views
         engine = import_module(settings.SESSION_ENGINE)
         store = engine.SessionStore()
         store.save()

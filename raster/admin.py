@@ -169,6 +169,7 @@ class LegendAdmin(admin.ModelAdmin):
     )
     exclude = ['entries']
 
+
 admin.site.register(LegendSemantics)
 admin.site.register(RasterLayer, RasterLayerModelAdmin)
 admin.site.register(RasterTile, RasterTileModelAdmin)
