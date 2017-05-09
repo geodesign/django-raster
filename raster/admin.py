@@ -160,14 +160,13 @@ class RasterTileModelAdmin(admin.ModelAdmin):
 
 
 class LegendEntriesInLine(admin.TabularInline):
-    model = Legend.entries.through
+    model = LegendEntry
 
 
 class LegendAdmin(admin.ModelAdmin):
     inlines = (
         LegendEntriesInLine,
     )
-    exclude = ['entries']
 
 
 admin.site.register(LegendSemantics)
