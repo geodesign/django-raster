@@ -15,16 +15,16 @@ before_script:
   - psql -c 'create extension postgis' -U postgres -d raster_test
 
 install:
-  - pip install django==1.10
-  - pip install psycopg2==2.5.3
+  - pip install django==1.11.1
+  - pip install psycopg2==2.7.1
   - pip install celery==4.0.2
   - pip install numpy
-  - pip install Pillow==2.7.0
+  - pip install Pillow==4.1.1
   - pip install django-colorful==1.0.1
-  - pip install pyparsing==2.1.1
-  - pip install flake8==2.5.0
+  - pip install pyparsing==2.2.0
+  - pip install flake8==3.3.0
   - pip install isort==4.2.2
-  - pip install coverage==4.2
+  - pip install coverage==4.4
   - pip install coveralls
 
 script: coverage run --include="raster/*" $(which django-admin.py) test
