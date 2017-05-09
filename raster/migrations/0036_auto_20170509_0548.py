@@ -17,7 +17,7 @@ def set_legend_on_entry(apps, schema_editor):
             # Update legend entry order field from related table if it exists.
             # The related table has a unique constraint, so there are no
             # duplicates here. Getting the first instance is sufficient.
-            order = LegendEntryOrder.filter(legend=legend, legendentry=entry).first()
+            order = LegendEntryOrder.objects.filter(legend=legend, legendentry=entry).first()
             if order:
                 entry.code = order.code
             # Save updated entry.
