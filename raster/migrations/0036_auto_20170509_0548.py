@@ -11,7 +11,7 @@ def set_legend_on_entry(apps, schema_editor):
     LegendEntryOrder = apps.get_model("raster", "LegendEntryOrder")
     # Loop through legend and entries.
     for legend in Legend.objects.all():
-        for entry in legend.entries:
+        for entry in legend.entries.all():
             # Set legend direct foreign key.
             entry.legend = legend
             # Update legend entry order field from related table if it exists.
