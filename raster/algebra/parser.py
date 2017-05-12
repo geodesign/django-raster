@@ -240,10 +240,13 @@ class RasterAlgebraParser(FormulaParser):
             else:
                 band_index = 0
 
-            data_arrays[variable] = numpy.ma.masked_values(
-                rast.bands[band_index].data().ravel().astype(const.ALGEBRA_PIXEL_TYPE_NUMPY),
-                rast.bands[band_index].nodata_value
-            )
+            if rast.bands[band_index].nodata_value is None:
+                data_arrays[variable] = rast.bands[band_index].data().ravel().astype(const.ALGEBRA_PIXEL_TYPE_NUMPY)
+            else:
+                data_arrays[variable] = numpy.ma.masked_values(
+                    rast.bands[band_index].data().ravel().astype(const.ALGEBRA_PIXEL_TYPE_NUMPY),
+                    rast.bands[band_index].nodata_value,
+                )
 
         # Evaluate formula on raster data
         result = self.evaluate(data_arrays, formula)

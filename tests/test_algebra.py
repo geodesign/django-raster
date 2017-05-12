@@ -1,6 +1,6 @@
 from __future__ import unicode_literals
 
-from django.contrib.gis.gdal import GDALRaster
+from django.contrib.gis.gdal import GDAL_VERSION, GDALRaster
 from django.test import TestCase
 from django.test.utils import override_settings
 from django.utils.http import urlquote
@@ -57,6 +57,14 @@ class RasterAlgebraParserTests(TestCase):
         parser = RasterAlgebraParser()
         result = parser.evaluate_raster_algebra(self.data2, 'x + y')
         self.assertEqual(result.bands[0].data().ravel().tolist(), [10, 32, 34, 36])
+
+    def test_algebra_parser_nodata_none(self):
+        if GDAL_VERSION < (2, 1):
+            self.skipTest("GDAL >= 2.1 is required for this test.")
+        parser = RasterAlgebraParser()
+        self.data['z'].bands[0].nodata_value = None
+        result = parser.evaluate_raster_algebra({'x': self.data.pop('z')}, 'x')
+        self.assertEqual(result.bands[0].data().ravel().tolist(), range(30, 34))
 
 
 @override_settings(RASTER_TILE_CACHE_TIMEOUT=0)
