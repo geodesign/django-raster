@@ -24,6 +24,13 @@ def set_legend_on_entry(apps, schema_editor):
             entry.save()
 
 
+def run_backwards(apps, schema_editor):
+    # The backward migration does not have to do anythign, the data
+    # is copied to the new fields but not removed. The data gets removed
+    # in the subsequent migration where the entry through table is dropped.
+    pass
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -31,5 +38,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(set_legend_on_entry),
+        migrations.RunPython(set_legend_on_entry, run_backwards),
     ]
