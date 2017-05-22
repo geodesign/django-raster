@@ -91,8 +91,11 @@ def legend_entries_changed(sender, instance, **kwargs):
     """
     Updates style json upon adding or removing legend entries.
     """
-    instance.legend.update_json()
-    instance.legend.save()
+    try:
+        instance.legend.update_json()
+        instance.legend.save()
+    except Legend.DoesNotExist:
+        pass
 
 
 @receiver(post_save, sender=LegendSemantics)

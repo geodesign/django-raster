@@ -49,3 +49,7 @@ class RasterLegendTests(TestCase):
             ],
             json.loads(self.leg.json)
         )
+
+    def test_raster_legend_entry_list_change_signal_on_legend_delete(self):
+        # Check if legend signals work when deleting a legend.
+        self.leg.delete()
