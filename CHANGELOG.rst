@@ -15,3 +15,5 @@ django-raster change log
 
 * Simplified the url structure, the format type keyword now does not
   include the "." anymore.
+
+* Celery 4.0 is now a requirement.
