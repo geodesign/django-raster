@@ -6,7 +6,7 @@ import traceback
 from celery import group, task
 
 from django.conf import settings
-from raster.tiles.const import GLOBAL_MAX_ZOOM_LEVEL
+from raster.tiles.const import GLOBAL_MAX_ZOOM_LEVEL, MIN_ZOOMLEVEL_TASK_PARALLEL
 from raster.tiles.parser import RasterLayerParser
 
 
@@ -101,21 +101,16 @@ def parse(rasterlayer_id):
         if zoom_range is not None:
             # Bundle the first five raster layers to one task. For low zoom
             # levels, downloading is more costly than parsing.
-            create_tiles_chain = create_tiles.si(rasterlayer_id, zoom_range[:5], True)
+            create_tiles_chain = create_tiles.si(rasterlayer_id, zoom_range[:MIN_ZOOMLEVEL_TASK_PARALLEL], True)
 
-            if len(zoom_range) > 5:
-                # Create a group of tasks with the middle zoom levels that are
-                # prioritized over high zoom levels.
-                middle_level_group = group(
-                    create_tiles.si(rasterlayer_id, zoom) for zoom in zoom_range[5:10]
+            # Run the higher level zooms in parallel tasks through a task group.
+            if len(zoom_range) > MIN_ZOOMLEVEL_TASK_PARALLEL:
+                high_zoom_level_group = group(
+                    create_tiles.si(rasterlayer_id, zoom) for zoom in zoom_range[MIN_ZOOMLEVEL_TASK_PARALLEL:]
                 )
                 # Combine bundle and middle levels to priority group.
-                create_tiles_chain = (create_tiles_chain | middle_level_group)
+                create_tiles_chain = (create_tiles_chain | high_zoom_level_group)
 
-            if len(zoom_range) > 10:
-                # Create a task group for high zoom levels.
-                high_level_group = group(create_tiles.si(rasterlayer_id, zoom) for zoom in zoom_range[10:])
-                create_tiles_chain = (create_tiles_chain | high_level_group)
         else:
             create_tiles_chain = create_tiles.si(rasterlayer_id, None, True)
 
