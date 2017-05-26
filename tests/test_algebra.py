@@ -64,7 +64,7 @@ class RasterAlgebraParserTests(TestCase):
         parser = RasterAlgebraParser()
         self.data['z'].bands[0].nodata_value = None
         result = parser.evaluate_raster_algebra({'x': self.data.pop('z')}, 'x')
-        self.assertEqual(result.bands[0].data().ravel().tolist(), range(30, 34))
+        self.assertEqual(result.bands[0].data().ravel().tolist(), [30, 31, 32, 33])
 
 
 @override_settings(RASTER_TILE_CACHE_TIMEOUT=0)
