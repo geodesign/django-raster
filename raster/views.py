@@ -227,10 +227,13 @@ class AlgebraView(RasterView):
             raise RasterAlgebraException('Failed to evaluate raster algebra.')
 
         # Get array from algebra result
-        result = numpy.ma.masked_values(
-            result.bands[0].data(),
-            result.bands[0].nodata_value,
-        )
+        if result.bands[0].nodata_value is None:
+            result = result.bands[0].data()
+        else:
+            result = numpy.ma.masked_values(
+                result.bands[0].data(),
+                result.bands[0].nodata_value,
+            )
 
         # Get colormap.
         colormap = self.get_colormap()
