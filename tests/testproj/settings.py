@@ -8,14 +8,17 @@ import os
 SECRET_KEY = 'testkey'
 
 INSTALLED_APPS = (
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
     'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    'django.contrib.postgres',
+    'django.contrib.gis',
+
     'raster',
 )
-
-
-MIDDLEWARE_CLASSES = [
-    'django.contrib.sessions.middleware.SessionMiddleware',
-]
 
 DATABASES = {
     'default': {
@@ -28,16 +31,25 @@ DATABASES = {
     }
 }
 
+MIDDLEWARE_CLASSES = [
+    'django.contrib.sessions.middleware.SessionMiddleware',
+]
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.contrib.auth.context_processors.auth',
+            ],
+        },
     },
 ]
 
 ROOT_URLCONF = 'raster.urls'
 
-RASTER_TILESIZE = 256
 RASTER_USE_CELERY = True
-CELERY_ALWAYS_EAGER = True
-CELERY_EAGER_PROPAGATES = True
+
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_EAGER_PROPAGATES = True

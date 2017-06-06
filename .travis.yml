@@ -8,20 +8,15 @@ python:
 sudo: false
 
 env:
-    - DB_NAME=raster_test PYTHONPATH=$PYTHONPATH:$PWD DJANGO_SETTINGS_MODULE=settings USE_NOSE=True
+    - DB_NAME=raster_test PYTHONPATH=$PYTHONPATH:$PWD DJANGO_SETTINGS_MODULE=tests.testproj.settings
 
 before_script:
   - psql -c 'create database raster_test' -U postgres
   - psql -c 'create extension postgis' -U postgres -d raster_test
 
 install:
-  - pip install django==1.11.1
+  - pip install -e .
   - pip install psycopg2==2.7.1
-  - pip install celery==4.0.2
-  - pip install numpy
-  - pip install Pillow==4.1.1
-  - pip install django-colorful==1.0.1
-  - pip install pyparsing==2.2.0
   - pip install flake8==3.3.0
   - pip install isort==4.2.2
   - pip install coverage==4.4
