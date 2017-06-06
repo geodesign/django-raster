@@ -7,7 +7,7 @@ urlpatterns = [
 
     # Normal raster tiles endpoint
     url(
-        r'^tiles/(?P<layer>[^/]+)/(?P<z>[0-9]+)/(?P<x>[0-9]+)/(?P<y>[0-9]+).(?P<frmt>png|jpg)$',
+        r'^tiles/(?P<layer>[^/]+)/(?P<z>[0-9]+)/(?P<x>[0-9]+)/(?P<y>[0-9]+).(?P<frmt>png|jpg|tif)$',
         AlgebraView.as_view(),
         name='tms',
     ),

@@ -128,3 +128,10 @@ class RasterTmsTests(RasterTestCase):
         self.assertEqual(response['Content-type'], 'image/png')
         self.assertIsExpectedTile(response.content, 'test_tms_continuous_colormap')
         self.assertEqual(response.status_code, 200)
+
+    def test_tms_tif_output(self):
+        # Get tms tile rendered as tif file.
+        response = self.client.get(self.tile_url.split('.')[0] + '.tif')
+        self.assertEqual(response['Content-type'], 'image/tiff')
+        self.assertEqual(response.status_code, 200)
+        self.assertIsExpectedTile(response.content, 'test_tms_tif_format', frmt='tif')
