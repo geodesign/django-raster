@@ -32,6 +32,7 @@ class RasterLayerParser(object):
 
         # Set raster tilesize
         self.tilesize = int(getattr(settings, 'RASTER_TILESIZE', WEB_MERCATOR_TILESIZE))
+        self.batch_step_size = int(getattr(settings, 'RASTER_BATCH_STEP_SIZE', BATCH_STEP_SIZE))
 
     def log(self, msg, status=None, zoom=None):
         """
@@ -383,7 +384,7 @@ class RasterLayerParser(object):
                 )
 
                 # Commit batch to database and reset it
-                if len(batch) == BATCH_STEP_SIZE:
+                if len(batch) == self.batch_step_size:
                     RasterTile.objects.bulk_create(batch)
                     batch = []
 

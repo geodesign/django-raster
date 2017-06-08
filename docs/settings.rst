@@ -40,3 +40,12 @@ chache tiles. Defaults to 1 day.
 ::
 
     RASTER_TILE_CACHE_TIMEOUT = 60 * 60 * 24
+
+Parse Batch Size
+----------------
+During parsing of a raster, tiles are written to the database in batches, using
+the ``bulk_create`` method. The size of each batch in the loop can be controlled
+by using the setting below. Defaults to 500 tiles.
+::
+
+    RASTER_BATCH_STEP_SIZE = 500
