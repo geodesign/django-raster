@@ -45,3 +45,15 @@ class RasterLegendViewTests(RasterTestCase):
             ]
         )
         self.assertEqual(response.status_code, 200)
+
+
+class RasterLegendViewTestsDefaultCacheTimeout(RasterTestCase):
+
+    def test_tms_legend_url_from_layer_id(self):
+        url = reverse('legend') + '?layer=' + str(self.rasterlayer.id)
+        response = self.client.get(url)
+        self.assertEqual(
+            json.loads(response.content.strip().decode()),
+            [{"code": "1", "color": "#123456", "expression": "4", "name": "Earth"}],
+        )
+        self.assertEqual(response.status_code, 200)
