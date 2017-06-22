@@ -215,6 +215,16 @@ class RasterAggregatorTests(RasterTestCase):
         # rescaling.
         for dat in zip(agg.statistics(), meta.statistics()):
             self.assertAlmostEqual(dat[0], dat[1], 1)
+        # Re-compute based on value counts.
+        agg = Aggregator(
+            layer_dict={'a': self.rasterlayer.id},
+            formula='a',
+        )
+        agg.value_count()
+        for dat in zip(agg.statistics(), meta.statistics()):
+            self.assertAlmostEqual(dat[0], dat[1], 1)
+        # The staistics have been built.
+        self.assertEqual(agg._stats_max_value, 9)
 
     def test_valuecount_exception(self):
         # Invalid input type

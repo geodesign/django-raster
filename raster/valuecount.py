@@ -128,48 +128,53 @@ class Aggregator(object):
                 if self.geom:
                     result_data = self.mask_by_geom(result, result_data)
 
-                yield result_data
+                yield result_data.compressed()
 
-    def statistics(self):
+    def _clear_stats(self):
+        self._stats_t0 = 0
+        self._stats_t1 = 0
+        self._stats_t2 = 0
+        self._stats_max_value = None
+        self._stats_min_value = None
+
+    def _push_stats(self, data):
+        # Stop if entire data was masked
+        if data.size == 0:
+            return
+
+        # Compute incremental statistics
+        self._stats_t0 += data.size
+        self._stats_t1 += numpy.sum(data)
+        self._stats_t2 += numpy.sum(numpy.square(data))
+
+        tile_max = numpy.max(data)
+        tile_min = numpy.min(data)
+
+        if self._stats_max_value is None:
+            self._stats_max_value = tile_max
+            self._stats_min_value = tile_min
+        else:
+            self._stats_max_value = max(tile_max, self._stats_max_value)
+            self._stats_min_value = min(tile_min, self._stats_min_value)
+
+    def statistics(self, reset=False):
         """
         Compute statistics for this aggregator. Returns (min, max, mean, std).
         The mean and std can be computed incrementally from the number of
         obeservations t0 = sum(x^0), the sum of values t1 = sum(x^1), and the
         sum of squares t2 = sum(x^2).
         """
-        # Set initial values for all variables
-        t0 = t1 = t2 = 0
-        max_value = min_value = None
-
-        for data in self.tiles():
-            # Apply mask to data values if mask exists
-            if numpy.ma.is_masked(data):
-                data = data.compressed()
-
-            # Stop if entire data was masked
-            if data.size == 0:
-                continue
-
-            # Compute incremental statistics
-            t0 += data.size
-            t1 += numpy.sum(data)
-            t2 += numpy.sum(numpy.square(data))
-
-            tile_max = numpy.max(data)
-            tile_min = numpy.min(data)
-
-            if max_value is None:
-                max_value = tile_max
-                min_value = tile_min
-            else:
-                max_value = max(tile_max, max_value)
-                min_value = min(tile_min, min_value)
+        if reset or not hasattr(self, '_stats_max_value') or self._stats_max_value is None:
+            self._clear_stats()
+            # Only compute statistics if they have not been previously computed.
+            for data in self.tiles():
+                self._push_stats(data)
 
         # Compute mean and std from totals sums
-        mean = t1 / t0
-        std = numpy.sqrt(t0 * t2 - t1 * t1) / t0
+        mean = self._stats_t1 / self._stats_t0
+        std = numpy.sqrt(self._stats_t0 * self._stats_t2 - self._stats_t1 * self._stats_t1) / self._stats_t0
 
-        return (min_value, max_value, mean, std)
+        return (self._stats_min_value, self._stats_max_value, mean, std)
 
     def mask_by_geom(self, tile, data):
         # Rasterize the aggregation area to the result raster
@@ -201,19 +206,21 @@ class Aggregator(object):
           legend_id. The data will be grouped using the legend expressions. For
           For instance, use grouping=23 for grouping the output with legend 23.
         """
+        # Instantiate counter dict for value counts.
         results = Counter({})
+        self._clear_stats()
 
         for result_data in self.tiles():
 
             if self.grouping == 'discrete':
                 # Compute unique counts for discrete input data
-                unique_counts = numpy.unique(result_data.compressed(), return_counts=True)
+                unique_counts = numpy.unique(result_data, return_counts=True)
                 # Add counts to results
                 values = dict(zip(unique_counts[0], unique_counts[1]))
 
             elif self.grouping == 'continuous':
-                # Handle continuous case - compute histogram on masked (compressed) data
-                counts, bins = numpy.histogram(result_data.compressed())
+                # Handle continuous case - compute histogram on masked data
+                counts, bins = numpy.histogram(result_data)
 
                 # Create dictionary with bins as keys and histogram counts as values
                 values = {}
@@ -239,14 +246,17 @@ class Aggregator(object):
                 for key, color in colormap.items():
                     try:
                         # Try to use the key as number directly
-                        selector = result_data.compressed() == float(key)
+                        selector = result_data == float(key)
                     except ValueError:
                         # Otherwise use it as numpy expression directly
-                        selector = formula_parser.evaluate({'x': result_data.compressed()}, key)
+                        selector = formula_parser.evaluate({'x': result_data}, key)
                     values[key] = numpy.sum(selector)
 
             # Add counts to results
             results += Counter(values)
+
+            # Push statistics.
+            self._push_stats(result_data)
 
         # Transform pixel count to acres if requested
         scaling_factor = 1
