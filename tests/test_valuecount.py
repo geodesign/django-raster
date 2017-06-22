@@ -6,6 +6,7 @@ from django.contrib.gis.geos import Polygon
 from django.test.utils import override_settings
 from raster.exceptions import RasterAggregationException
 from raster.tiles.const import WEB_MERCATOR_SRID
+from raster.tiles.utils import tile_scale
 from raster.valuecount import Aggregator
 
 from .raster_testcase import RasterTestCase
@@ -245,3 +246,6 @@ class RasterAggregatorTests(RasterTestCase):
                 formula='a',
                 grouping='99999'
             )
+
+    def test_valuecount_pixelsize(self):
+        self.assertAlmostEqual(self.rasterlayer.pixelsize()[0], tile_scale(11))
