@@ -249,3 +249,17 @@ class RasterAggregatorTests(RasterTestCase):
 
     def test_valuecount_pixelsize(self):
         self.assertAlmostEqual(self.rasterlayer.pixelsize()[0], tile_scale(11))
+
+    def test_full_mask_data(self):
+        # Override all tiles to be fully masked.
+        for tile in self.rasterlayer.rastertile_set.all():
+            tile.rast.bands[0].data([0], shape=(1, 1))
+            tile.rast.bands[0].nodata_value = 0
+            tile.save()
+
+        # Use a legend with simple int expression
+        agg = Aggregator(
+            layer_dict={'a': self.rasterlayer.id},
+            formula='a',
+        )
+        self.assertEqual((None, None, None, None), agg.statistics())

@@ -170,9 +170,14 @@ class Aggregator(object):
             for data in self.tiles():
                 self._push_stats(data)
 
-        # Compute mean and std from totals sums
-        mean = self._stats_t1 / self._stats_t0
-        std = numpy.sqrt(self._stats_t0 * self._stats_t2 - self._stats_t1 * self._stats_t1) / self._stats_t0
+        if self._stats_t0 == 0:
+            # If totals sum is zero, no data was available to comput statistics
+            mean = None
+            std = None
+        else:
+            # Compute mean and std from totals sums.
+            mean = self._stats_t1 / self._stats_t0
+            std = numpy.sqrt(self._stats_t0 * self._stats_t2 - self._stats_t1 * self._stats_t1) / self._stats_t0
 
         return (self._stats_min_value, self._stats_max_value, mean, std)
 
