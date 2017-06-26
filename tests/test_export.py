@@ -10,11 +10,9 @@ import numpy
 
 from django.contrib.gis.gdal import GDALRaster
 from django.core.urlresolvers import reverse
-from django.test.utils import override_settings
 from tests.raster_testcase import RasterTestCase
 
 
-@override_settings(RASTER_TILE_CACHE_TIMEOUT=0)
 class RasterAlgebraViewTests(RasterTestCase):
 
     def tearDown(self):

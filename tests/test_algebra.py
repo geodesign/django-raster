@@ -2,7 +2,6 @@ from __future__ import unicode_literals
 
 from django.contrib.gis.gdal import GDAL_VERSION, GDALRaster
 from django.test import TestCase
-from django.test.utils import override_settings
 from django.utils.http import urlquote
 from raster.algebra.const import BAND_INDEX_SEPARATOR
 from raster.algebra.parser import RasterAlgebraParser
@@ -67,7 +66,6 @@ class RasterAlgebraParserTests(TestCase):
         self.assertEqual(result.bands[0].data().ravel().tolist(), [30, 31, 32, 33])
 
 
-@override_settings(RASTER_TILE_CACHE_TIMEOUT=0)
 class RasterAlgebraViewTests(RasterTestCase):
 
     def test_basic_algebra_request(self):

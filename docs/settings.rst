@@ -33,14 +33,6 @@ are parsed in single celery tasks.
 
     RASTER_PARSE_SINGLE_TASK = True
 
-Tile Cache Timeout
-------------------
-The tile out time for cached tiles. Set this to zero if you do not want to
-chache tiles. Defaults to 1 day.
-::
-
-    RASTER_TILE_CACHE_TIMEOUT = 60 * 60 * 24
-
 Parse Batch Size
 ----------------
 During parsing of a raster, tiles are written to the database in batches, using

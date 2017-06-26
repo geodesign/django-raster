@@ -4,13 +4,11 @@ import sys
 from unittest import skipUnless
 
 from django.core.urlresolvers import reverse
-from django.test.utils import override_settings
 from raster.shortcuts import set_session_colormap
 from tests.raster_testcase import RasterTestCase
 
 
 @skipUnless(sys.version_info[:2] == (3, 5), 'The binary version of the output files depends on the python version')
-@override_settings(RASTER_TILE_CACHE_TIMEOUT=0)
 class RasterTmsTests(RasterTestCase):
 
     def test_tms_nonexisting_layer(self):

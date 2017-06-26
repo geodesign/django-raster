@@ -3,7 +3,6 @@ from __future__ import unicode_literals
 import numpy
 
 from django.contrib.gis.geos import Polygon
-from django.test.utils import override_settings
 from raster.exceptions import RasterAggregationException
 from raster.tiles.const import WEB_MERCATOR_SRID
 from raster.tiles.utils import tile_scale
@@ -12,7 +11,6 @@ from raster.valuecount import Aggregator
 from .raster_testcase import RasterTestCase
 
 
-@override_settings(RASTER_TILE_CACHE_TIMEOUT=0)
 class RasterValueCountTests(RasterTestCase):
 
     def test_value_count_no_geom(self):

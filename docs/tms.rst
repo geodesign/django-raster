@@ -174,9 +174,3 @@ you can do so by using this url:
     /raster/tiles/{z}/{x}/{y}.png?colormap=%22%7B1%3A%20'%23FF0000'%2C%202%3A%20'%2300FF00'%2C%203%3A%20'%230000FF'%7D%22
 
 The colormap value is the URIEncoded version of the json stringified colormap object.
-
-Caching
--------
-All views of django-raster are cached for 24 hours by default. To change the
-timeout of the cache use the ``RASTER_TILE_CACHE_TIMEOUT`` setting. To disable
-caching, set this timeout to 0.
