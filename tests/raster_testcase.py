@@ -92,7 +92,7 @@ class RasterTestCase(TransactionTestCase):
         # Precompute expected totals from value count
         expected = {}
         for tile in self.rasterlayer.rastertile_set.filter(tilez=11):
-            val, counts = numpy.unique(tile.rast.rast.bands[0].data(), return_counts=True)
+            val, counts = numpy.unique(tile.rast.bands[0].data(), return_counts=True)
             for pair in zip(val, counts):
                 if pair[0] in expected:
                     expected[pair[0]] += pair[1]
