@@ -18,7 +18,6 @@ def get_raster_tile(layer_id, tilez, tilex, tiley):
     ensures that a tile can be requested at any zoom level.
     """
     # Loop through zoom levels to search for a tile
-    result = None
     for zoom in range(tilez, -1, -1):
         # Compute multiplier to find parent raster
         multiplier = 2 ** (tilez - zoom)
@@ -27,7 +26,7 @@ def get_raster_tile(layer_id, tilez, tilex, tiley):
             tilex=tilex / multiplier,
             tiley=tiley / multiplier,
             tilez=zoom,
-            rasterlayer_id=layer_id
+            rasterlayer_id=layer_id,
         )
 
         if tile.exists():
@@ -41,17 +40,16 @@ def get_raster_tile(layer_id, tilez, tilex, tiley):
                 tilesize = int(getattr(settings, 'RASTER_TILESIZE', WEB_MERCATOR_TILESIZE))
                 tilescale = tile_scale(tilez)
 
-                # Warp parent tile to child tile
+                # Warp parent tile to child tile in memory.
                 result = result.warp({
+                    'driver': 'MEM',
                     'width': tilesize,
                     'height': tilesize,
                     'scale': [tilescale, -tilescale],
                     'origin': [bounds[0], bounds[3]],
                 })
 
-            break
-
-    return result
+            return result
 
 
 def tile_index_range(bbox, z, tolerance=0):
