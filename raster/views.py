@@ -297,7 +297,7 @@ class AlgebraView(RasterView):
             rast = result.warp({
                 'name': vsi_path,
                 'driver': 'tif',
-                'compress': 'DEFLATE',
+                'papsz_options': {'compress': 'DEFLATE'},
             })
             content_type = IMG_FORMATS['tif'][1]
             return HttpResponse(rast.vsi_buffer, content_type)
