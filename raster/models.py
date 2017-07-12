@@ -34,8 +34,8 @@ class LegendEntry(models.Model):
     """
     One row in a Legend.
     """
-    legend = models.ForeignKey('Legend', null=True)
-    semantics = models.ForeignKey(LegendSemantics)
+    legend = models.ForeignKey('Legend', null=True, on_delete=models.CASCADE)
+    semantics = models.ForeignKey(LegendSemantics, on_delete=models.CASCADE)
     expression = models.CharField(max_length=500,
         help_text='Use a number or a valid numpy logical expression where x is the'
                   'pixel value. For instance: "(-3.0 < x) & (x <= 1)" or "x <= 1".')
@@ -153,7 +153,7 @@ class RasterLayer(models.Model, ValueCountMixin):
     store_reprojected = models.BooleanField(default=True,
         help_text='Should the reprojected raster be stored? If unchecked, the '
                   'reprojected version of the raster is not stored.')
-    legend = models.ForeignKey(Legend, blank=True, null=True)
+    legend = models.ForeignKey(Legend, blank=True, null=True, on_delete=models.CASCADE)
     modified = models.DateTimeField(auto_now=True)
 
     def __str__(self):
@@ -247,7 +247,7 @@ class RasterLayerReprojected(models.Model):
     """
     Stores reprojected version of raster.
     """
-    rasterlayer = models.OneToOneField(RasterLayer, related_name='reprojected')
+    rasterlayer = models.OneToOneField(RasterLayer, related_name='reprojected', on_delete=models.CASCADE)
     rasterfile = models.FileField(upload_to='rasters/reprojected', null=True, blank=True)
 
     def __str__(self):
@@ -258,7 +258,7 @@ class RasterLayerMetadata(models.Model):
     """
     Stores meta data for a raster layer
     """
-    rasterlayer = models.OneToOneField(RasterLayer, related_name='metadata')
+    rasterlayer = models.OneToOneField(RasterLayer, related_name='metadata', on_delete=models.CASCADE)
     uperleftx = models.FloatField(null=True, blank=True)
     uperlefty = models.FloatField(null=True, blank=True)
     width = models.IntegerField(null=True, blank=True)
@@ -297,7 +297,7 @@ class RasterLayerParseStatus(models.Model):
         (FINISHED, 'Finished parsing'),
         (FAILED, 'Failed parsing'),
     )
-    rasterlayer = models.OneToOneField(RasterLayer, related_name='parsestatus')
+    rasterlayer = models.OneToOneField(RasterLayer, related_name='parsestatus', on_delete=models.CASCADE)
     status = models.IntegerField(choices=STATUS_CHOICES, default=UNPARSED)
     log = models.TextField(default='', editable=False)
     tile_levels = ArrayField(models.PositiveIntegerField(), default=[])
@@ -316,7 +316,7 @@ class RasterLayerBandMetadata(models.Model):
 
     HISTOGRAM_BINS = 100
 
-    rasterlayer = models.ForeignKey(RasterLayer)
+    rasterlayer = models.ForeignKey(RasterLayer, on_delete=models.CASCADE)
     band = models.PositiveIntegerField()
     nodata_value = models.FloatField(null=True)
     min = models.FloatField()
@@ -361,7 +361,7 @@ class RasterTile(models.Model):
     )
     rid = models.AutoField(primary_key=True)
     rast = models.RasterField(null=True, blank=True, srid=WEB_MERCATOR_SRID)
-    rasterlayer = models.ForeignKey(RasterLayer, null=True, blank=True, db_index=True)
+    rasterlayer = models.ForeignKey(RasterLayer, null=True, blank=True, db_index=True, on_delete=models.CASCADE)
     tilex = models.IntegerField(db_index=True, null=True)
     tiley = models.IntegerField(db_index=True, null=True)
     tilez = models.IntegerField(db_index=True, null=True, choices=ZOOMLEVELS)
