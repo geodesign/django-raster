@@ -16,7 +16,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
                 ('rasterfile', models.FileField(null=True, upload_to=b'rasters/reprojected', blank=True)),
-                ('rasterlayer', models.OneToOneField(related_name='reprojected', to='raster.RasterLayer')),
+                ('rasterlayer', models.OneToOneField(related_name='reprojected', to='raster.RasterLayer', on_delete=models.CASCADE)),
             ],
         ),
     ]

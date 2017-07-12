@@ -32,6 +32,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='rasterlayerbandmetadata',
             name='rasterlayer',
-            field=models.ForeignKey(to='raster.RasterLayer'),
+            field=models.ForeignKey(to='raster.RasterLayer', on_delete=models.CASCADE),
         ),
     ]

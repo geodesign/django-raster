@@ -24,7 +24,7 @@ class Migration(migrations.Migration):
                 ('skewx', models.FloatField(null=True, blank=True)),
                 ('skewy', models.FloatField(null=True, blank=True)),
                 ('numbands', models.IntegerField(null=True, blank=True)),
-                ('rasterlayer', models.OneToOneField(to='raster.RasterLayer')),
+                ('rasterlayer', models.OneToOneField(to='raster.RasterLayer', on_delete=models.CASCADE)),
             ],
             options={
             },

@@ -33,7 +33,7 @@ class Migration(migrations.Migration):
                 ('rid', models.AutoField(serialize=False, primary_key=True)),
                 ('rast', models.RasterField(null=True, blank=True)),
                 ('filename', models.TextField(null=True, blank=True)),
-                ('rasterlayer', models.ForeignKey(blank=True, to='raster.RasterLayer', null=True)),
+                ('rasterlayer', models.ForeignKey(blank=True, to='raster.RasterLayer', null=True, on_delete=models.CASCADE)),
             ],
             options={
             },

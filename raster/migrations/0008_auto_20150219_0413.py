@@ -51,7 +51,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='legendentry',
             name='semantics',
-            field=models.ForeignKey(to='raster.LegendSemantics'),
+            field=models.ForeignKey(to='raster.LegendSemantics', on_delete=models.CASCADE),
             preserve_default=True,
         ),
         migrations.AddField(
@@ -63,7 +63,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='rasterlayer',
             name='legend',
-            field=models.ForeignKey(blank=True, to='raster.Legend', null=True),
+            field=models.ForeignKey(blank=True, to='raster.Legend', null=True, on_delete=models.CASCADE),
             preserve_default=True,
         ),
     ]

@@ -19,6 +19,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='rasterlayermetadata',
             name='rasterlayer',
-            field=models.OneToOneField(related_name='metadata', to='raster.RasterLayer'),
+            field=models.OneToOneField(related_name='metadata', to='raster.RasterLayer', on_delete=models.CASCADE),
         ),
     ]
