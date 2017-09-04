@@ -385,7 +385,10 @@ class RasterLayerParser(object):
                 dest = GDALRaster({
                     'name': '/vsimem/{}'.format(uuid.uuid4()),
                     'driver': 'tif',
-                    'papsz_options': {'compress': 'deflate'},
+                    'papsz_options': {
+                        'compress': 'deflate',
+                        'predictor': 2,
+                    },
                     'width': self.tilesize,
                     'height': self.tilesize,
                     'origin': [bounds[0], bounds[3]],
