@@ -128,6 +128,4 @@ def parse(rasterlayer_id):
         parser.log('Parse task queued in all-in-one mode, waiting for worker availability.')
         all_in_one.delay(rasterlayer_id, zoom_range)
     else:
-        clear_tiles(rasterlayer_id)
-        create_tiles(rasterlayer_id, zoom_range, True)
-        send_success_signal(rasterlayer_id)
+        all_in_one(rasterlayer_id, zoom_range)
