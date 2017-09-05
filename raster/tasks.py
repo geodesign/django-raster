@@ -87,7 +87,7 @@ def parse(rasterlayer_id):
 
     # Create array of all allowed zoom levels
     if parser.rasterlayer.build_pyramid:
-        zoom_range = range(GLOBAL_MAX_ZOOM_LEVEL + 1)
+        zoom_range = list(range(GLOBAL_MAX_ZOOM_LEVEL + 1))
     else:
         if parser.rasterlayer.max_zoom is not None:
             zoom_range = (parser.rasterlayer.max_zoom, )
