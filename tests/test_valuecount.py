@@ -172,21 +172,21 @@ class RasterAggregatorTests(RasterTestCase):
         agg = Aggregator(
             layer_dict={'a': self.rasterlayer.id},
             formula='a',
-            grouping=self.legend.id
+            grouping=self.legend.id,
         )
         self.assertDictEqual(
             agg.value_count(),
-            {'2': self.expected_totals[2]}
+            {'2': self.expected_totals[2], '10': 0},
         )
         # Use a legend with formula expression
         agg = Aggregator(
             layer_dict={'a': self.rasterlayer.id},
             formula='a',
-            grouping=self.legend_with_expression.id
+            grouping=self.legend_with_expression.id,
         )
         self.assertDictEqual(
             agg.value_count(),
-            {'(x >= 2) & (x < 5)': self.expected_totals[2] + self.expected_totals[3] + self.expected_totals[4]}
+            {'(x >= 2) & (x < 5)': self.expected_totals[2] + self.expected_totals[3] + self.expected_totals[4]},
         )
 
     def test_layer_with_json_grouping(self):
@@ -198,7 +198,7 @@ class RasterAggregatorTests(RasterTestCase):
         )
         self.assertDictEqual(
             agg.value_count(),
-            {'2': self.expected_totals[2]}
+            {'2': self.expected_totals[2], '10': 0}
         )
 
     def test_layer_stats(self):
@@ -261,3 +261,59 @@ class RasterAggregatorTests(RasterTestCase):
             formula='a',
         )
         self.assertEqual((None, None, None, None), agg.statistics())
+
+    def test_histogram_range(self):
+        agg = Aggregator(
+            layer_dict={'a': self.rasterlayer.id},
+            formula='a',
+            grouping='continuous',
+            hist_range=(0, 100)
+        )
+        self.assertDictEqual(
+            agg.value_count(),
+            {
+                '(0.0, 10.0)': 62440, '(20.0, 30.0)': 0, '(70.0, 80.0)': 0,
+                '(80.0, 90.0)': 0, '(30.0, 40.0)': 0, '(10.0, 20.0)': 0,
+                '(90.0, 100.0)': 0, '(60.0, 70.0)': 0, '(50.0, 60.0)': 0,
+                '(40.0, 50.0)': 0,
+            }
+        )
+
+    def test_memory_efficient(self):
+        agg = Aggregator(
+            layer_dict={'a': self.rasterlayer.id},
+            formula='a',
+            grouping='discrete',
+            memory_efficient=True,
+        )
+        self.assertDictEqual(
+            agg.value_count(),
+            {str(k): v for k, v in self.expected_totals.items()}
+        )
+        agg = Aggregator(
+            layer_dict={'a': self.rasterlayer.id},
+            formula='a',
+            grouping='continuous',
+            memory_efficient=True,
+            hist_range=(0, 100),
+        )
+        self.assertDictEqual(
+            agg.value_count(),
+            {
+                '(10.0, 20.0)': 0, '(60.0, 70.0)': 0, '(40.0, 50.0)': 0,
+                '(90.0, 100.0)': 0, '(70.0, 80.0)': 0, '(50.0, 60.0)': 0,
+                '(30.0, 40.0)': 0, '(20.0, 30.0)': 0, '(0.0, 10.0)': 62440,
+                '(80.0, 90.0)': 0
+            },
+        )
+
+    def test_memory_efficient_error(self):
+        msg = 'Secify a histogram range for memory efficient continuous aggregation.'
+        with self.assertRaisesMessage(RasterAggregationException, msg):
+            agg = Aggregator(
+                layer_dict={'a': self.rasterlayer.id},
+                formula='a',
+                grouping='continuous',
+                memory_efficient=True,
+            )
+            agg.value_count()

@@ -23,7 +23,8 @@ class Aggregator(object):
     functions on all tiles from a set of layers.
     """
 
-    def __init__(self, layer_dict, formula, zoom=None, geom=None, acres=True, grouping='auto', all_touched=True):
+    def __init__(self, layer_dict, formula, zoom=None, geom=None, acres=True,
+                 grouping='auto', all_touched=True, memory_efficient=False, hist_range=None):
         # Set defining parameter for this aggregator
         self.layer_dict = layer_dict
         self.formula = formula
@@ -31,6 +32,8 @@ class Aggregator(object):
         self.acres = acres
         self.rastgeom = None
         self.all_touched = all_touched
+        self.memory_efficient = memory_efficient
+        self.hist_range = hist_range
 
         # Get layers from input dict
         self.layers = RasterLayer.objects.filter(id__in=layer_dict.values())
@@ -215,7 +218,18 @@ class Aggregator(object):
         results = Counter({})
         self._clear_stats()
 
-        for result_data in self.tiles():
+        if self.memory_efficient:
+            # Loop through tiles individually.
+            all_result_data = self.tiles()
+        else:
+            # Combine all tiles into one big array.
+            all_result_data = [tile for tile in self.tiles()]
+            if len(all_result_data):
+                all_result_data = (
+                    numpy.concatenate(all_result_data),
+                )
+
+        for result_data in all_result_data:
 
             if self.grouping == 'discrete':
                 # Compute unique counts for discrete input data
@@ -224,8 +238,13 @@ class Aggregator(object):
                 values = dict(zip(unique_counts[0], unique_counts[1]))
 
             elif self.grouping == 'continuous':
+                if self.memory_efficient and not self.hist_range:
+                    raise RasterAggregationException(
+                        'Secify a histogram range for memory efficient continuous aggregation.'
+                    )
+
                 # Handle continuous case - compute histogram on masked data
-                counts, bins = numpy.histogram(result_data)
+                counts, bins = numpy.histogram(result_data, range=self.hist_range)
 
                 # Create dictionary with bins as keys and histogram counts as values
                 values = {}
@@ -257,9 +276,8 @@ class Aggregator(object):
                         selector = formula_parser.evaluate({'x': result_data}, key)
                     values[key] = numpy.sum(selector)
 
-            # Add counts to results
-            results += Counter(values)
-
+            # Add counts to results.
+            results.update(Counter(values))
             # Push statistics.
             self._push_stats(result_data)
 
