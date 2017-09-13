@@ -5,12 +5,16 @@ python:
   - '3.4'
   - '3.5'
 
-sudo: false
+sudo: true
+
+addons:
+  postgresql: "9.6"
 
 env:
-    - DB_NAME=raster_test PYTHONPATH=$PYTHONPATH:$PWD DJANGO_SETTINGS_MODULE=tests.testproj.settings
+  - DB_NAME=raster_test PYTHONPATH=$PYTHONPATH:$PWD DJANGO_SETTINGS_MODULE=tests.testproj.settings
 
 before_script:
+  - sudo apt-get install -y -q postgresql-9.6-postgis-2.3 postgis
   - psql -c 'create database raster_test' -U postgres
   - psql -c 'create extension postgis' -U postgres -d raster_test
 
