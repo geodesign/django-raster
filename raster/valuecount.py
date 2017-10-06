@@ -11,7 +11,8 @@ from raster.exceptions import RasterAggregationException
 from raster.models import Legend, RasterLayer
 from raster.rasterize import rasterize
 from raster.tiles.const import WEB_MERCATOR_SRID
-from raster.tiles.utils import get_raster_tile, tile_index_range
+from raster.tiles.lookup import get_raster_tile
+from raster.tiles.utils import tile_index_range
 
 
 class Aggregator(object):

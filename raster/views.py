@@ -24,7 +24,8 @@ from raster.exceptions import RasterAlgebraException
 from raster.models import Legend, RasterLayer, RasterLayerBandMetadata
 from raster.shortcuts import get_session_colormap
 from raster.tiles.const import WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE
-from raster.tiles.utils import get_raster_tile, tile_bounds, tile_index_range, tile_scale
+from raster.tiles.lookup import get_raster_tile
+from raster.tiles.utils import tile_bounds, tile_index_range, tile_scale
 from raster.utils import band_data_to_image, colormap_to_rgba
 
 
