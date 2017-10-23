@@ -96,11 +96,15 @@ If the raw data in the tiles is not already scaled to the range [0, 255], an
 additional scaling factor can be specified, which will be used to rescale
 all three bands to the default RGB color range. For instance, the following
 query would assume that the input bands have values in the range of
-[0, 10000], and would rescale them to the RGB color space.
+[5, 10000], and would rescale them to the RGB color space.
 
 ::
 
-    /raster/algebra/{z}/{x}/{y}.png?layers=r=1,g=3,b=6&scale=1e4
+    /raster/algebra/{z}/{x}/{y}.png?layers=r=1,g=3,b=6&scale=5,10000
+
+An alpha channel can be activated by passing the ``alpha`` query parameter. The
+alpha parameter makes all the pixels transparent that have values equal to
+``0`` in all three RGB channels.
 
 Formula parser
 --------------

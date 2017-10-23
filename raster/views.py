@@ -104,7 +104,7 @@ class RasterView(View):
         """
         Writes rgba numpy array to http response.
         """
-        # Create response, and add image
+        # Create response.
         response = HttpResponse()
         frmt, content_type = self.get_format()
         response['Content-Type'] = content_type
@@ -254,24 +254,49 @@ class AlgebraView(RasterView):
         green = green.bands[0].data()
         blue = blue.bands[0].data()
 
-        scale = float(self.request.GET.get('scale', 255))
+        # Get scale for the image value range.
+        if 'scale' in self.request.GET:
+            # The scale is either a number or two numbers separated by comma.
+            scale = self.request.GET.get('scale').split(',')
+            if len(scale) == 1:
+                scale_min = 0
+                scale_max = float(scale[0])
+            else:
+                # Get min an max scale from
+                scale_min = float(scale[0])
+                scale_max = float(scale[1])
 
-        red[red > scale] = scale
-        green[green > scale] = scale
-        blue[blue > scale] = scale
+                # Clip the image minimum.
+                red[red < scale_min] = scale_min
+                green[green < scale_min] = scale_min
+                blue[blue < scale_min] = scale_min
 
-        red = red * 255.0 / scale
-        green = green * 255.0 / scale
-        blue = blue * 255.0 / scale
+            # Clip the image maximum.
+            red[red > scale_max] = scale_max
+            green[green > scale_max] = scale_max
+            blue[blue > scale_max] = scale_max
 
-        # Create zeros array.
-        alpha = 255 * (red > 0) * (blue > 0) * (green > 0)
+            # Scale the image.
+            red = 255 * (red - scale_min) / scale_max
+            green = 255 * (green - scale_min) / scale_max
+            blue = 255 * (blue - scale_min) / scale_max
 
-        rgba = numpy.array((red.ravel(), green.ravel(), blue.ravel(), alpha.ravel())).T
-        rgba = rgba.reshape(WEB_MERCATOR_TILESIZE, WEB_MERCATOR_TILESIZE, 4).astype('uint8')
+        if 'alpha' in self.request.GET:
+            mode = 'RGBA'
+            reshape = 4
+            # Create the alpha channel.
+            alpha = 255 * (red > 0) * (blue > 0) * (green > 0)
+            img_array = numpy.array((red.ravel(), green.ravel(), blue.ravel(), alpha.ravel()))
+        else:
+            mode = 'RGB'
+            reshape = 3
+            img_array = numpy.array((red.ravel(), green.ravel(), blue.ravel()))
+
+        # Reshape array into tile size.
+        img_array = img_array.T.reshape(WEB_MERCATOR_TILESIZE, WEB_MERCATOR_TILESIZE, reshape).astype('uint8')
 
         # Create image from array
-        img = Image.fromarray(rgba)
+        img = Image.fromarray(img_array, mode=mode)
         stats = {}
 
         # Return rendered image

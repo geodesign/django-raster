@@ -1,6 +1,12 @@
 django-raster change log
 ========================
 
+0.6
+---
+* Changed alpha channel handling on RGB endpoint. The alpha channel is now
+  switched off by default. To activate it, add the ``alpha`` query parameter
+  to the rgb request.
+
 0.5
 ---
 * Added ``memory_efficient`` flag to value count aggregator. The value counts
