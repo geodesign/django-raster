@@ -7,6 +7,9 @@ django-raster change log
   switched off by default. To activate it, add the ``alpha`` query parameter
   to the rgb request.
 
+* Added enhancers from the ``PIL.ImageEnhance`` to the tiles endpoints. Tiles
+  can now be enhanced dynamically.
+
 0.5
 ---
 * Added ``memory_efficient`` flag to value count aggregator. The value counts

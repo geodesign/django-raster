@@ -1,6 +1,14 @@
 from __future__ import unicode_literals
 
+from PIL import ImageEnhance
+
 IMG_FORMATS = {'png': ('PNG', 'image/png'), 'jpg': ('JPEG', 'image/jpeg')}
+IMG_ENHANCEMENTS = {
+    'enhance_color': ImageEnhance.Color,
+    'enhance_contrast': ImageEnhance.Contrast,
+    'enhance_brightness': ImageEnhance.Brightness,
+    'enhance_sharpness': ImageEnhance.Sharpness,
+}
 EXPORT_MAX_PIXELS = 10000 * 10000
 MAX_EXPORT_NAME_LENGTH = 100
 README_TEMPLATE = """Django Raster Algebra Export

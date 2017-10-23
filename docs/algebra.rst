@@ -106,6 +106,30 @@ An alpha channel can be activated by passing the ``alpha`` query parameter. The
 alpha parameter makes all the pixels transparent that have values equal to
 ``0`` in all three RGB channels.
 
+Image Enhancement
+^^^^^^^^^^^^^^^^^
+The algebra and TMS endpoints support image enhancement using the
+``ImageEnhance`` PIL module. The following query parameters arguments
+are passed to the corresponding image enhancers. The parameter value
+is passed to the enhancer as ``factor`` argument.
+
+.. table:: Enhancer query parameters.
+
+    ================== =======================
+    Query              Enhancer
+    ================== =======================
+    enhance_color      ImageEnhance.Color
+    enhance_contrast   ImageEnhance.Contrast
+    enhance_brightness ImageEnhance.Brightness
+    enhance_sharpness  ImageEnhance.Sharpness
+    ================== =======================
+
+The following example enhances the contrast of tiles from the RGB endpoint by a
+factor of 3:
+::
+
+    /raster/algebra/{z}/{x}/{y}.png?layers=r=1,g=3,b=6&scale=5,10000&enhance_contrast=3
+
 Formula parser
 --------------
 At the heart of the raster calculator is the :class:`FormulaParser`, which

@@ -132,3 +132,5 @@ class RasterAlgebraViewTests(RasterTestCase):
         self.assertEqual(response.status_code, 200)
         response = self.client.get(self.algebra_tile_url + '?layers=r={0},g={0},b={0}&alpha'.format(self.rasterlayer.id))
         self.assertEqual(response.status_code, 200)
+        response = self.client.get(self.algebra_tile_url + '?layers=r={0},g={0},b={0}&alpha&enhance_contrast=3'.format(self.rasterlayer.id))
+        self.assertEqual(response.status_code, 200)

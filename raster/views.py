@@ -19,7 +19,7 @@ from django.template.defaultfilters import slugify
 from django.views.generic import View
 from raster.algebra.const import ALGEBRA_PIXEL_TYPE_GDAL
 from raster.algebra.parser import RasterAlgebraParser
-from raster.const import EXPORT_MAX_PIXELS, IMG_FORMATS, MAX_EXPORT_NAME_LENGTH, README_TEMPLATE
+from raster.const import EXPORT_MAX_PIXELS, IMG_ENHANCEMENTS, IMG_FORMATS, MAX_EXPORT_NAME_LENGTH, README_TEMPLATE
 from raster.exceptions import RasterAlgebraException
 from raster.models import Legend, RasterLayer, RasterLayerBandMetadata
 from raster.shortcuts import get_session_colormap
@@ -100,6 +100,12 @@ class RasterView(View):
         """
         return IMG_FORMATS[self.kwargs.get('frmt')]
 
+    def enhance(self, img):
+        for key, enhancer in IMG_ENHANCEMENTS.items():
+            if key in self.request.GET:
+                img = enhancer(img).enhance(float(self.request.GET.get(key)))
+        return img
+
     def write_img_to_response(self, img, stats):
         """
         Writes rgba numpy array to http response.
@@ -109,6 +115,9 @@ class RasterView(View):
         frmt, content_type = self.get_format()
         response['Content-Type'] = content_type
         response['aggregation'] = json.dumps(stats)
+        # Enhance image if requested.
+        img = self.enhance(img)
+        # Save image to response.
         img.save(response, frmt)
 
         return response
