@@ -17,7 +17,7 @@ from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.template.defaultfilters import slugify
 from django.views.generic import View
-from raster.algebra.const import ALGEBRA_PIXEL_TYPE_GDAL
+from raster.algebra.const import ALGEBRA_PIXEL_TYPE_GDAL, BAND_INDEX_SEPARATOR
 from raster.algebra.parser import RasterAlgebraParser
 from raster.const import EXPORT_MAX_PIXELS, IMG_ENHANCEMENTS, IMG_FORMATS, MAX_EXPORT_NAME_LENGTH, README_TEMPLATE
 from raster.exceptions import RasterAlgebraException
@@ -192,21 +192,28 @@ class AlgebraView(RasterView):
             return ids
 
     def get(self, request, *args, **kwargs):
-
         # Get layer ids
         ids = self.get_ids()
 
-        # Get raster data as 1D arrays and store in dict that can be used
-        # for formula evaluation.
-        data = {}
-        for name, layerid in ids.items():
+        # Prepare unique list of layer ids to be efficient if the same layer
+        # is used multiple times (for band access for instance).
+        layerids = set(ids.values())
+
+        # Get the tiles for each unique layer.
+        tiles = {}
+        for layerid in layerids:
             tile = self.get_tile(layerid)
             if tile:
-                data[name] = tile
+                tiles[layerid] = tile
             else:
                 # Create empty image if any layer misses the required tile
                 img = Image.new("RGBA", (WEB_MERCATOR_TILESIZE, WEB_MERCATOR_TILESIZE), (0, 0, 0, 0))
                 return self.write_img_to_response(img, {})
+
+        # Map tiles to a dict with formula names as keys.
+        data = {}
+        for name, layerid in ids.items():
+            data[name] = tiles[layerid]
 
         # Get formula from request
         if 'layer' in self.kwargs:
@@ -219,12 +226,14 @@ class AlgebraView(RasterView):
         # algebra otherwise look for rgb request.
         if formula:
             return self.get_algebra(data, formula)
-        elif 'r' in data and 'g' in data and 'b' in data:
-            return self.get_rgb(data)
         else:
-            raise RasterAlgebraException(
-                'Specify raster algebra formula or provide rgb layer keys.'
-            )
+            keys = [key.split(BAND_INDEX_SEPARATOR)[0] for key in data.keys()]
+            if 'r' in keys and 'g' in keys and 'b' in keys:
+                return self.get_rgb(data)
+            else:
+                raise RasterAlgebraException(
+                    'Specify raster algebra formula or provide rgb layer keys.'
+                )
 
     def get_algebra(self, data, formula):
         parser = RasterAlgebraParser()
@@ -255,13 +264,23 @@ class AlgebraView(RasterView):
         return self.write_img_to_response(img, stats)
 
     def get_rgb(self, data):
-        red = data['r']
-        green = data['g']
-        blue = data['b']
+        # Get data arrays from tiles, by band if requested.
+        for key, tile in data.items():
 
-        red = red.bands[0].data()
-        green = green.bands[0].data()
-        blue = blue.bands[0].data()
+            keysplit = key.split(BAND_INDEX_SEPARATOR)
+            variable = keysplit[0]
+
+            if len(keysplit) > 1:
+                band_index = int(keysplit[1])
+            else:
+                band_index = 0
+
+            if variable == 'r':
+                red = tile.bands[band_index].data()
+            elif variable == 'g':
+                green = tile.bands[band_index].data()
+            elif variable == 'b':
+                blue = tile.bands[band_index].data()
 
         # Get scale for the image value range.
         if 'scale' in self.request.GET:

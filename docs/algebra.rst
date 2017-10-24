@@ -65,10 +65,8 @@ pixels in green.
 
 Using specific bands
 ^^^^^^^^^^^^^^^^^^^^
-By default, the algebra endpoint uses the first band in each layer specified.
-To select specific bands to evaluate on, the band can be specified as
-By default, the first band is used for calculations on the raster algebra
-endpoint. To specify a specific band the syntax is ``'variable:band'``, where
+By default, the algebra and rgb endpoints use the first band in each layer
+specified. To use a specific band, use a ``'variable:band'`` syntax, where
 variable is the name of the variable, and band is the band index. For example
 ``{'a:3': 23}`` would match band 3 of the :class:`RasterLayer` with the id
 ``23`` to the variable name ``a``.
@@ -106,6 +104,16 @@ An alpha channel can be activated by passing the ``alpha`` query parameter. The
 alpha parameter makes all the pixels transparent that have values equal to
 ``0`` in all three RGB channels.
 
+For multi band rasters that have the rgb channels as bands and not in separate
+files, the band accessor syntax can be used. For instance, if the layer with id
+``23`` is a 3-band RGB raster, the following would render the tiles as RGB
+using bands ``0``, ``1``, and ``2``:
+
+::
+
+    /raster/algebra/{z}/{x}/{y}.png?layers=r:0=23,g:1=23,b:2=23
+
+>>>>>>> bla
 Image Enhancement
 ^^^^^^^^^^^^^^^^^
 The algebra and TMS endpoints support image enhancement using the

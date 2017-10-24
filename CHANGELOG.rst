@@ -10,6 +10,10 @@ django-raster change log
 * Added enhancers from the ``PIL.ImageEnhance`` to the tiles endpoints. Tiles
   can now be enhanced dynamically.
 
+* The RGB endpoint now supports the band accessor syntax similar to the
+  regular algebra endpoint.
+
+>>>>>>> bla
 0.5
 ---
 * Added ``memory_efficient`` flag to value count aggregator. The value counts
