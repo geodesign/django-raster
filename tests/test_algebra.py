@@ -134,3 +134,11 @@ class RasterAlgebraViewTests(RasterTestCase):
         self.assertEqual(response.status_code, 200)
         response = self.client.get(self.algebra_tile_url + '?layers=r={0},g={0},b={0}&alpha&enhance_contrast=3'.format(self.rasterlayer.id))
         self.assertEqual(response.status_code, 200)
+
+    def test_pixel_request(self):
+        response = self.client.get(self.pixel_url + '?layers=x={0}&formula=x'.format(self.rasterlayer.id))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {'value': 3.0, 'x': -9218229, 'y': 3229269},
+        )

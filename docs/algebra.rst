@@ -113,7 +113,6 @@ using bands ``0``, ``1``, and ``2``:
 
     /raster/algebra/{z}/{x}/{y}.png?layers=r:0=23,g:1=23,b:2=23
 
->>>>>>> bla
 Image Enhancement
 ^^^^^^^^^^^^^^^^^
 The algebra and TMS endpoints support image enhancement using the
@@ -137,6 +136,29 @@ factor of 3:
 ::
 
     /raster/algebra/{z}/{x}/{y}.png?layers=r=1,g=3,b=6&scale=5,10000&enhance_contrast=3
+
+
+Pixel Value Lookup
+------------------
+Single pixel values for raster algebra expressions can be looked up by
+coordinates. The endpoint works very similar to the raster algebra TMS
+endpoint, but instead of Z-X-Y tile indices, coordinates are passed through
+the url. The query parameters are analogue to the algebra TMS endpoint as
+described above.
+
+The base url structure is
+
+::
+
+    /raster/pixel/{xcoord}/{ycoord}/
+
+For instance, the following request will return the pixel value of the
+requested raster algebra expressino for the coordinates ``xcoord = -9218229``
+and ``ycoord = 3229269``. The coordinates must be provided in the web mercator
+projection (EPSG 3857).
+
+::
+    /raster/pixel/-9218229/3229269/?layers=a=1,b=3,c=6&formula=log(a+b)*c
 
 Formula parser
 --------------

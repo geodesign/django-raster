@@ -13,6 +13,9 @@ django-raster change log
 * The RGB endpoint now supports the band accessor syntax similar to the
   regular algebra endpoint.
 
+* Single pixel value lookups by coordinates from algebra expressions can now be
+  requested.
+
 >>>>>>> bla
 0.5
 ---

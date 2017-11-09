@@ -86,6 +86,10 @@ class RasterTestCase(TransactionTestCase):
             'z': self.tile.tilez, 'y': self.tile.tiley,
             'x': self.tile.tilex, 'frmt': 'png'
         })
+        self.pixel_url = reverse('pixel', kwargs={
+            'xcoord': -9218229,
+            'ycoord': 3229269,
+        })
 
         # Precompute expected totals from value count
         expected = {}

@@ -19,6 +19,13 @@ urlpatterns = [
         name='algebra',
     ),
 
+    # Pixel value endpoint
+    url(
+        r'^pixel/(?P<xcoord>-?\d+(?:\.\d+)?)/(?P<ycoord>-?\d+(?:\.\d+)?)$',
+        AlgebraView.as_view(),
+        name='pixel',
+    ),
+
     # Raster legend endpoint
     url(
         r'^legend(?:/(?P<legend_id>[^/]+))?/$',

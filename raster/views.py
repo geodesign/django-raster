@@ -12,24 +12,29 @@ from PIL import Image
 from django.conf import settings
 from django.contrib.gis.gdal import GDALRaster
 from django.contrib.gis.geos import Polygon
-from django.db.models import Q
+from django.db.models import Max, Q
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.template.defaultfilters import slugify
+from django.utils.functional import cached_property
 from django.views.generic import View
 from raster.algebra.const import ALGEBRA_PIXEL_TYPE_GDAL, BAND_INDEX_SEPARATOR
 from raster.algebra.parser import RasterAlgebraParser
 from raster.const import EXPORT_MAX_PIXELS, IMG_ENHANCEMENTS, IMG_FORMATS, MAX_EXPORT_NAME_LENGTH, README_TEMPLATE
 from raster.exceptions import RasterAlgebraException
-from raster.models import Legend, RasterLayer, RasterLayerBandMetadata
+from raster.models import Legend, RasterLayer, RasterLayerBandMetadata, RasterLayerMetadata
 from raster.shortcuts import get_session_colormap
 from raster.tiles.const import WEB_MERCATOR_SRID, WEB_MERCATOR_TILESIZE
 from raster.tiles.lookup import get_raster_tile
 from raster.tiles.utils import tile_bounds, tile_index_range, tile_scale
-from raster.utils import band_data_to_image, colormap_to_rgba
+from raster.utils import band_data_to_image, colormap_to_rgba, pixel_value_from_point
 
 
 class RasterView(View):
+
+    @property
+    def is_pixel_request(self):
+        return 'xcoord' in self.kwargs
 
     def get_colormap(self, layer=None):
         """
@@ -122,15 +127,25 @@ class RasterView(View):
 
         return response
 
-    def get_tile(self, layer_id):
+    def get_tile(self, layer_id, zlevel=None):
         """
         Returns a tile for rendering. If the tile does not exists, higher
         level tiles are searched and warped to lower level if found.
         """
-        # Get tile indices from request
-        tilez = int(self.kwargs.get('z'))
-        tilex = int(self.kwargs.get('x'))
-        tiley = int(self.kwargs.get('y'))
+        if self.is_pixel_request:
+            tilez = self.max_zoom
+            # Derive the tile index from the input coordinates.
+            xcoord = float(self.kwargs.get('xcoord'))
+            ycoord = float(self.kwargs.get('ycoord'))
+            bbox = [xcoord, ycoord, xcoord, ycoord]
+            indexrange = tile_index_range(bbox, tilez)
+            tilex = indexrange[0]
+            tiley = indexrange[1]
+        else:
+            # Get tile indices from the request url parameters.
+            tilez = int(self.kwargs.get('z'))
+            tilex = int(self.kwargs.get('x'))
+            tiley = int(self.kwargs.get('y'))
 
         return get_raster_tile(layer_id, tilez, tilex, tiley)
 
@@ -154,13 +169,24 @@ class RasterView(View):
 
         return get_object_or_404(RasterLayer, query)
 
+    @cached_property
+    def max_zoom(self):
+        return RasterLayerMetadata.objects.filter(
+            rasterlayer_id__in=self.get_ids().values()
+        ).aggregate(zlevel=Max('max_zoom'))['zlevel']
+
 
 class AlgebraView(RasterView):
     """
     A view to calculate map algebra on raster layers.
     """
 
+    _layer_ids = None
+
     def get_ids(self):
+        if self._layer_ids is not None:
+            return self._layer_ids
+
         if 'layer' in self.kwargs:
             # For tms requests, construct simple ids dictionary.
             data = self.kwargs.get('layer')
@@ -171,7 +197,7 @@ class AlgebraView(RasterView):
                 query = Q(rasterfile__contains='rasters/' + data)
                 layer_id = get_object_or_404(RasterLayer, query).id
             # For TMS tile request, get the layer id from the url.
-            return {'x': layer_id}
+            self._layer_ids = {'x': layer_id}
         else:
             # For algebra requests, get the layer ids from the query parameter.
             ids = self.request.GET.get('layers', '').split(',')
@@ -188,8 +214,9 @@ class AlgebraView(RasterView):
                 ids = {idx[0]: int(idx[1]) for idx in ids}
             except ValueError:
                 raise RasterAlgebraException('Layer parameter is not valid.')
+            self._layer_ids = ids
 
-            return ids
+        return self._layer_ids
 
     def get(self, request, *args, **kwargs):
         # Get layer ids
@@ -244,6 +271,16 @@ class AlgebraView(RasterView):
             result = parser.evaluate_raster_algebra(data, formula)
         except:
             raise RasterAlgebraException('Failed to evaluate raster algebra.')
+
+        # For pixel value requests, return result as json.
+        if self.is_pixel_request:
+            xcoord = float(self.kwargs.get('xcoord'))
+            ycoord = float(self.kwargs.get('ycoord'))
+            val = pixel_value_from_point(result, [xcoord, ycoord])
+            return HttpResponse(
+                json.dumps({'x': xcoord, 'y': ycoord, 'value': val}),
+                content_type='application/json',
+            )
 
         # Get array from algebra result
         if result.bands[0].nodata_value is None:
@@ -400,7 +437,7 @@ class ExportView(AlgebraView):
             zlevel = int(self.request.GET.get('zoom'))
         else:
             # Get highest zoom level of all input layers
-            zlevel = max([layer.metadata.max_zoom for layer in layers])
+            zlevel = self.max_zoom
         # Use bounding box to compute tile range
         if self.request.GET.get('bbox', None):
             bbox = Polygon.from_bbox(self.request.GET.get('bbox').split(','))
