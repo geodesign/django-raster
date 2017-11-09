@@ -385,14 +385,12 @@ class RasterLayerParser(object):
                         'predictor': 2,
                     }
                     driver = 'GTiff'
-                    name='tile.tif'
+                    name = 'tile.tif'
                     vsiname = '/vsimem/{}.tif'.format(uuid.uuid4())
                 else:
-                    papsz_options = {
-                        'nbits': 15,
-                    }
+                    papsz_options = {}
                     driver = 'JP2OpenJPEG'
-                    name='tile.jp2'
+                    name = 'tile.jp2'
                     vsiname = '/vsimem/{}.jp2'.format(uuid.uuid4())
 
                 # Warp source raster into this tile (in memory).

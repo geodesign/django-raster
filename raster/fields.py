@@ -20,13 +20,10 @@ class RasterFileAlternative(FieldFile, GDALRaster):
 
     @property
     def name(self):
-        #return super(RasterFile, self).name
-        print('getting name', self._name)
         return self._name
 
     @name.setter
     def name(self, value):
-        print('setting name', value)
         self._name = value
 
 
