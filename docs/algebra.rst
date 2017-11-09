@@ -158,6 +158,7 @@ and ``ycoord = 3229269``. The coordinates must be provided in the web mercator
 projection (EPSG 3857).
 
 ::
+
     /raster/pixel/-9218229/3229269/?layers=a=1,b=3,c=6&formula=log(a+b)*c
 
 Formula parser
