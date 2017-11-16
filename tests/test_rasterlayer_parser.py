@@ -1,6 +1,9 @@
 from __future__ import unicode_literals
 
 import os
+from shutil import copyfile
+
+import mock
 
 from django.contrib.gis.gdal import GDALRaster
 from django.core.files import File
@@ -12,6 +15,11 @@ from raster.tiles.const import WEB_MERCATOR_SRID
 from tests.raster_testcase import RasterTestCase
 
 
+def mock_download_file(*args, **kwargs):
+    copyfile(kwargs['Key'], kwargs['Filename'])
+
+
+@mock.patch('boto3.s3.inject.download_file', mock_download_file)
 @override_settings(RASTER_TILESIZE=100)
 class RasterLayerParserTests(RasterTestCase):
 
@@ -101,6 +109,12 @@ class RasterLayerParserTests(RasterTestCase):
             self.rasterlayer.source_url = 'file://' + os.path.join(self.pwd, 'raster.tif.zip')
             self.rasterlayer.save()
             self.assertEqual(self.rasterlayer.rastertile_set.count(), 9 + 4 + 6 * 1)
+
+    def test_parse_with_s3_source_url(self):
+        self.rasterlayer.rastertile_set.all().delete()
+        self.rasterlayer.source_url = 's3://rasterbucket/' + os.path.join(self.pwd, 'raster.tif.zip')
+        self.rasterlayer.save()
+        self.assertEqual(self.rasterlayer.rastertile_set.count(), 9 + 4 + 6 * 1)
 
     def test_parse_without_building_pyramid(self):
         lyr = RasterLayer.objects.get(id=self.rasterlayer.id)

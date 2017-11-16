@@ -16,7 +16,9 @@ django-raster change log
 * Single pixel value lookups by coordinates from algebra expressions can now be
   requested.
 
->>>>>>> bla
+* Added option to add direct s3 links that download data from s3 using boto3.
+  This allows specifying private or requester-pays buckets as raster source.
+
 0.5
 ---
 * Added ``memory_efficient`` flag to value count aggregator. The value counts

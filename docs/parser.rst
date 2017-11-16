@@ -14,7 +14,7 @@ created using the Django shell. Each raster file corresponds to one
 properties are **required**:
 
   - Layer name
-  - Raster file (either as file or url)
+  - Raster file (either as file, http url or s3 url)
   - Data type
 
 The datatype tells django-raster how to interpret the pixel values. The choices
@@ -59,6 +59,37 @@ reprojected file, the "store reprojected" flag can be disactivated. Note that
 this will result in less use of storage, but an overhead when parsing,
 especially for asynchronous parsing where the file will be reprojected by each
 worker.
+
+Specifying an Url as Source
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+The raster file can be uploaded directly using the raster file field, or passed
+as a url either to a public http(s) address, or a url like string, pointing
+directly to an s3 bucket. The http(s) urls are regular web urls.
+
+For the s3 links, the ``boto3`` library is used to directly access an s3 bucket
+and download it from there. In this way, private or requester-pays buckets can
+be used as source. The credentials for accessing the buckets need to be configured
+so that boto3 can see them.
+
+The url should have the following structure
+
+::
+
+    s3://BUCKET_NAME/BUCKET_KEY
+
+for instance,
+
+::
+
+    s3://sentinel-s2-l1c/tiles/12/S/VG/2017/9/15/0/B12.jp2
+
+gets the same file as the following regular http url
+
+::
+
+    http://sentinel-s2-l1c.s3.amazonaws.com/tiles/12/S/VG/2017/9/15/0/B12.jp2
+
+but instead of making a regular web request, it accesses the file using boto3.
 
 Raster Tile Creation
 --------------------

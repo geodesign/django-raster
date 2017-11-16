@@ -129,7 +129,7 @@ class RasterLayer(models.Model, ValueCountMixin):
     description = models.TextField(blank=True, null=True)
     datatype = models.CharField(max_length=2, choices=DATATYPES, default='co')
     rasterfile = models.FileField(upload_to='rasters', null=True, blank=True)
-    source_url = models.URLField(default='', blank=True, max_length=2500,
+    source_url = models.CharField(default='', blank=True, max_length=2500,
         help_text='External url to get the raster file from. If a value is set,'
                   'the rasterfile field will be ignored.')
     nodata = models.CharField(max_length=100, null=True, blank=True,

@@ -6,6 +6,7 @@ import os
 import tempfile
 import zipfile
 
+import boto3
 import numpy
 
 from django.conf import settings
@@ -79,10 +80,26 @@ class RasterLayerParser(object):
 
         # Choose source for raster data, use the reprojected version if it exists.
         if self.rasterlayer.source_url and not has_reprojected:
-            url_path = urlparse(self.rasterlayer.source_url).path
-            filename = url_path.split('/')[-1]
-            filepath = os.path.join(self.tmpdir, filename)
-            urlretrieve(self.rasterlayer.source_url, filepath)
+            url = self.rasterlayer.source_url
+            if url.lower().startswith('http') or url.startswith('file'):
+                url_path = urlparse(self.rasterlayer.source_url).path
+                filename = url_path.split('/')[-1]
+                filepath = os.path.join(self.tmpdir, filename)
+                urlretrieve(self.rasterlayer.source_url, filepath)
+            elif url.startswith('s3'):
+                # Get the bucket name and file key, assuming the following url
+                # strucure: s3://BUCKET_NAME/BUCKET_KEY
+                bucket_name = url.split('s3://')[1].split('/')[0]
+                bucket_key = '/'.join(url.split('s3://')[1].split('/')[1:])
+                # Assume the file name is the last piece of the key.
+                filename = bucket_key.split('/')[-1]
+                filepath = os.path.join(self.tmpdir, filename)
+                # Get file from s3.
+                s3 = boto3.resource('s3')
+                buck = s3.Bucket(bucket_name)
+                buck.download_file(bucket_key, filepath)
+            else:
+                raise RasterException('Only http(s) and s3 urls are supported.')
         else:
             if has_reprojected:
                 rasterfile_source = reproj.rasterfile
