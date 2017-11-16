@@ -91,6 +91,9 @@ gets the same file as the following regular http url
 
 but instead of making a regular web request, it accesses the file using boto3.
 
+Note that for requester pays bucket this might incur charges even if the
+requester is not the owner of the bucket.
+
 Raster Tile Creation
 --------------------
 Upon uploading a file, django-raster automatically parses the raster file. The
