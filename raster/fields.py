@@ -37,7 +37,7 @@ class RasterFile(FieldFile):
     @property
     def rast(self):
         if not self._rast:
-            self._rast = GDALRaster(self.file.read())
+            self._rast = GDALRaster(self.read())
         return self._rast
 
     @rast.setter
