@@ -377,8 +377,11 @@ class RasterLayerParser(object):
                 if all([numpy.all(dat['data'] == dat['nodata_value']) for dat in band_data]):
                     continue
 
-                # Add tile data to histogram
-                self.push_histogram(band_data)
+                if zoom == self.max_zoom:
+                    # Add tile data to histogram
+                    self.push_histogram(band_data)
+
+                # Creation options.
                 papsz_options = {
                     'compress': 'deflate',
                     'predictor': 2,
