@@ -377,21 +377,15 @@ class RasterLayerParser(object):
                 if all([numpy.all(dat['data'] == dat['nodata_value']) for dat in band_data]):
                     continue
 
-                if zoom == self.max_zoom:
-                    # Add tile data to histogram
-                    self.push_histogram(band_data)
-                    papsz_options = {
-                        'compress': 'deflate',
-                        'predictor': 2,
-                    }
-                    driver = 'GTiff'
-                    name = 'tile.tif'
-                    vsiname = '/vsimem/{}.tif'.format(uuid.uuid4())
-                else:
-                    papsz_options = {}
-                    driver = 'JP2OpenJPEG'
-                    name = 'tile.jp2'
-                    vsiname = '/vsimem/{}.jp2'.format(uuid.uuid4())
+                # Add tile data to histogram
+                self.push_histogram(band_data)
+                papsz_options = {
+                    'compress': 'deflate',
+                    'predictor': 2,
+                }
+                driver = 'GTiff'
+                name = 'tile.tif'
+                vsiname = '/vsimem/{}.tif'.format(uuid.uuid4())
 
                 # Warp source raster into this tile (in memory).
                 dest = GDALRaster({
