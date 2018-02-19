@@ -1,6 +1,7 @@
 import json
 import math
 import os
+import uuid
 from operator import itemgetter
 
 import numpy
@@ -351,7 +352,8 @@ class RasterLayerBandMetadata(models.Model):
 
 
 def upload_tile_to(instance, filename):
-    return 'tiles/{rst}/{z}/tile-{x}-{y}{form}'.format(
+    return '{uuid}-tile-{rst}-{z}-{x}-{y}{form}'.format(
+        uuid=uuid.uuid4(),
         rst=instance.rasterlayer_id,
         z=instance.tilez,
         x=instance.tilex,
