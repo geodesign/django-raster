@@ -1,7 +1,7 @@
 ===============
 Rendering tiles
 ===============
-After creating and parsing a :class:`RaterLayer`, the tiles for that layer can
+After creating and parsing a :class:`RasterLayer`, the tiles for that layer can
 be accessed through the tiles url. The raster urls have to be added to the
 application's url patterns. Here we assume that the ``/raster/`` base url is used
 as proposed in the :doc:`installation` section.
