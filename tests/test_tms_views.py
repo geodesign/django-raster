@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 import sys
 from unittest import skipUnless
 
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from raster.shortcuts import set_session_colormap
 from tests.raster_testcase import RasterTestCase
 

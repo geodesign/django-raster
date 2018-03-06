@@ -10,8 +10,8 @@ import numpy
 
 from django.conf import settings
 from django.core.files import File
-from django.core.urlresolvers import reverse
 from django.test import Client, TransactionTestCase
+from django.urls import reverse
 from raster.models import Legend, LegendEntry, LegendSemantics, RasterLayer
 
 
