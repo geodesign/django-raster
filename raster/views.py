@@ -246,9 +246,7 @@ class AlgebraView(RasterView):
             if tile:
                 tiles[layerid] = tile
             else:
-                # Create empty image if any layer misses the required tile
-                img = Image.new("RGBA", (WEB_MERCATOR_TILESIZE, WEB_MERCATOR_TILESIZE), (0, 0, 0, 0))
-                return self.write_img_to_response(img, {})
+                return self.get_empty()
 
         # Map tiles to a dict with formula names as keys.
         data = {}
@@ -429,6 +427,12 @@ class AlgebraView(RasterView):
         # Return rendered image
         return self.write_img_to_response(img, stats)
 
+    def get_empty(self):
+        """
+        Create empty image if any layer misses the required tile
+        """
+        img = Image.new("RGBA", (WEB_MERCATOR_TILESIZE, WEB_MERCATOR_TILESIZE), (0, 0, 0, 0))
+        return self.write_img_to_response(img, {})
 
 class LegendView(RasterView):
 
