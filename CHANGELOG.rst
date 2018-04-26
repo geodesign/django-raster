@@ -3,6 +3,8 @@ django-raster change log
 
 0.6
 ---
+* BREAKING CHANGE: Dropped support for Python 2.
+
 * Changed alpha channel handling on RGB endpoint. The alpha channel is now
   switched off by default. To activate it, add the ``alpha`` query parameter
   to the rgb request.
@@ -18,6 +20,10 @@ django-raster change log
 
 * Added option to add direct s3 links that download data from s3 using boto3.
   This allows specifying private or requester-pays buckets as raster source.
+
+* Made it possible to request TIFF tiles on the TMS, Algebra and RGB endpoints.
+
+* Updated dependency versions to latest respective releases.
 
 0.5
 ---
