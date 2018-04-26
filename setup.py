@@ -11,7 +11,7 @@ setup(
     packages=find_packages(exclude=('tests', )),
     include_package_data=True,
     install_requires=[
-        'Django>=1.9',
+        'Django>=2.0',
         'numpy>=1.9.1',
         'celery>=4.0.2',
         'Pillow>=4.1.1',
@@ -28,8 +28,6 @@ setup(
         'License :: OSI Approved :: BSD License',
         'Operating System :: OS Independent',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
