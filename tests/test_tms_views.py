@@ -1,7 +1,8 @@
 from __future__ import unicode_literals
 
+import os
 import sys
-from unittest import skipUnless
+from unittest import skipIf, skipUnless
 
 from django.urls import reverse
 from raster.shortcuts import set_session_colormap
@@ -129,6 +130,7 @@ class RasterTmsTests(RasterTestCase):
         self.assertIsExpectedTile(response.content, 'test_tms_continuous_colormap')
         self.assertEqual(response.status_code, 200)
 
+    @skipIf('TRAVIS' in os.environ, 'The binary version of the output files depends on the environment.')
     def test_tms_tif_output(self):
         # Get tms tile rendered as tif file.
         response = self.client.get(self.tile_url.split('.')[0] + '.tif')

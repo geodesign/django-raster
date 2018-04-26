@@ -1,5 +1,8 @@
 from __future__ import unicode_literals
 
+import os
+from unittest import skipIf
+
 from django.contrib.gis.gdal import GDAL_VERSION, GDALRaster
 from django.test import TestCase
 from django.utils.http import urlquote
@@ -143,6 +146,7 @@ class RasterAlgebraViewTests(RasterTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIsExpectedTile(response.content, 'test_algebra_rgb')
 
+    @skipIf('TRAVIS' in os.environ, 'The binary version of the output files depends on the environment.')
     def test_rgb_request_tif(self):
         url = self.algebra_tile_url.split('.')[0] + '.tif?layers=r={0},g={0},b={0}'.format(self.rasterlayer.id)
         response = self.client.get(url)
