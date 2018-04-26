@@ -1,4 +1,13 @@
+from codecs import open
+from os import path
+
 from setuptools import find_packages, setup
+
+here = path.abspath(path.dirname(__file__))
+
+# Get the long description from the README file
+with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
+    long_description = f.read()
 
 setup(
     name='django-raster',
@@ -7,6 +16,8 @@ setup(
     author='Daniel Wiesmann',
     author_email='daniel@urbmet.com',
     description='Raster file implementation for Django based on PostGis',
+    long_description=long_description,
+    long_description_content_type='text/x-rst',
     license='BSD',
     packages=find_packages(exclude=('tests', )),
     include_package_data=True,
