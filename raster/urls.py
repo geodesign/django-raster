@@ -14,7 +14,7 @@ urlpatterns = [
 
     # Raster algebra endpoint
     url(
-        r'^algebra/(?P<z>[0-9]+)/(?P<x>[0-9]+)/(?P<y>[0-9]+).(?P<frmt>jpg|png)$',
+        r'^algebra/(?P<z>[0-9]+)/(?P<x>[0-9]+)/(?P<y>[0-9]+).(?P<frmt>jpg|png|tif)$',
         AlgebraView.as_view(),
         name='algebra',
     ),

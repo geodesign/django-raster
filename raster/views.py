@@ -13,7 +13,7 @@ from PIL import Image
 
 from django.conf import settings
 from django.contrib.gis.gdal import GDALRaster
-from django.contrib.gis.gdal.raster.const import VSI_FILESYSTEM_BASEPATH
+from django.contrib.gis.gdal.raster.const import VSI_FILESYSTEM_BASE_PATH
 from django.contrib.gis.geos import Polygon
 from django.db.models import Max, Q
 from django.http import FileResponse, Http404, HttpResponse
@@ -287,7 +287,7 @@ class AlgebraView(RasterView):
 
         # For tif requests, skip colormap and return georeferenced tif file.
         if self.kwargs.get('frmt') == 'tif':
-            vsi_path = os.path.join(VSI_FILESYSTEM_BASEPATH, str(uuid.uuid4()))
+            vsi_path = os.path.join(VSI_FILESYSTEM_BASE_PATH, str(uuid.uuid4()))
             rast = result.warp({
                 'name': vsi_path,
                 'driver': 'tif',
@@ -326,12 +326,44 @@ class AlgebraView(RasterView):
             else:
                 band_index = 0
 
+            band = tile.bands[band_index]
             if variable == 'r':
-                red = tile.bands[band_index].data()
+                red = band.data()
+                red_nodata = band.nodata_value
+                red_gdal_dtype = band.datatype()
             elif variable == 'g':
-                green = tile.bands[band_index].data()
+                green = band.data()
+                green_nodata = band.nodata_value
             elif variable == 'b':
-                blue = tile.bands[band_index].data()
+                blue = band.data()
+                blue_nodata = band.nodata_value
+
+        # For tif requests, skip rgb rendering and return georeferenced tif file.
+        if self.kwargs.get('frmt') == 'tif':
+            vsi_path = os.path.join(VSI_FILESYSTEM_BASE_PATH, str(uuid.uuid4()))
+            # Construct 3 band raster, assuming all
+            ref = next(iter(data.values()))
+            result = GDALRaster({
+                'name': vsi_path,
+                'driver': 'tif',
+                'srid': WEB_MERCATOR_SRID,
+                'datatype': red_gdal_dtype,
+                'width': ref.width,
+                'height': ref.height,
+                'origin': ref.origin,
+                'scale': ref.scale,
+                'skew': ref.skew,
+                'bands': [
+                    {'data': red, 'nodata_value': red_nodata},
+                    {'data': green.astype(red.dtype), 'nodata_value': green_nodata},
+                    {'data': blue.astype(red.dtype), 'nodata_value': blue_nodata},
+                ],
+                'papsz_options': {
+                    'compress': 'deflate',
+                },
+            })
+            content_type = IMG_FORMATS['tif'][1]
+            return HttpResponse(result.vsi_buffer, content_type)
 
         # Get scale for the image value range.
         if 'scale' in self.request.GET:

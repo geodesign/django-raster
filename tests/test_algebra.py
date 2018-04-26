@@ -71,6 +71,7 @@ class RasterAlgebraViewTests(RasterTestCase):
     def test_basic_algebra_request(self):
         response = self.client.get(self.algebra_tile_url + '?layers=a={0}&formula=a'.format(self.rasterlayer.id))
         self.assertEqual(response.status_code, 200)
+        self.assertIsExpectedTile(response.content, 'test_algebra_basic')
 
     def test_undeclared_variable_name_error(self):
         response = self.client.get(self.algebra_tile_url + '?layers=a={0}&formula=a*b'.format(self.rasterlayer.id))
@@ -80,22 +81,27 @@ class RasterAlgebraViewTests(RasterTestCase):
         formula = urlquote('a*(a<=5)+(a<5)')
         response = self.client.get(self.algebra_tile_url + '?layers=a={0}&formula={1}'.format(self.rasterlayer.id, formula))
         self.assertEqual(response.status_code, 200)
+        self.assertIsExpectedTile(response.content, 'test_algebra_valid_multi_formula')
 
     def test_legend_id_specified(self):
         response = self.client.get(self.algebra_tile_url + '?layers=a={0}&formula=a&legend={1}'.format(self.rasterlayer.id, self.legend.id))
         self.assertEqual(response.status_code, 200)
+        self.assertIsExpectedTile(response.content, 'test_algebra_legend_id_specified')
 
     def test_legend_title_specified(self):
         response = self.client.get(self.algebra_tile_url + '?layers=a={0}&formula=a&legend={1}'.format(self.rasterlayer.id, self.legend.title))
         self.assertEqual(response.status_code, 200)
+        self.assertIsExpectedTile(response.content, 'test_algebra_legend_id_specified')
 
     def test_algebra_with_empty_tile(self):
         response = self.client.get(self.algebra_tile_url + '?layers=a={0},b={1}&formula=a*b&legend={2}'.format(self.rasterlayer.id, self.empty_rasterlayer.id, self.legend.title))
         self.assertEqual(response.status_code, 200)
+        self.assertIsExpectedTile(response.content, 'test_algebra_empty_tile')
 
     def test_nested_algebra_request(self):
         response = self.client.get(self.algebra_tile_url + '?layers=a={0},b={0}&formula=((a*5)%2B(b*3))*4'.format(self.rasterlayer.id))
         self.assertEqual(response.status_code, 200)
+        self.assertIsExpectedTile(response.content, 'test_algebra_nested')
 
     def test_long_variable_algebra_request(self):
         response = self.client.get(self.algebra_tile_url + '?layers=abc={0},a_long_var={0}&formula=((abc*5)%2B(a_long_var*3))*4'.format(self.rasterlayer.id))
@@ -123,6 +129,7 @@ class RasterAlgebraViewTests(RasterTestCase):
         # Manually specify first band.
         response = self.client.get(self.algebra_tile_url + '?layers=a{0}0={1}&formula=a'.format(BAND_INDEX_SEPARATOR, self.rasterlayer.id))
         self.assertEqual(response.status_code, 200)
+        self.assertIsExpectedTile(response.content, 'test_algebra_band_level')
         # Try getting band that does not exist.
         response = self.client.get(self.algebra_tile_url + '?layers=a{0}1={1}&formula=a'.format(BAND_INDEX_SEPARATOR, self.rasterlayer.id))
         self.assertEqual(response.status_code, 400)
@@ -132,7 +139,15 @@ class RasterAlgebraViewTests(RasterTestCase):
         self.assertEqual(response.status_code, 200)
         response = self.client.get(self.algebra_tile_url + '?layers=r={0},g={0},b={0}&alpha'.format(self.rasterlayer.id))
         self.assertEqual(response.status_code, 200)
-        response = self.client.get(self.algebra_tile_url + '?layers=r={0},g={0},b={0}&alpha&enhance_contrast=3'.format(self.rasterlayer.id))
+        response = self.client.get(self.algebra_tile_url + '?layers=r={0},g={0},b={0}&alpha&enhance_sharpness=1.2&enhance_color=1.2&enhance_contrast=1.1&enhance_brightness=1.1'.format(self.rasterlayer.id))
+        self.assertEqual(response.status_code, 200)
+        self.assertIsExpectedTile(response.content, 'test_algebra_rgb')
+
+    def test_rgb_request_tif(self):
+        url = self.algebra_tile_url.split('.')[0] + '.tif?layers=r={0},g={0},b={0}'.format(self.rasterlayer.id)
+        response = self.client.get(url)
+        self.assertEqual(response['Content-type'], 'image/tiff')
+        self.assertIsExpectedTile(response.content, 'test_algebra_rgb', frmt='tif')
         self.assertEqual(response.status_code, 200)
 
     def test_pixel_request(self):
