@@ -12,12 +12,12 @@ setup(
     include_package_data=True,
     install_requires=[
         'Django>=2.0',
-        'numpy>=1.9.1',
-        'celery>=4.0.2',
-        'Pillow>=4.1.1',
-        'django-colorful>=1.0.1',
+        'numpy>=1.14.2',
+        'celery>=4.1.0',
+        'Pillow>=5.1.0',
+        'django-colorful>=1.2',
         'pyparsing>=2.2.0',
-        'boto3>=1.4.7',
+        'boto3>=1.7.9',
     ],
     keywords=['django', 'raster', 'gis', 'gdal', 'celery', 'geo', 'spatial'],
     classifiers=[
