@@ -85,7 +85,7 @@ is provided as a key in the colormap dictionary.
 
 The continuous color scheme requires at least two colors, which are
 interpolated over the range of pixel values. These colors can be specified
-using the ``from`` and ``to`` keywords. A third color can be specified to 
+using the ``from`` and ``to`` keywords. A third color can be specified to
 force interpolation through another color in the middle of the range. This
 intermediate color can be specified using the ``over`` key.
 
@@ -174,3 +174,18 @@ you can do so by using this url:
     /raster/tiles/{z}/{x}/{y}.png?colormap=%22%7B1%3A%20'%23FF0000'%2C%202%3A%20'%2300FF00'%2C%203%3A%20'%230000FF'%7D%22
 
 The colormap value is the URIEncoded version of the json stringified colormap object.
+
+Image formats
+-------------
+All endpoints (regular tiles, algebra and RGB) support three formats: PNG, JPEG
+and TIFF. The different formats can be requested by changing the file extension
+in the url. The extensions to use are ``.png``, ``.jpg``, and ``.tif``.
+
+The PNG and JPEG endpoints behave the same way, except that JPEG images do not
+support an alpha channel. Nodata pixels are rendered in black.
+
+The TIFF endpoint will return the raw data produced from the request in a
+georeferenced GeoTIFF file. It therefore ignores any of the rendering parameters
+and simply returns the raw values of the result of the request. This might be
+useful for analysis purposes, where raster algebra results can be obtained in
+raw form for further downstream processing.
