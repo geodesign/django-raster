@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='django-raster',
-    version='0.5',
+    version='0.6',
     url='https://github.com/geodesign/django-raster',
     author='Daniel Wiesmann',
     author_email='daniel@urbmet.com',
