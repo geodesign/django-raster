@@ -27,6 +27,13 @@ class RasterTmsTests(RasterTestCase):
         self.assertIsExpectedTile(response.content, 'test_tms_nonexisting_tile')
         self.assertEqual(response.status_code, 200)
 
+    def test_tms_nonexisting_tile_tif(self):
+        url = reverse('tms', kwargs={'z': 100, 'y': 0, 'x': 0, 'layer': self.rasterlayer.id, 'frmt': 'tif'})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-type'], 'image/tiff')
+        self.assertIsExpectedTile(response.content, 'test_tms_nonexisting_tile', frmt='tif')
+
     def test_tms_duplicated_layer_filename(self):
         url = reverse('tms', kwargs={'z': 100, 'y': 0, 'x': 0, 'layer': 'raster.tif', 'frmt': 'png'})
         DUPL_MSG = 'get() returned more than one RasterLayer -- it returned 2!'

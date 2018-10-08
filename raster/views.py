@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 
+import io
 import json
 import os
 import re
@@ -118,17 +119,21 @@ class RasterView(View):
         """
         Writes rgba numpy array to http response.
         """
-        # Create response.
-        response = HttpResponse()
+        # Get requested format and corresponding content type.
         frmt, content_type = self.get_format()
-        response['Content-Type'] = content_type
-        response['aggregation'] = json.dumps(stats)
         # Enhance image if requested.
         img = self.enhance(img)
-        # Save image to response.
-        img.save(response, frmt)
-
-        return response
+        # Save image to io buffer.
+        with io.BytesIO() as output:
+            img.save(output, format=frmt)
+            # Create response with image content.
+            response = HttpResponse(
+                output.getvalue(),
+                content_type=content_type,
+            )
+            # Add aggregation statistics to response headers.
+            response['aggregation'] = json.dumps(stats)
+            return response
 
     def get_tile(self, layer_id, zlevel=None):
         """
