@@ -300,7 +300,7 @@ class RasterLayerParseStatus(models.Model):
     rasterlayer = models.OneToOneField(RasterLayer, related_name='parsestatus', on_delete=models.CASCADE)
     status = models.IntegerField(choices=STATUS_CHOICES, default=UNPARSED)
     log = models.TextField(default='', editable=False)
-    tile_levels = ArrayField(models.PositiveIntegerField(), default=[])
+    tile_levels = ArrayField(models.PositiveIntegerField(), default=list)
 
     def __str__(self):
         return '{0} - {1}'.format(self.rasterlayer.name, self.get_status_display())
