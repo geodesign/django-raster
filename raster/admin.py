@@ -161,6 +161,7 @@ class RasterTileModelAdmin(admin.ModelAdmin):
 
 class LegendEntriesInLine(admin.TabularInline):
     model = LegendEntry
+    extra = 0
 
 
 class LegendAdmin(admin.ModelAdmin):
