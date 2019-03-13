@@ -4,6 +4,7 @@ import os
 from shutil import copyfile
 
 import mock
+
 from django.contrib.gis.gdal import GDALRaster
 from django.core.files import File
 from django.test.utils import override_settings
