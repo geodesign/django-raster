@@ -4,7 +4,6 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.db import connection
 from raster.tiles.const import WEB_MERCATOR_SRID
 
-
 CLIPPED_VALUE_COUNT_SQL = """
 WITH tiles_for_agg AS (
     SELECT ST_ValueCount(ST_Clip(ST_Transform(rast, {geom_srid}), ST_GeomFromEWKT('{geom_ewkt}'))) AS vcresult
