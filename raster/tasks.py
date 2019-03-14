@@ -116,9 +116,9 @@ def parse(rasterlayer_id):
 
         # Setup the parser logic as parsing chain
         parsing_task_chain = (
-            clear_tiles.si(rasterlayer_id) |
-            create_tiles_chain |
-            send_success_signal.si(rasterlayer_id)
+            clear_tiles.si(rasterlayer_id)
+            | create_tiles_chain
+            | send_success_signal.si(rasterlayer_id)
         )
 
         # Apply the parsing chain

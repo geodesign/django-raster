@@ -222,13 +222,13 @@ def reset_parse_log_if_data_changed(sender, instance, **kwargs):
         # If filename or nodata value has changed, clear parse status to
         # trigger re-parsing. Also remove the reprojected copy of the previous
         # file if it exists.
-        if (obj.rasterfile.name != instance.rasterfile.name or
-                obj.nodata != instance.nodata or
-                obj.max_zoom != instance.max_zoom or
-                obj.srid != instance.srid or
-                obj.source_url != instance.source_url or
-                obj.build_pyramid != instance.build_pyramid or
-                obj.next_higher != instance.next_higher):
+        if (obj.rasterfile.name != instance.rasterfile.name
+                or obj.nodata != instance.nodata
+                or obj.max_zoom != instance.max_zoom
+                or obj.srid != instance.srid
+                or obj.source_url != instance.source_url
+                or obj.build_pyramid != instance.build_pyramid
+                or obj.next_higher != instance.next_higher):
             if hasattr(instance, 'reprojected'):
                 instance.reprojected.delete()
             instance.parsestatus.reset()
