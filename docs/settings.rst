@@ -41,3 +41,10 @@ by using the setting below. Defaults to 500 tiles.
 ::
 
     RASTER_BATCH_STEP_SIZE = 500
+
+S3 Endpoint URL
+----------------
+Set the S3 compatible endpoint used when retrieving raster tile sources from S3.
+::
+
+    RASTER_S3_ENDPOINT_URL = "http://localhost:4572"
