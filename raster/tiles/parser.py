@@ -34,6 +34,7 @@ class RasterLayerParser(object):
         # Set raster tilesize
         self.tilesize = int(getattr(settings, 'RASTER_TILESIZE', WEB_MERCATOR_TILESIZE))
         self.batch_step_size = int(getattr(settings, 'RASTER_BATCH_STEP_SIZE', BATCH_STEP_SIZE))
+        self.s3_endpoint_url = getattr(settings, 'RASTER_S3_ENDPOINT_URL', None)
 
     def log(self, msg, status=None, zoom=None):
         """
@@ -95,7 +96,7 @@ class RasterLayerParser(object):
                 filename = bucket_key.split('/')[-1]
                 filepath = os.path.join(self.tmpdir, filename)
                 # Get file from s3.
-                s3 = boto3.resource('s3')
+                s3 = boto3.resource('s3', endpoint_url=self.s3_endpoint_url)
                 bucket = s3.Bucket(bucket_name)
                 bucket.download_file(bucket_key, filepath, ExtraArgs={'RequestPayer': 'requester'})
             else:
