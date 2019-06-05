@@ -14,7 +14,7 @@ setup(
     version='0.6',
     url='https://github.com/geodesign/django-raster',
     author='Daniel Wiesmann',
-    author_email='daniel@urbmet.com',
+    author_email='daniel@wiesmann.pt',
     description='Raster file implementation for Django based on PostGis',
     long_description=long_description,
     long_description_content_type='text/x-rst',
