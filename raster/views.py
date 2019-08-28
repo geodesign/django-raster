@@ -226,6 +226,13 @@ class AlgebraView(RasterView):
 
         return self._layer_ids
 
+    def get_formula(self):
+        if 'layer' in self.kwargs:
+            # Set the formula to trivial for TMS requests.
+            return 'x'
+        else:
+            return self.request.GET.get('formula', None)
+
     def get(self, request, *args, **kwargs):
         # Get layer ids
         ids = self.get_ids()
@@ -251,11 +258,7 @@ class AlgebraView(RasterView):
             data[name] = tiles[layerid]
 
         # Get formula from request
-        if 'layer' in self.kwargs:
-            # Set the formula to trivial for TMS requests.
-            formula = 'x'
-        else:
-            formula = request.GET.get('formula', None)
+        formula = self.get_formula()
 
         # Dispatch by request type. If a formula was provided, use raster
         # algebra otherwise look for rgb request.
