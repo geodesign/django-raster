@@ -1,6 +1,6 @@
 from __future__ import unicode_literals
 
-from django.contrib.gis.gdal import GDAL_VERSION, GDALRaster, OGRGeometry
+from django.contrib.gis.gdal import GDALRaster, OGRGeometry
 from django.contrib.gis.geos import Point
 from django.test import TestCase
 from raster.rasterize import rasterize
@@ -62,10 +62,8 @@ class RasterizeGeometryTests(TestCase):
         result = rasterize(geom, self.rast)
         self.assertEqual(result.bands[0].data().ravel().tolist(), [0, 0, 1, 1])
         result = rasterize(geom, result, add=True)
-        if GDAL_VERSION < (2, 1, 0):
-            self.assertEqual(result.bands[0].data().ravel().tolist(), [0, 0, 1, 1])
-        else:
-            self.assertEqual(result.bands[0].data().ravel().tolist(), [0, 0, 2, 2])
+        # This might fail on older GDAL versions.
+        self.assertEqual(result.bands[0].data().ravel().tolist(), [0, 0, 2, 2])
 
     def test_rasterize_all_options_active(self):
         geom = Point(5e5 + 150, 4e5 - 150, srid=3086)
@@ -73,8 +71,5 @@ class RasterizeGeometryTests(TestCase):
         result = rasterize(geom, self.rast, burn_value=99, all_touched=True, add=True)
         # Original raster is unchanged.
         self.assertEqual(self.rast.bands[0].data().ravel().tolist(), [0, 1, 2, 3])
-        # Target raster is incremented.
-        if GDAL_VERSION < (2, 1, 0):
-            self.assertEqual(result.bands[0].data().ravel().tolist(), [0, 1, 2, 99])
-        else:
-            self.assertEqual(result.bands[0].data().ravel().tolist(), [0, 1, 2, 102])
+        # Target raster is incremented. This might fail on older GDAL versions.
+        self.assertEqual(result.bands[0].data().ravel().tolist(), [0, 1, 2, 102])
