@@ -322,6 +322,25 @@ class AlgebraView(RasterView):
         # Return rendered image
         return self.write_img_to_response(img, stats)
 
+    def get_rgb_scale(self):
+        if 'scale' not in self.request.GET:
+            return
+
+        # The scale is either a number or two numbers separated by comma.
+        scale = self.request.GET.get('scale').split(',')
+        if len(scale) == 1:
+            scale_min = 0
+            scale_max = float(scale[0])
+        else:
+            # Get min an max scale from
+            scale_min = float(scale[0])
+            scale_max = float(scale[1])
+
+        return scale_min, scale_max
+
+    def get_alpha(self):
+        return 'alpha' in self.request.GET
+
     def get_rgb(self, data):
         # Get data arrays from tiles, by band if requested.
         for key, tile in data.items():
@@ -374,33 +393,24 @@ class AlgebraView(RasterView):
             return HttpResponse(result.vsi_buffer, content_type)
 
         # Get scale for the image value range.
-        if 'scale' in self.request.GET:
-            # The scale is either a number or two numbers separated by comma.
-            scale = self.request.GET.get('scale').split(',')
-            if len(scale) == 1:
-                scale_min = 0
-                scale_max = float(scale[0])
-            else:
-                # Get min an max scale from
-                scale_min = float(scale[0])
-                scale_max = float(scale[1])
-
-                # Clip the image minimum.
-                red[red < scale_min] = scale_min
-                green[green < scale_min] = scale_min
-                blue[blue < scale_min] = scale_min
+        scale = self.get_rgb_scale()
+        if scale is not None:
+            # Clip the image minimum.
+            red[red < scale[0]] = scale[0]
+            green[green < scale[0]] = scale[0]
+            blue[blue < scale[0]] = scale[0]
 
             # Clip the image maximum.
-            red[red > scale_max] = scale_max
-            green[green > scale_max] = scale_max
-            blue[blue > scale_max] = scale_max
+            red[red > scale[1]] = scale[1]
+            green[green > scale[1]] = scale[1]
+            blue[blue > scale[1]] = scale[1]
 
             # Scale the image.
-            red = 255 * (red - scale_min) / scale_max
-            green = 255 * (green - scale_min) / scale_max
-            blue = 255 * (blue - scale_min) / scale_max
+            red = 255 * (red - scale[0]) / scale[1]
+            green = 255 * (green - scale[0]) / scale[1]
+            blue = 255 * (blue - scale[0]) / scale[1]
 
-        if 'alpha' in self.request.GET:
+        if self.get_alpha():
             mode = 'RGBA'
             reshape = 4
             # Create the alpha channel.
