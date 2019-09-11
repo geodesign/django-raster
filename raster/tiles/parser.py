@@ -4,6 +4,7 @@ import datetime
 import fnmatch
 import os
 import tempfile
+import uuid
 import zipfile
 
 import boto3
@@ -338,11 +339,11 @@ class RasterLayerParser(object):
 
         # Compute quadrant bounds and create destination file
         bounds = utils.tile_bounds(indexrange[0], indexrange[1], zoom)
-        dest_file = tempfile.NamedTemporaryFile(dir=self.tmpdir, suffix='.tif', delete=False)
+        dest_file_name = os.path.join(self.tmpdir, '{}.tif'.format(uuid.uuid4()))
 
         # Snap dataset to the quadrant
         snapped_dataset = self.dataset.warp({
-            'name': dest_file.name,
+            'name': dest_file_name,
             'origin': [bounds[0], bounds[3]],
             'scale': [tilescale, -tilescale],
             'width': (indexrange[2] - indexrange[0] + 1) * self.tilesize,
@@ -409,7 +410,7 @@ class RasterLayerParser(object):
             RasterTile.objects.bulk_create(batch)
 
         # Remove quadrant raster tempfile.
-        os.remove(dest_file.name)
+        os.remove(dest_file_name)
 
     def push_histogram(self, data):
         """
