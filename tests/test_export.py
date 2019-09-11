@@ -20,7 +20,7 @@ class RasterAlgebraViewTests(RasterTestCase):
         if hasattr(self, 'tmpdir'):
             shutil.rmtree(self.tmpdir)
 
-    def get_export(self, bbox=None, colormap=None, description=None, name=None):
+    def get_export(self, bbox=None, colormap=None, description=None, name=None, zoom=None):
         # Setup the Get export url
         url = reverse('export')
         # Request export for a simple algebra formula
@@ -33,6 +33,8 @@ class RasterAlgebraViewTests(RasterTestCase):
             url += '&description=' + description
         if name:
             url += '&filename=' + name
+        if zoom:
+            url += '&zoom={}'.format(zoom)
         # Request url and return response
         return self.client.get(url)
 
@@ -103,3 +105,11 @@ class RasterAlgebraViewTests(RasterTestCase):
         expected_slug = 'algebra_export_model-23-special-edition-234'
         match = (expected_slug in name for name in os.listdir(self.tmpdir))
         self.assertTrue(any(match))
+
+    def test_export_custom_zoom(self):
+        response = self.get_export(zoom=3)
+        self.unzip_response(response)
+        readme = open(os.path.join(self.tmpdir, "README.txt"), "r").read()
+        self.assertIn('Zoom level: 3', readme)
+        self.assertIn('Tile index range x: 2 - 2', readme)
+        self.assertIn('Tile index range y: 3 - 3', readme)
