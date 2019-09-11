@@ -1,7 +1,6 @@
 from __future__ import unicode_literals
 
 import os
-from unittest import skipIf
 
 from django.contrib.gis.gdal import GDAL_VERSION, GDALRaster
 from django.test import TestCase
@@ -115,8 +114,11 @@ class RasterAlgebraViewTests(RasterTestCase):
         self.assertEqual(response.status_code, 400)
 
     def test_broken_layers_request(self):
-        # Missing parameter
+        # Missing parameter layers.
         response = self.client.get(self.algebra_tile_url + '?formula=3*a')
+        self.assertEqual(response.status_code, 400)
+        # Missing formula and r-g-b parameters.
+        response = self.client.get(self.algebra_tile_url + '?layers=a={0}'.format(self.rasterlayer.id))
         self.assertEqual(response.status_code, 400)
         # Empty parameter
         response = self.client.get(self.algebra_tile_url + '?layers=&formula=3*a')
@@ -140,19 +142,23 @@ class RasterAlgebraViewTests(RasterTestCase):
     def test_rgb_request(self):
         response = self.client.get(self.algebra_tile_url + '?layers=r={0},g={0},b={0}'.format(self.rasterlayer.id))
         self.assertEqual(response.status_code, 200)
-        response = self.client.get(self.algebra_tile_url + '?layers=r={0},g={0},b={0}&alpha'.format(self.rasterlayer.id))
+        response = self.client.get(self.algebra_tile_url + '?layers=r={0},g={0},b={0}&alpha&scale=1,100'.format(self.rasterlayer.id))
+        self.assertEqual(response.status_code, 200)
+        response = self.client.get(self.algebra_tile_url + '?layers=r:0={0},g:0={0},b={0}&alpha&scale=100'.format(self.rasterlayer.id))
         self.assertEqual(response.status_code, 200)
         response = self.client.get(self.algebra_tile_url + '?layers=r={0},g={0},b={0}&alpha&enhance_sharpness=1.2&enhance_color=1.2&enhance_contrast=1.1&enhance_brightness=1.1'.format(self.rasterlayer.id))
         self.assertEqual(response.status_code, 200)
         self.assertIsExpectedTile(response.content, 'test_algebra_rgb')
 
-    @skipIf('TRAVIS' in os.environ, 'The binary version of the output files depends on the environment.')
     def test_rgb_request_tif(self):
         url = self.algebra_tile_url.split('.')[0] + '.tif?layers=r={0},g={0},b={0}'.format(self.rasterlayer.id)
         response = self.client.get(url)
         self.assertEqual(response['Content-type'], 'image/tiff')
-        self.assertIsExpectedTile(response.content, 'test_algebra_rgb', frmt='tif')
         self.assertEqual(response.status_code, 200)
+        # Skip binary comparison on travis. The binary version of the output
+        # files depends on the environment.
+        if 'TRAVIS' not in os.environ:
+            self.assertIsExpectedTile(response.content, 'test_algebra_rgb', frmt='tif')
 
     def test_pixel_request(self):
         response = self.client.get(self.pixel_url + '?layers=x={0}&formula=x'.format(self.rasterlayer.id))
