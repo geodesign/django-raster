@@ -202,21 +202,19 @@ class RasterLayerParser(object):
 
         # Compress reprojected raster file and store it
         if self.rasterlayer.store_reprojected:
-            dest = tempfile.NamedTemporaryFile(dir=self.tmpdir, suffix='.zip')
-            dest_zip = zipfile.ZipFile(dest.name, 'w', allowZip64=True)
-            dest_zip.write(
-                filename=self.dataset.name,
-                arcname=os.path.basename(self.dataset.name),
-                compress_type=zipfile.ZIP_DEFLATED,
-            )
-            dest_zip.close()
-
-            # Store zip file in reprojected raster model
-            self.rasterlayer.reprojected.rasterfile = File(
-                open(dest_zip.filename, 'rb'),
-                name=os.path.basename(dest_zip.filename)
-            )
-            self.rasterlayer.reprojected.save()
+            with tempfile.NamedTemporaryFile(dir=self.tmpdir, suffix='.zip') as dest:
+                with zipfile.ZipFile(dest.name, 'w', allowZip64=True) as dest_zip:
+                    dest_zip.write(
+                        filename=self.dataset.name,
+                        arcname=os.path.basename(self.dataset.name),
+                        compress_type=zipfile.ZIP_DEFLATED,
+                    )
+                # Store zip file in reprojected raster model
+                self.rasterlayer.reprojected.rasterfile = File(
+                    open(dest.name, 'rb'),
+                    name=os.path.basename(dest_zip.filename)
+                )
+                self.rasterlayer.reprojected.save()
 
         self.log('Finished transforming raster.')
 
@@ -340,7 +338,7 @@ class RasterLayerParser(object):
 
         # Compute quadrant bounds and create destination file
         bounds = utils.tile_bounds(indexrange[0], indexrange[1], zoom)
-        dest_file = tempfile.NamedTemporaryFile(dir=self.tmpdir, suffix='.tif')
+        dest_file = tempfile.NamedTemporaryFile(dir=self.tmpdir, suffix='.tif', delete=False)
 
         # Snap dataset to the quadrant
         snapped_dataset = self.dataset.warp({
@@ -409,6 +407,9 @@ class RasterLayerParser(object):
         # Commit remaining objects
         if len(batch):
             RasterTile.objects.bulk_create(batch)
+
+        # Remove quadrant raster tempfile.
+        os.remove(dest_file.name)
 
     def push_histogram(self, data):
         """
