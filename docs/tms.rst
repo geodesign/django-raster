@@ -139,18 +139,18 @@ Examples
 ^^^^^^^^
 
 If you want to overrides the legend to use MyOtherLegend stored in database you
-can use the following url for the tiling:
+can use the following url for the tiling (assuming `23` is your rasterlayer_id):
 
 ::
 
-    /raster/tiles/{z}/{x}/{y}.png?legend=MyOtherLegend
+    /raster/tiles/23/{z}/{x}/{y}.png?legend=MyOtherLegend
 
 If you want to use the legend from the session with the same name as above you
 can use following one:
 
 ::
 
-    /raster/tiles/{z}/{x}/{y}.png?legend=MyOtherLegend&store=session
+    /raster/tiles/23/{z}/{x}/{y}.png?legend=MyOtherLegend&store=session
 
 .. note::
 
