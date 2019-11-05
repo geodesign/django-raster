@@ -283,6 +283,37 @@ class RasterAggregatorTests(RasterTestCase):
                 '(40.0, 50.0)': 0,
             }
         )
+        # Limit histogram range.
+        agg = Aggregator(
+            layer_dict={'a': self.rasterlayer.id},
+            formula='a',
+            grouping='continuous',
+            hist_range=(0.5, 8)
+        )
+        # Compute value count.
+        vals = agg.value_count()
+        self.assertDictEqual(
+            vals,
+            {
+                '(0.5, 1.25)': 695,
+                '(1.25, 2.0)': 0,
+                '(2.0, 2.75)': 56,
+                '(2.75, 3.5)': 4131,
+                '(3.5, 4.25)': 31490,
+                '(4.25, 5.0)': 0,
+                '(5.0, 5.75)': 0,
+                '(5.75, 6.5)': 0,
+                '(6.5, 7.25)': 0,
+                '(7.25, 8.0)': 1350
+            }
+        )
+        # Statistics are clipped to range.
+        self.assertEqual(agg._stats_min_value, 1)
+        self.assertEqual(agg._stats_max_value, 8)
+        self.assertEqual(agg._stats_t0, 37722)
+        self.assertEqual(sum(vals.values()), agg._stats_t0)
+        self.assertEqual(agg._stats_t1, 149960)
+        self.assertEqual(agg._stats_t2, 628338)
 
     def test_memory_efficient(self):
         agg = Aggregator(

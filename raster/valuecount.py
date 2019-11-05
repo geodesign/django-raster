@@ -146,13 +146,20 @@ class Aggregator(object):
         if data.size == 0:
             return
 
-        # Compute incremental statistics
-        self._stats_t0 += data.size
-        self._stats_t1 += numpy.sum(data)
-        self._stats_t2 += numpy.sum(numpy.square(data))
+        # Filter data by histogram range.
+        if self.hist_range:
+            stats_data = data[data >= self.hist_range[0]]
+            stats_data = stats_data[stats_data <= self.hist_range[1]]
+        else:
+            stats_data = data
 
-        tile_max = numpy.max(data)
-        tile_min = numpy.min(data)
+        # Compute incremental statistics
+        self._stats_t0 += stats_data.size
+        self._stats_t1 += numpy.sum(stats_data)
+        self._stats_t2 += numpy.sum(numpy.square(stats_data))
+
+        tile_max = numpy.max(stats_data)
+        tile_min = numpy.min(stats_data)
 
         if self._stats_max_value is None:
             self._stats_max_value = tile_max
