@@ -92,6 +92,9 @@ class Aggregator(object):
                 )
         self.grouping = grouping
 
+    def get_raster_tile(self, layerid, zoom, tilex, tiley):
+        return get_raster_tile(layerid, zoom, tilex, tiley)
+
     def tiles(self):
         """
         Generator that yields an algebra-ready data dictionary for each tile in
@@ -109,7 +112,7 @@ class Aggregator(object):
                 # Prepare a data dictionary with named tiles for algebra evaluation
                 data = {}
                 for name, layerid in self.layer_dict.items():
-                    tile = get_raster_tile(layerid, self.zoom, tilex, tiley)
+                    tile = self.get_raster_tile(layerid, self.zoom, tilex, tiley)
                     if tile:
                         data[name] = tile
                     else:
