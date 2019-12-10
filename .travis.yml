@@ -3,8 +3,8 @@ dist: xenial
 language: python
 
 python:
+  - '3.4'
   - '3.5'
-  - '3.6'
 
 env:
   - DB_NAME=raster_test PYTHONPATH=$PYTHONPATH:$PWD DJANGO_SETTINGS_MODULE=tests.testproj.settings
