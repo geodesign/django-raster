@@ -4,7 +4,6 @@ import numpy
 from PIL import Image
 
 from django.contrib.gis.gdal import OGRGeometry
-from django.utils import six
 from raster.algebra.parser import FormulaParser
 from raster.exceptions import RasterException
 
@@ -127,9 +126,9 @@ def colormap_to_rgba(colormap):
     Convert color ma to rgba colors.
     """
     if 'continuous' in colormap:
-        return {k: hex_to_rgba(v) if isinstance(v, (six.string_types, int)) and k in ['from', 'to', 'over'] else v for k, v in colormap.items()}
+        return {k: hex_to_rgba(v) if isinstance(v, (str, int)) and k in ['from', 'to', 'over'] else v for k, v in colormap.items()}
     else:
-        return {k: hex_to_rgba(v) if isinstance(v, (six.string_types, int)) else v for k, v in colormap.items()}
+        return {k: hex_to_rgba(v) if isinstance(v, (str, int)) else v for k, v in colormap.items()}
 
 
 def pixel_value_from_point(raster, point, band=0):

@@ -8,7 +8,6 @@ import numpy
 from pyparsing import Forward, Keyword, Literal, Optional, Regex, Word, ZeroOrMore, alphanums, delimitedList, oneOf
 
 from django.contrib.gis.gdal import GDALRaster
-from django.utils import six
 from raster.algebra import const
 from raster.exceptions import RasterAlgebraException
 
@@ -121,10 +120,10 @@ class FormulaParser(object):
             op2 = self.evaluate_stack(stack)
             op1 = self.evaluate_stack(stack)
             # Handle null case
-            if isinstance(op1, six.string_types) and op1 == const.NULL:
+            if isinstance(op1, str) and op1 == const.NULL:
                 op2 = self.get_mask(op2, op)
                 op1 = True
-            elif isinstance(op2, six.string_types) and op2 == const.NULL:
+            elif isinstance(op2, str) and op2 == const.NULL:
                 op1 = self.get_mask(op1, op)
                 op2 = True
             return const.OPERATOR_MAP[op](op1, op2)

@@ -6,6 +6,8 @@ import os
 import tempfile
 import uuid
 import zipfile
+from urllib.parse import urlparse
+from urllib.request import urlretrieve
 
 import boto3
 import numpy
@@ -15,8 +17,6 @@ from django.contrib.gis.gdal import GDALRaster, OGRGeometry
 from django.contrib.gis.gdal.error import GDALException
 from django.core.files import File
 from django.dispatch import Signal
-from django.utils.six.moves.urllib.parse import urlparse
-from django.utils.six.moves.urllib.request import urlretrieve
 from raster.exceptions import RasterException
 from raster.models import RasterLayer, RasterLayerBandMetadata, RasterLayerReprojected, RasterTile
 from raster.tiles import utils
