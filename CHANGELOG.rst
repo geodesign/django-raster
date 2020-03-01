@@ -1,6 +1,15 @@
 django-raster change log
 ========================
 
+0.8
+---
+* Django 3.0 compatability.
+
+0.7
+---
+* Fixed array field default.
+* Fixed tms endpoint for tif format requests of empty tiles.
+
 0.6
 ---
 * BREAKING CHANGE: Dropped support for Python 2.
