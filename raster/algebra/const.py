@@ -1,7 +1,6 @@
 """
 Define all mappings between operators and string representations.
 """
-from __future__ import unicode_literals
 
 import numpy
 

@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
 import django.contrib.gis.db.models.fields
 from django.db import migrations
 

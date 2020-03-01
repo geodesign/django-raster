@@ -1,5 +1,3 @@
-from __future__ import unicode_literals
-
 import numpy
 
 from django.test import TestCase

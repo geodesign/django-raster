@@ -1,5 +1,3 @@
-from __future__ import unicode_literals
-
 import os
 
 from django.contrib.gis.gdal import GDAL_VERSION, GDALRaster

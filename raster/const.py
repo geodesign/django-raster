@@ -1,5 +1,3 @@
-from __future__ import unicode_literals
-
 from PIL import ImageEnhance
 
 IMG_ENHANCEMENTS = {

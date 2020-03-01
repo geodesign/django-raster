@@ -1,5 +1,3 @@
-from __future__ import unicode_literals
-
 import json
 import math
 from operator import itemgetter

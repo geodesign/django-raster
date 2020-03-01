@@ -1,5 +1,3 @@
-from __future__ import unicode_literals
-
 import keyword
 import operator
 from functools import reduce
