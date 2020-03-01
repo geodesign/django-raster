@@ -1,5 +1,3 @@
-from __future__ import unicode_literals
-
 from raster.utils import colormap_to_rgba
 
 

@@ -1,5 +1,3 @@
-from __future__ import unicode_literals
-
 from django.contrib.gis.gdal import GDALRaster, OGRGeometry
 from django.contrib.gis.geos import Point
 from django.test import TestCase

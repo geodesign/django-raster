@@ -1,8 +1,6 @@
 """
 Define all mappings between operators and string representations.
 """
-from __future__ import unicode_literals
-
 import numpy
 
 ALGEBRA_PIXEL_TYPE_GDAL = 7

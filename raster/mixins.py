@@ -1,5 +1,3 @@
-from __future__ import unicode_literals
-
 from django.contrib.gis.geos import GEOSGeometry
 from django.db import connection
 from raster.tiles.const import WEB_MERCATOR_SRID

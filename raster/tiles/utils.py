@@ -1,8 +1,6 @@
 """
 Everything required to create TMS tiles.
 """
-from __future__ import unicode_literals
-
 from django.conf import settings
 from raster.tiles.const import (
     GLOBAL_MAX_ZOOM_LEVEL, QUADRANT_SIZE, WEB_MERCATOR_TILESHIFT, WEB_MERCATOR_TILESIZE, WEB_MERCATOR_WORLDSIZE

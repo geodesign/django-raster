@@ -1,5 +1,3 @@
-from __future__ import unicode_literals
-
 import os
 import sys
 from unittest import skipIf, skipUnless

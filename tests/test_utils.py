@@ -1,5 +1,3 @@
-from __future__ import unicode_literals
-
 import numpy
 
 from django.contrib.gis.gdal import GDALRaster, OGRGeometry
