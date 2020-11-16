@@ -17,3 +17,6 @@ docs/_build
 
 # Coverage output
 .coverage
+
+.idea/
+.idea

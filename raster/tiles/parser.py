@@ -201,19 +201,23 @@ class RasterLayerParser(object):
 
         # Compress reprojected raster file and store it
         if self.rasterlayer.store_reprojected:
-            with tempfile.NamedTemporaryFile(dir=self.tmpdir, suffix='.zip') as dest:
-                with zipfile.ZipFile(dest.name, 'w', allowZip64=True) as dest_zip:
-                    dest_zip.write(
-                        filename=self.dataset.name,
-                        arcname=os.path.basename(self.dataset.name),
-                        compress_type=zipfile.ZIP_DEFLATED,
-                    )
-                # Store zip file in reprojected raster model
-                self.rasterlayer.reprojected.rasterfile = File(
-                    open(dest.name, 'rb'),
-                    name=os.path.basename(dest_zip.filename)
-                )
-                self.rasterlayer.reprojected.save()
+            dest = tempfile.NamedTemporaryFile(dir=self.tmpdir, suffix='.zip', delete=False)
+            dest.close()
+            dest_zip = zipfile.ZipFile(dest.name, 'w', allowZip64=True)
+            dest_zip.write(
+                filename=self.dataset.name,
+                arcname=os.path.basename(self.dataset.name),
+                compress_type=zipfile.ZIP_DEFLATED,
+            )
+            dest_zip.close()
+            # Store zip file in reprojected raster model
+            self.rasterlayer.reprojected.rasterfile = File(
+                open(dest.name, 'rb'),
+                name=os.path.basename(dest_zip.filename)
+            )
+            self.rasterlayer.reprojected.save()
+            # Remove tmp file
+            os.unlink(dest.name)
 
         self.log('Finished transforming raster.')
 
@@ -408,7 +412,7 @@ class RasterLayerParser(object):
             RasterTile.objects.bulk_create(batch)
 
         # Remove quadrant raster tempfile.
-        os.remove(dest_file_name)
+        # os.remove(dest_file_name)
 
     def push_histogram(self, data):
         """
