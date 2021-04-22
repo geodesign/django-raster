@@ -412,7 +412,8 @@ class RasterLayerParser(object):
             RasterTile.objects.bulk_create(batch)
 
         # Remove quadrant raster tempfile.
-        # os.remove(dest_file_name)
+        snapped_dataset = None
+        os.remove(dest_file_name)
 
     def push_histogram(self, data):
         """
