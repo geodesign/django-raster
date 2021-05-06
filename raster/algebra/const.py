@@ -4,7 +4,7 @@ Define all mappings between operators and string representations.
 import numpy
 
 ALGEBRA_PIXEL_TYPE_GDAL = 7
-ALGEBRA_PIXEL_TYPE_NUMPY = "Float64"
+ALGEBRA_PIXEL_TYPE_NUMPY = "float64"
 
 LPAR = "("
 RPAR = ")"

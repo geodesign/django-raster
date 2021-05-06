@@ -432,7 +432,7 @@ class AlgebraView(RasterView):
 
 class LegendView(RasterView):
 
-    def get(self, request, legend_id):
+    def get(self, request, legend_id=None):
         """
         Returns the legend for this layer as a json string. The legend is a list of
         legend entries with the attributes "name", "expression" and "color".
