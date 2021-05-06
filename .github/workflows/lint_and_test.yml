@@ -1,0 +1,61 @@
+name: Automated testing for django-raster
+
+on: [push]
+
+jobs:
+  flake8:
+    name: Run the flake8 linter
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout package
+        uses: actions/checkout@v2
+        with:
+          path: .
+      - name: Install flake8
+        run: pip install flake8
+      - name: Lint with Flake8
+        run: flake8 .
+
+  isort:
+    name: Run the isort linter
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout package
+        uses: actions/checkout@v2
+        with:
+          path: .
+      - name: Install isort
+        run: pip install isort
+      - name: Lint with isort
+        run: isort --check --diff .
+
+  test:
+    name: Run django unit tests suite
+    runs-on: ubuntu-18.04
+    services:
+      postgres:
+        image: postgis/postgis:10-2.5
+        env:
+          # must specify password for PG Docker container image, see: https://registry.hub.docker.com/_/postgres?tab=description&page=1&name=10
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: raster_test
+        ports:
+          - 5432:5432
+        # needed because the postgres container does not provide a healthcheck
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - name: Checkout package
+        uses: actions/checkout@v2
+        with:
+          path: .
+      - name: Install dependencies
+        run: |
+          sudo apt-get install -y gdal-bin python3-pip
+          pip3 install --upgrade importlib-metadata
+          pip3 install celery==4.3.1 django numpy Pillow django-colorful pyparsing boto3 psycopg2-binary mock
+      - name: Run tests
+        run: PYTHONPATH=$PYTHONPATH:$PWD django-admin test ./tests
+        env:
+          DB_PASSWORD: password
+          DB_NAME: raster_test
+          DJANGO_SETTINGS_MODULE: tests.testproj.settings

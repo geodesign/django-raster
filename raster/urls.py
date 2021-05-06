@@ -24,11 +24,16 @@ urlpatterns = [
         name='pixel',
     ),
 
-    # Raster legend endpoint
+    # Raster legend endpoints.
     url(
-        r'^legend(?:/(?P<legend_id>[^/]+))?/$',
+        r'^legend$',
         LegendView.as_view(),
         name='legend',
+    ),
+    url(
+        r'^legend/(?P<legend_id>[^/]+)$',
+        LegendView.as_view(),
+        name='legend-detail',
     ),
 
     # Exporter endpoint

@@ -43,6 +43,7 @@ TEMPLATES = [
             'context_processors': [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'django.template.context_processors.request',
             ],
         },
     },
@@ -54,3 +55,5 @@ RASTER_USE_CELERY = True
 
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
+
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
