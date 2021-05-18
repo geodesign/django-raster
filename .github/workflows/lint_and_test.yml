@@ -50,7 +50,7 @@ jobs:
           path: .
       - name: Install dependencies
         run: |
-          sudo apt-get install -y gdal-bin python3-pip
+          sudo apt-get install -y gdal-bin python3-pip python3-setuptools
           pip3 install --upgrade importlib-metadata
           pip3 install celery==4.3.1 django numpy Pillow django-colorful pyparsing boto3 psycopg2-binary mock
       - name: Run tests
