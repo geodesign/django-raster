@@ -1,5 +1,5 @@
 from django.apps import AppConfig
 
 
-class BatchConfig(AppConfig):
+class RasterConfig(AppConfig):
     name = "raster"
