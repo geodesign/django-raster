@@ -11,7 +11,7 @@ with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
 
 setup(
     name='django-raster',
-    version='0.8.1',
+    version='1.0rc1',
     url='https://github.com/geodesign/django-raster',
     author='Daniel Wiesmann',
     author_email='daniel@wiesmann.pt',
