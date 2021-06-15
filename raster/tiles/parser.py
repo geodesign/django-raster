@@ -403,13 +403,9 @@ class RasterLayerParser(object):
                 )
 
                 # Commit batch to database and reset it
-                if len(batch) == self.batch_step_size:
-                    RasterTile.objects.bulk_create(batch)
+                if len(batch):
+                    RasterTile.objects.bulk_create(batch, self.batch_step_size)
                     batch = []
-
-        # Commit remaining objects
-        if len(batch):
-            RasterTile.objects.bulk_create(batch)
 
         # Remove quadrant raster tempfile.
         snapped_dataset = None
