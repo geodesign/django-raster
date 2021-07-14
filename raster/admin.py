@@ -29,10 +29,6 @@ class RasterLayerMetadataInline(admin.TabularInline):
     def has_add_permission(self, request, obj=None):
         return False
 
-    def has_delete_permission(self, request, obj=None):
-        return False
-
-
 class RasterLayerParseStatusInline(admin.TabularInline):
     model = RasterLayerParseStatus
     extra = 0
@@ -40,10 +36,6 @@ class RasterLayerParseStatusInline(admin.TabularInline):
 
     def has_add_permission(self, request, obj=None):
         return False
-
-    def has_delete_permission(self, request, obj=None):
-        return False
-
 
 class RasterLayerBandMetadataInline(admin.TabularInline):
     model = RasterLayerBandMetadata
@@ -55,10 +47,6 @@ class RasterLayerBandMetadataInline(admin.TabularInline):
 
     def has_add_permission(self, request, obj=None):
         return False
-
-    def has_delete_permission(self, request, obj=None):
-        return False
-
 
 class RasterLayerReprojectedInline(admin.TabularInline):
     model = RasterLayerReprojected
@@ -141,9 +129,6 @@ class RasterLayerMetadataModelAdmin(admin.ModelAdmin):
     def has_add_permission(self, request, obj=None):
         return False
 
-    def has_delete_permission(self, request, obj=None):
-        return False
-
 
 class RasterTileModelAdmin(admin.ModelAdmin):
     readonly_fields = (
@@ -151,9 +136,6 @@ class RasterTileModelAdmin(admin.ModelAdmin):
     )
 
     def has_add_permission(self, request, obj=None):
-        return False
-
-    def has_delete_permission(self, request, obj=None):
         return False
 
 
