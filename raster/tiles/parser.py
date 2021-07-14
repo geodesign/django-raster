@@ -136,6 +136,7 @@ class RasterLayerParser(object):
             self.dataset = None
             for match in matches:
                 try:
+                     # change to vsis3 or vsimem
                     self.dataset = GDALRaster(match)
                     break
                 except GDALException:
@@ -145,6 +146,7 @@ class RasterLayerParser(object):
             if not self.dataset:
                 raise RasterException('Could not open rasterfile.')
         else:
+            # change to vsis3 or vsimem
             self.dataset = GDALRaster(filepath)
 
         # Override srid if provided
@@ -341,77 +343,80 @@ class RasterLayerParser(object):
 
         # Compute quadrant bounds and create destination file
         bounds = utils.tile_bounds(indexrange[0], indexrange[1], zoom)
+        dest_file_name = os.path.join('/vsimem/', '{}.tif'.format(uuid.uuid4()))
 
-        try:
-            dest_file_name = os.path.join(self.tmpdir, '{}.tif'.format(uuid.uuid4()))
+        # Snap dataset to the quadrant
+        snapped_dataset = self.dataset.warp({
+            'name': dest_file_name,
+            'origin': [bounds[0], bounds[3]],
+            'scale': [tilescale, -tilescale],
+            'width': (indexrange[2] - indexrange[0] + 1) * self.tilesize,
+            'height': (indexrange[3] - indexrange[1] + 1) * self.tilesize,
+        })
 
-            # Snap dataset to the quadrant
-            snapped_dataset = self.dataset.warp({
-                'name': dest_file_name,
-                'origin': [bounds[0], bounds[3]],
-                'scale': [tilescale, -tilescale],
-                'width': (indexrange[2] - indexrange[0] + 1) * self.tilesize,
-                'height': (indexrange[3] - indexrange[1] + 1) * self.tilesize,
-            })
+        # Create all tiles in this quadrant in batches
+        batch = []
+        for tilex in range(indexrange[0], indexrange[2] + 1):
+            for tiley in range(indexrange[1], indexrange[3] + 1):
+                # Calculate raster tile origin
+                bounds = utils.tile_bounds(tilex, tiley, zoom)
 
-            # Create all tiles in this quadrant in batches
-            batch = []
-            for tilex in range(indexrange[0], indexrange[2] + 1):
-                for tiley in range(indexrange[1], indexrange[3] + 1):
-                    # Calculate raster tile origin
-                    bounds = utils.tile_bounds(tilex, tiley, zoom)
+                # Construct band data arrays
+                pixeloffset = (
+                    (tilex - indexrange[0]) * self.tilesize,
+                    (tiley - indexrange[1]) * self.tilesize
+                )
 
-                    # Construct band data arrays
-                    pixeloffset = (
-                        (tilex - indexrange[0]) * self.tilesize,
-                        (tiley - indexrange[1]) * self.tilesize
+                band_data = [
+                    {
+                        'data': band.data(offset=pixeloffset, size=(self.tilesize, self.tilesize)),
+                        'nodata_value': band.nodata_value
+                    } for band in snapped_dataset.bands
+                ]
+
+                # Ignore tile if its only nodata.
+                if all([numpy.all(dat['data'] == dat['nodata_value']) for dat in band_data]):
+                    continue
+
+                # Add tile data to histogram
+                if zoom == self.max_zoom:
+                    self.push_histogram(band_data)
+
+                # Warp source raster into this tile (in memory)
+                dest = GDALRaster({
+                    'width': self.tilesize,
+                    'height': self.tilesize,
+                    'origin': [bounds[0], bounds[3]],
+                    'scale': [tilescale, -tilescale],
+                    'srid': WEB_MERCATOR_SRID,
+                    'datatype': snapped_dataset.bands[0].datatype(),
+                    'bands': band_data,
+                })
+
+                # Store tile in batch array
+                batch.append(
+                    RasterTile(
+                        rast=dest,
+                        rasterlayer_id=self.rasterlayer.id,
+                        tilex=tilex,
+                        tiley=tiley,
+                        tilez=zoom
                     )
+                )
 
-                    band_data = [
-                        {
-                            'data': band.data(offset=pixeloffset, size=(self.tilesize, self.tilesize)),
-                            'nodata_value': band.nodata_value
-                        } for band in snapped_dataset.bands
-                    ]
+                # Commit batch to database and reset it
+                # if len(batch) == self.batch_step_size:
+                #     RasterTile.objects.bulk_create(batch)
+                #     batch = []
 
-                    # Ignore tile if its only nodata.
-                    if all([numpy.all(dat['data'] == dat['nodata_value']) for dat in band_data]):
-                        continue
+            if len(batch):
+                RasterTile.objects.bulk_create(batch, self.batch_step_size)
+                # print("{0}, batch# written: {1} for zoom: {2}".format(self.rasterlayer.id, len(batch), zoom))
+                batch = [] 
 
-                    # Add tile data to histogram
-                    if zoom == self.max_zoom:
-                        self.push_histogram(band_data)
-
-                    # Warp source raster into this tile (in memory)
-                    dest = GDALRaster({
-                        'width': self.tilesize,
-                        'height': self.tilesize,
-                        'origin': [bounds[0], bounds[3]],
-                        'scale': [tilescale, -tilescale],
-                        'srid': WEB_MERCATOR_SRID,
-                        'datatype': snapped_dataset.bands[0].datatype(),
-                        'bands': band_data,
-                    })
-
-                    # Store tile in batch array
-                    batch.append(
-                        RasterTile(
-                            rast=dest,
-                            rasterlayer_id=self.rasterlayer.id,
-                            tilex=tilex,
-                            tiley=tiley,
-                            tilez=zoom
-                        )
-                    )
-
-                    # Commit batch to database and reset it
-                    if len(batch):
-                        RasterTile.objects.bulk_create(batch, self.batch_step_size)
-                        batch = []
-        finally:
-            # Remove quadrant raster tempfile.
-            snapped_dataset = None
-            os.remove(dest_file_name)
+        # Remove quadrant raster tempfile.
+        snapped_dataset = None
+        # os.remove(dest_file_name)
 
     def push_histogram(self, data):
         """
@@ -440,7 +445,16 @@ class RasterLayerParser(object):
             'Successfully finished parsing raster',
             status=self.rasterlayer.parsestatus.FINISHED
         )
+
+        if self.rasterlayer.rasterfile.name:
+            tmpFile = os.path.join("/tmp/", os.path.basename(self.rasterlayer.rasterfile.name))
+            if tmpFile:
+                if os.path.exists(tmpFile):
+                    print("tmpfile to delete: " + tmpFile)
+                    os.remove(tmpFile)
+
         rasterlayers_parser_ended.send(sender=self.rasterlayer.__class__, instance=self.rasterlayer)
+    
 
     def compute_max_zoom(self):
         """
