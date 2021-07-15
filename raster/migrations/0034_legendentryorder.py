@@ -13,7 +13,8 @@ def move_legend_entries_to_through_model(apps, schema_editor):
     """
     Legend = apps.get_model("raster", "Legend")
     LegendEntryOrder = apps.get_model("raster", "LegendEntryOrder")
-    for leg in Legend.objects.all():
+    db_alias = schema_editor.connection.alias
+    for leg in Legend.objects.using(db_alias).all():
         for entry in leg.entries.all():
             # Respect unique contraint.
             if LegendEntryOrder.objects.filter(legend=leg, legendentry=entry).exists():
@@ -43,7 +44,8 @@ def move_legend_entries_from_through_model_to_normal_m2m(apps, schema_editor):
     """
     Legend = apps.get_model("raster", "Legend")
     LegendEntryOrder = apps.get_model("raster", "LegendEntryOrder")
-    for leg in Legend.objects.all():
+    db_alias = schema_editor.connection.alias
+    for leg in Legend.objects.using(db_alias).all():
         for enor in LegendEntryOrder.objects.filter(legend=leg):
             leg.entries.add(enor.legendentry)
 

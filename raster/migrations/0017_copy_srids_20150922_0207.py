@@ -9,7 +9,8 @@ def move_srid_from_layer_to_metadata_forward(apps, schema_editor):
     """
     RasterLayer = apps.get_model("raster", "RasterLayer")
     RasterLayerMetadata = apps.get_model("raster", "RasterLayerMetadata")
-    for lyr in RasterLayer.objects.all():
+    db_alias = schema_editor.connection.alias
+    for lyr in RasterLayer.objects.using(db_alias).all():
         meta, created = RasterLayerMetadata.objects.get_or_create(rasterlayer=lyr)
         meta.srid = lyr.srid
         meta.save()
@@ -20,7 +21,8 @@ def move_srid_from_layer_to_metadata_backward(apps, schema_editor):
     Copy the srids back to the raster layers.
     """
     RasterLayer = apps.get_model("raster", "RasterLayer")
-    for lyr in RasterLayer.objects.all():
+    db_alias = schema_editor.connection.alias
+    for lyr in RasterLayer.objects.using(db_alias).all():
         if hasattr(lyr, 'rasterlayermetadata'):
             lyr.srid = lyr.rasterlayermetadata.srid
             lyr.save()

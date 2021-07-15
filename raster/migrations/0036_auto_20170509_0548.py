@@ -7,8 +7,9 @@ def set_legend_on_entry(apps, schema_editor):
     # Get models.
     Legend = apps.get_model("raster", "Legend")
     LegendEntryOrder = apps.get_model("raster", "LegendEntryOrder")
+    db_alias = schema_editor.connection.alias
     # Loop through legend and entries.
-    for legend in Legend.objects.all():
+    for legend in Legend.objects.using(db_alias).all():
         for entry in legend.entries.all():
             # Set legend direct foreign key.
             entry.legend = legend
