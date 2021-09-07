@@ -127,7 +127,7 @@ class RasterLayerModelAdmin(admin.ModelAdmin):
 
         # Before posting, prepare empty action form
         if not form:
-            form = FilenameActionForm(initial={'_selected_action': request.POST.getlist(admin.ACTION_CHECKBOX_NAME)})
+            form = FilenameActionForm(initial={'_selected_action': request.POST.getlist(admin.helpers.ACTION_CHECKBOX_NAME)})
 
         return render(request, 'raster/updatepath.html', {'items': queryset, 'form': form, 'title': u'Update Path'})
 
