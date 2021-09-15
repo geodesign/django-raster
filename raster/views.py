@@ -86,18 +86,18 @@ class RasterView(View):
                 'from': (0, 0, 0),
                 'to': (255, 255, 255),
             }
-        else:
-            # Add layer level value range to continuous colormaps if it was
-            # not provided manually.
-            if 'continuous' in colormap and 'range' not in colormap:
-                meta = RasterLayerBandMetadata.objects.filter(rasterlayer_id=self.kwargs.get('layer')).first()
-                if meta:
-                    colormap['range'] = (meta.min, meta.max)
 
-            # Filter by custom entries if requested
-            if colormap and 'entries' in self.request.GET:
-                entries = self.request.GET['entries'].split(',')
-                colormap = {k: v for (k, v) in colormap.items() if str(k) in entries}
+        # Add layer level value range to continuous colormaps if it was
+        # not provided manually.
+        if 'continuous' in colormap and 'range' not in colormap:
+            meta = RasterLayerBandMetadata.objects.filter(rasterlayer_id=self.kwargs.get('layer')).first()
+            if meta:
+                colormap['range'] = (meta.min, meta.max)
+
+        # Filter by custom entries if requested
+        if colormap and 'entries' in self.request.GET:
+            entries = self.request.GET['entries'].split(',')
+            colormap = {k: v for (k, v) in colormap.items() if str(k) in entries}
 
         return colormap
 
