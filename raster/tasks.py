@@ -1,14 +1,15 @@
 import shutil
 import traceback
 
-from celery import group, shared_task
+from ceom.celery import app
+from celery import group
 
 from django.conf import settings
 from raster.tiles.const import GLOBAL_MAX_ZOOM_LEVEL, MIN_ZOOMLEVEL_TASK_PARALLEL
 from raster.tiles.parser import RasterLayerParser
 
 
-@shared_task
+@app.task()
 def create_tiles(rasterlayer_id, zoom, extract_metadata=False):
     """
     Create all tiles for a raster layer at the input zoom level.
@@ -51,7 +52,7 @@ def create_tiles(rasterlayer_id, zoom, extract_metadata=False):
             shutil.rmtree(tmpdir)
 
 
-@shared_task
+@app.task
 def clear_tiles(rasterlayer_id):
     """
     Drop all tiles of a rasterlayer.
@@ -60,7 +61,7 @@ def clear_tiles(rasterlayer_id):
     parser.drop_all_tiles()
 
 
-@shared_task
+@app.task
 def send_success_signal(rasterlayer_id):
     """
     Drop empty tiles of a raster layer and send parse succes signal.
@@ -69,7 +70,7 @@ def send_success_signal(rasterlayer_id):
     parser.send_success_signal()
 
 
-@shared_task
+@app.task
 def all_in_one(rasterlayer_id, zoom_range):
     """
     Parses raster in a single task.

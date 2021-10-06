@@ -4,7 +4,7 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import render
 
 from .models import (
-    Legend, LegendEntry, LegendSemantics, RasterLayer, RasterLayerBandMetadata, RasterLayerMetadata,
+    Legend, LegendEntry, LegendSemantics, RasterProduct, RasterLayer, RasterLayerBandMetadata, RasterLayerMetadata,
     RasterLayerParseStatus, RasterLayerReprojected, RasterTile
 )
 
@@ -70,6 +70,8 @@ class RasterLayerReprojectedInline(admin.TabularInline):
     def has_add_permission(self, request, obj=None):
         return False
 
+class RasterProductModelAdmin(admin.ModelAdmin):
+    list_display = ('name',)
 
 class RasterLayerModelAdmin(admin.ModelAdmin):
     """
@@ -78,7 +80,7 @@ class RasterLayerModelAdmin(admin.ModelAdmin):
     raster objects through this action. This might be useful for large raster
     files.
     """
-    actions = ['reparse_rasters', 'manually_update_filepath']
+    actions = ['reparse_rasters']
     list_filter = ('datatype', 'parsestatus__status')
     search_fields = ('name', 'rasterfile')
     inlines = (
@@ -98,39 +100,6 @@ class RasterLayerModelAdmin(admin.ModelAdmin):
             rasterlayer.save()
         msg = 'Parsing Rasters, check parse logs for progress'
         self.message_user(request, msg)
-
-    def manually_update_filepath(self, request, queryset):
-        """
-        Admin action to change filepath without uploading new file.
-        """
-        form = None
-        layer = queryset[0]
-
-        # Check if layer already has a file specified
-        if layer.rasterfile:
-            self.message_user(
-                request,
-                "This layer already has a file specified. Remove file from layer before specifying new path.",
-                level=messages.ERROR
-            )
-            return
-
-        # After posting, set the new name to file field
-        if 'apply' in request.POST:
-            form = FilenameActionForm(request.POST)
-            if form.is_valid():
-                path = form.cleaned_data['path']
-                layer.rasterfile.name = path
-                layer.save()
-                self.message_user(request, "Successfully updated path.")
-                return HttpResponseRedirect(request.get_full_path())
-
-        # Before posting, prepare empty action form
-        if not form:
-            form = FilenameActionForm(initial={'_selected_action': request.POST.getlist(admin.helpers.ACTION_CHECKBOX_NAME)})
-
-        return render(request, 'raster/updatepath.html', {'items': queryset, 'form': form, 'title': u'Update Path'})
-
 
 class RasterLayerMetadataModelAdmin(admin.ModelAdmin):
     readonly_fields = (
@@ -169,6 +138,7 @@ class LegendAdmin(admin.ModelAdmin):
 
 
 admin.site.register(LegendSemantics)
+admin.site.register(RasterProduct, RasterProductModelAdmin)
 admin.site.register(RasterLayer, RasterLayerModelAdmin)
 admin.site.register(RasterTile, RasterTileModelAdmin)
 admin.site.register(RasterLayerMetadata, RasterLayerMetadataModelAdmin)
