@@ -22,7 +22,7 @@ class LegendSemantics(models.Model):
     """
     name = models.CharField(max_length=50)
     description = models.TextField(null=True, blank=True)
-    keyword = models.TextField(null=True, blank=True, max_length=100)
+    keyword = models.TextField(null=True, blank=True, max_length=200)
 
     def __str__(self):
         return self.name
@@ -38,7 +38,7 @@ class LegendEntry(models.Model):
         help_text='Use a number or a valid numpy logical expression where x is the'
                   'pixel value. For instance: "(-3.0 < x) & (x <= 1)" or "x <= 1".')
     color = RGBColorField()
-    code = models.CharField(max_length=100, blank=True, default='')
+    code = models.CharField(max_length=200, blank=True, default='')
 
     def __str__(self):
         return '{}, {}, {}'.format(self.semantics.name, self.expression, self.color)
@@ -107,6 +107,14 @@ def update_dependent_legends_on_semantics_change(sender, instance, **kwargs):
         legend.save()
 
 
+class RasterProduct(models.Model):
+    name = models.CharField(max_length=100, blank=True, null=True)
+    description = models.TextField(blank=True, null=True)
+    location = models.CharField(max_length=200)
+
+    def __str__(self):
+        return self.name
+
 class RasterLayer(models.Model, ValueCountMixin):
     """
     Source data model for raster layers
@@ -123,14 +131,16 @@ class RasterLayer(models.Model, ValueCountMixin):
         (RANK_ORDERED, 'Rank Ordered'),
     )
 
-    name = models.CharField(max_length=100, blank=True, null=True)
-    description = models.TextField(blank=True, null=True)
+    product = models.ForeignKey(RasterProduct, on_delete=models.CASCADE)
+    year = models.IntegerField(
+        help_text="The 4 digit year the data is from."
+    )
+    day = models.IntegerField(
+        help_text="A value from 0 to 364 indicating what day of the year the data is from."
+    )
     datatype = models.CharField(max_length=2, choices=DATATYPES, default='co')
-    rasterfile = models.FileField(upload_to='rasters', null=True, blank=True)
-    source_url = models.CharField(default='', blank=True, max_length=2500,
-        help_text='External url to get the raster file from. If a value is set,'
-                  'the rasterfile field will be ignored.')
-    nodata = models.CharField(max_length=100, null=True, blank=True,
+    location = models.CharField(max_length=200)
+    nodata = models.CharField(max_length=200, null=True, blank=True,
         help_text='Leave blank to keep the internal band nodata values. If a nodata '
                   'value is specified here, it will be used for all bands of this raster.')
     srid = models.IntegerField(null=True, blank=True,
@@ -154,8 +164,11 @@ class RasterLayer(models.Model, ValueCountMixin):
     legend = models.ForeignKey(Legend, blank=True, null=True, on_delete=models.CASCADE)
     modified = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        unique_together = ('product', 'year', 'day')
+
     def __str__(self):
-        return '{} {} (type: {})'.format(self.id, self.name, self.datatype)
+        return '{} {} (type: {})'.format(self.product.name, self.year, self.day)
 
     @property
     def discrete(self):

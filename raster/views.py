@@ -74,7 +74,8 @@ class RasterView(View):
 
         elif 'layer' in self.kwargs:
             # Get legend for the input layer.
-            legend = Legend.objects.filter(rasterlayer=self.kwargs.get('layer')).first()
+            layer = RasterLayer.objects.get(name__icontains=self.kwargs.get('layer'))
+            legend = Legend.objects.filter(rasterlayer=layer).first()
 
             if legend and hasattr(legend, 'colormap'):
                 colormap = legend.colormap
@@ -200,7 +201,7 @@ class AlgebraView(RasterView):
             try:
                 layer_id = int(data)
             except ValueError:
-                query = Q(rasterfile__contains='rasters/' + data)
+                query = Q(name__icontains=data)
                 layer_id = get_object_or_404(RasterLayer, query).id
             # For TMS tile request, get the layer id from the url.
             self._layer_ids = {'x': layer_id}
