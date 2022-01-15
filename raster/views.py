@@ -412,7 +412,7 @@ class AlgebraView(RasterView):
             mode = 'RGBA'
             reshape = 4
             # Create the alpha channel.
-            alpha = 255 * (red > -0.01 and ) * (blue != 0) * (green != 0)
+            alpha = 255 * (red > 0) * (blue > 0) * (green > 0)
             img_array = numpy.array((red.ravel(), green.ravel(), blue.ravel(), alpha.ravel()))
         else:
             mode = 'RGB'
