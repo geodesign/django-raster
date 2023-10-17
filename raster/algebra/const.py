@@ -109,7 +109,7 @@ FUNCTION_MAP = {
     "log": numpy.log,
     "exp": numpy.exp,
     "abs": numpy.abs,
-    "int": numpy.int,
+    "int": numpy.int_,
     "round": numpy.round,
     "sign": numpy.sign,
     "min": numpy.min,
