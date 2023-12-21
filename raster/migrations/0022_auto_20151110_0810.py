@@ -8,7 +8,8 @@ def move_parse_log_to_parse_status_objects_forward(apps, schema_editor):
     """
     RasterLayer = apps.get_model("raster", "RasterLayer")
     RasterLayerParseStatus = apps.get_model("raster", "RasterLayerParseStatus")
-    for lyr in RasterLayer.objects.all():
+    db_alias = schema_editor.connection.alias
+    for lyr in RasterLayer.objects.using(db_alias).all():
         status, created = RasterLayerParseStatus.objects.get_or_create(rasterlayer=lyr)
         status.log = lyr.parse_log
         if 'Successfully finished parsing raster' in lyr.parse_log:
@@ -23,7 +24,8 @@ def move_parse_log_to_parse_status_objects_backward(apps, schema_editor):
     Copy the srids back to the raster layers.
     """
     RasterLayer = apps.get_model("raster", "RasterLayer")
-    for lyr in RasterLayer.objects.all():
+    db_alias = schema_editor.connection.alias
+    for lyr in RasterLayer.objects.using(db_alias).all():
         if hasattr(lyr, 'parsestatus'):
             lyr.parse_log = lyr.parsestatus.log
             lyr.save()
